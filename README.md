@@ -6,6 +6,15 @@ Telefonda çalışan, neon/"2100" görünümlü kripto analiz ve işlem terminal
 
 > ⚠️ **Yatırım tavsiyesi değildir. Sinyal garanti değildir.** Elle her işlem onay penceresinde **ONAYLA**'ya dokunduğunda gider. **OTO AL-SAT varsayılan olarak KAPALI**dır; açarsan bot yalnızca BOT CÜZDANI'ndaki parayla, koyduğun limitler içinde onay sormadan işlem yapar. pump.fun tokenlarının büyük çoğunluğu kısa sürede değerini neredeyse tamamen kaybeder; vadeli işlemler kaldıraçlıdır.
 
+## v7.11 · ⏱ SCALP 2-5 DK (her mum LONG / SHORT / BEKLE)
+
+Yeni sekme: **⏱ SCALP**. Seçilen coin için her 1 dakikalık mumda LONG / SHORT / BEKLE sinyali, güven %, giriş / limit giriş / ATR stop / TP1 (1R) / TP2 (2R), mum kapanış sayacı ve 2–5 dk çıkış sayacı.
+- Veri: Binance herkese açık (anahtarsız) — USDⓈ-M vadeli 1m/3m/5m mumlar, canlı kline (`/market`) + derinlik (`/public`) WebSocket, funding, OI 5dk, L/S oranı, taker alış/satış. Vadelide olmayan coin → spot (api.binance.com → data-api.binance.vision). WebSocket susarsa 3 sn REST yoklama.
+- 26 oy: EMA 9/21/50, VWAP, RSI, RSI uyumsuzluk, Stoch RSI, MACD, Bollinger, ATR (filtre), SuperTrend, ADX/DMI, Ichimoku, Parabolic SAR, CCI, Williams %R, MFI, OBV, CVD/hacim deltası, hacim patlaması, Heikin Ashi, mum formasyonları, emir defteri dengesizliği, funding, OI değişimi, L/S oranı, taker 5dk, çoklu TF 1m/3m/5m.
+- BEKLE: uyum zayıfsa, ADX zayıfsa, 3m/5m ters yöndeyse, fiyat EMA21'den 1.5 ATR'den uzaksa (kovalama), RSI uçtaysa veya hareket ücretlere (~%0.10) göre çok küçükse.
+- Sinyal geçmişi (coin başına son 50 mum, bu cihazda) 2/3/5 dk sonra TP1 mi stop mu (aynı mumda ikisi → stop) → isabet %; ayrıca "geriye dönük test" yüklü mumlarda aynı kuralları tekrar çalıştırır.
+- **Yalnızca sinyal**: emir göndermez, API anahtarına / cüzdana dokunmaz. Olasılıksaldır, garanti değildir. Testler: `node tests/scalp.test.js`.
+
 ## v6 · MEME platformu (ana sayfa)
 
 Sekmeler: **MEME** (`#meme`) · **GROK** (`#grok`) · **VADELİ** (`#vadeli`, eski Binance analizi/grafik/işlem) · **CÜZDAN** (`#cuzdan`, BOT cüzdanı + günlük).
