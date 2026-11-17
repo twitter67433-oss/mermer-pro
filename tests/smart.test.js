@@ -26,4 +26,25 @@ ok("liq magnets: 10x long liq ≈ 90.4 below, short liq ≈ 109.6 above", lm.bel
 // walls + spoof
 const mk = (bw) => ({ bids: [["99.9", "1"], ["99.8", "1"], ["99.5", bw ? "500" : "1"], ["99", "1"], ["98.5", "1"]].concat(Array.from({ length: 40 }, (_, i) => [String(98 - i*0.01), "1"])), asks: [["100.1", "1"], ["100.2", "1"]].concat(Array.from({ length: 40 }, (_, i) => [String(100.3 + i*0.01), "1"])) });
 let m = SMT.walls(mk(true), null, 0).mem; m = SMT.walls(mk(true), m, 5000).mem; const w3 = SMT.walls(mk(false), m, 10000); ok("walls: big bid wall seen then vanished without price reaching it → spoof", w3.mem.spoof.length === 1 && w3.mem.spoof[0].side === 1);
+// v7.14 GENEL YÖN consensus
+{ const all = (d, rel) => Object.fromEntries(SMT.G_ALL.map(t => [t, { d, rel }]));
+  const up = SMT.consensus(all(1)); ok("consensus: all intervals up → GÜÇLÜ LONG, strength 100", up.label === "GÜÇLÜ LONG" && up.strength === 100 && up.dir === 1);
+  const dn = SMT.consensus(all(-0.5)); ok("consensus: all -0.5 → GÜÇLÜ SHORT", dn.label === "GÜÇLÜ SHORT");
+  const I = all(0.75); for (const t of SMT.G_SHORT) I[t] = { d: -1 }; const pb = SMT.consensus(I); ok("consensus: big up, short down → still LONG (higher TFs carry trend)", pb.dir === 1 && pb.short < 0, pb.label + " G=" + pb.G.toFixed(2));
+  const I2 = all(0); for (const t of SMT.G_SHORT) I2[t] = { d: 1 }; ok("consensus: only 1–5dk up → not GÜÇLÜ (short TFs only time it)", !SMT.consensus(I2).strong, SMT.consensus(I2).label);
+  ok("consensus: empty → NÖTR, finite", SMT.consensus({}).label === "NÖTR" && isFinite(SMT.consensus({}).G));
+  const good = SMT.relMul({ n: 300, acc: 0.6 }), bad = SMT.relMul({ n: 300, acc: 0.4 }), few = SMT.relMul({ n: 3, acc: 1 }); ok("reliability: good > 1 > bad, few samples shrink to ≈1", good > 1 && bad < 1 && Math.abs(few - 1) < 0.6, [good, bad, few].map(x => x.toFixed(2)).join("/"));
+  const a1 = SMT.action(up, { main: {}, px: 100, atr: 1, ema21: 99 }); ok("action: GÜÇLÜ + short aligned → GİR LONG with stop below, target above", a1.act === "GİR LONG" && a1.kind === "trend" && a1.stop < 100 && a1.tp > 100);
+  const a2 = SMT.action(pb, { main: {}, px: 100, atr: 1, ema21: 99 }); ok("action: big up, short down → BEKLE geri çekilmeyi bekle at EMA21", a2.act === "BEKLE" && a2.wait === "geri çekilmeyi bekle" && a2.entry === 99 && a2.stop < 99);
+  const a3 = SMT.action(SMT.consensus({}), { main: { state: "SIKIŞMA", plan: { longAbove: 101, shortBelow: 99 }, pUp: 0.6 }, px: 100, atr: 1 }); ok("action: squeeze → BEKLE kırılımı bekle with both levels", a3.wait === "kırılımı bekle" && a3.longAbove === 101);
+  const a4 = SMT.action(dn, { main: { state: "LONG", d: 1, plan: { entry: 100, stop: 99, tp: 101 } }, px: 100, atr: 1 }); ok("action: A+ LONG against strong SHORT big picture → not GİR", a4.act !== "GİR LONG");
+  const L = { "1m": "1dk", "3m": "3dk", "5m": "5dk", "1h": "1s", "4h": "4s", "1d": "1G" }, I3 = { ...I, "15m": { d: -1 }, "30m": { d: -1 } }, sm = SMT.summary(I3, SMT.consensus(I3), L, "15dk'da sıkışma var."), smx = SMT.summary(I, pb, L, null); ok("summary: ≤3 lines, big up + short pullback wording, no NaN/undefined", sm.length === 3 && /Büyük resim yukarı/.test(sm[0]) && /geri çekiliyor/.test(sm[1]) && !/NaN|undefined/.test(sm.join(" ")), sm.join(" | "));
+  ok("summary: mixed short/mid → 'karışık' with both sides", /karışık/.test(smx[1]) && smx.length === 2, smx.join(" | "));
+  ok("gate: needs ≥20 entries, ≥55 % winners, positive avg", !SMT.gGate({ T: { n: 30, win: 0.6, avg: -0.01 } }) && !SMT.gGate({ T: { n: 10, win: 0.9, avg: 1 } }) && SMT.gGate({ T: { n: 25, win: 0.56, avg: 0.05 } }));
+  // gReplay: no lookahead — appending future bars must not change results computed before them
+  const mkB = (n, ms, seed) => { let p = 100, r = seed; const out = []; for (let i = 0; i < n; i++){ r = (r*16807) % 2147483647; const o = p; p = p*(1 + ((r/2147483647) - 0.49)*0.01); out.push({ t: i*ms, o, h: Math.max(o, p)*1.002, l: Math.min(o, p)*0.998, c: p, v: 100, T: i*ms + ms - 1, tb: 50, x: true }); } return out; };
+  const K = { "15m": mkB(400, 9e5, 7), "1h": mkB(100, 36e5, 9), "4h": mkB(60, 144e5, 11) }, cut = K["15m"][300].T;
+  const cutK = Object.fromEntries(Object.entries(K).map(([t, b]) => [t, b.filter(x => x.T <= cut)]));
+  const gA = SMT.gReplay(K, "15m", { maxB: 0 }), gB = SMT.gReplay(cutK, "15m", { maxB: 0 }); const lt = gA.tr.filter(r => r.t <= K["15m"][299].t).length;
+  ok("gReplay: entries before the cut are identical with/without future data", lt === gB.tr.length, lt + " vs " + gB.tr.length); }
 console.log(f ? f + " FAIL" : "ALL PASS"); process.exit(f ? 1 : 0);

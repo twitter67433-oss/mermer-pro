@@ -1,4 +1,4 @@
-/* NEON//TERMINAL v7.13 — AKILLI SİNYAL engine (pure math, no DOM, no network). Exported as SMT (window.SMT / module.exports).
+/* NEON//TERMINAL v7.14 — AKILLI SİNYAL engine (+ GENEL YÖN consensus) (pure math, no DOM, no network). Exported as SMT (window.SMT / module.exports).
    • prep(): every indicator computed ONCE over the whole series; votesAt(i) only reads values at ≤ i (no lookahead).
    • walk(): walk-forward self-learning — each feature's hit rate is learned only from candles whose outcome was already known at that time
      (exponentially decayed so it adapts), features that do not predict get weight 0, ones that work backwards get a negative weight.
@@ -184,5 +184,68 @@ function walls(book, mem, now, opts = {}){ mem = mem || { w: new Map(), spoof: [
 /* replay summary of walk-forward A+ signals and breakouts (already decided without lookahead) */
 function replay(W, b){ const res = { aplus: bucket(), brk: bucket() }; for (const s of W.sig){ const r = resolveTrade(b, s.i, s.d, s.stop, s.tp, H_OUT); if (r) addB(res.aplus, r); }
   for (const k of W.brk){ const bx = null; void bx; const r = resolveTrade(b, k.i, k.d, k.stop, k.tp, 20); if (r) addB(res.brk, r); } return res; }
-return { patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
+/* ---------------- v7.14 GENEL YÖN: all-interval consensus (pure, no lookahead when fed closed data) ----------------
+   Every interval gives a direction d ∈ [-1, 1] (its trend vote: EMA9/21, SuperTrend, MACD, price vs EMA21; an A+ / PUMP / DUMP state overrides to ±1).
+   Weights: higher intervals carry the trend (big 60 %, mid 25 %, short 15 %); each interval's weight is scaled by its OWN measured reliability
+   (how often its vote matched the next 3 candles, shrunk toward 50 % when there are few samples). Low reliability ⇒ less weight, never fake certainty. */
+const GW = { "1m": 0.5, "3m": 0.6, "5m": 0.7, "15m": 0.9, "30m": 1, "1h": 1, "2h": 1, "4h": 1.15, "6h": 1, "8h": 0.9, "12h": 0.9, "1d": 1.1 };
+const G_BIG = ["1h", "2h", "4h", "6h", "8h", "12h", "1d"], G_MID = ["15m", "30m"], G_SHORT = ["1m", "3m", "5m"], G_ALL = G_SHORT.concat(G_MID, G_BIG);
+/* reliability of an interval's vote, only from samples whose outcome was known by `upTo` */
+function tfRel(H, c, k = 3, upTo = Infinity){ let n = 0, w = 0; if (!H) return { n: 0, acc: null };
+  for (let j = 0; j + k < H.v.length; j++){ if (H.T[j + k] > upTo) break; const v = H.v[j]; if (!fin(v) || Math.abs(v) < 0.5) continue; const m = c[j + k] - c[j]; if (!m) continue; n++; if ((m > 0) === (v > 0)) w++; }
+  return { n, acc: n ? w/n : null }; }
+const relAcc = r => r && r.n ? (r.acc*r.n + 0.5*30)/(r.n + 30) : 0.5, relMul = r => clip(1 + (relAcc(r) - 0.5)*6, 0.4, 1.6);
+function consensus(I){ const grp = L => { let s = 0, w = 0; const on = []; for (const t of L){ const x = I[t]; if (!x || !fin(x.d)) continue; const ww = GW[t]*relMul(x.rel); s += ww*x.d; w += ww; on.push(t); } return { v: w ? s/w : 0, w, on }; };
+  const big = grp(G_BIG), mid = grp(G_MID), sh = grp(G_SHORT); let s = 0, w = 0;
+  for (const [g, k] of [[big, 0.6], [mid, 0.25], [sh, 0.15]]) if (g.on.length){ s += k*g.v; w += k; }
+  const G = w ? s/w : 0, agree = sgn(big.v, 0.2) !== 0 && sgn(big.v, 0.2) === sgn(mid.v, 0.2), dir = sgn(G, 0.2), strong = dir !== 0 && Math.abs(G) >= 0.5 && agree;
+  const label = !dir ? "NÖTR" : (strong ? "GÜÇLÜ " : "") + (dir > 0 ? "LONG" : "SHORT"), n = big.on.length + mid.on.length + sh.on.length;
+  const rel = G_ALL.filter(t => I[t] && I[t].rel && I[t].rel.n).map(t => relAcc(I[t].rel)), relAvg = rel.length ? rel.reduce((a, x) => a + x, 0)/rel.length : null;
+  return { G, big: big.v, mid: mid.v, short: sh.v, dir, strong, agree, label, strength: Math.round(Math.abs(G)*100), n, relAvg }; }
+/* ŞİMDİ NE YAPMALI — one actionable line. x: { main: {state,d,plan,pUp}, px, atr, ema21 } */
+function action(C, x){ const m = x.main || {}, R = fin(x.atr) && x.atr > 0 ? x.atr : x.px*0.003, px = x.px;
+  const mk = (d, kind, entry) => { const stop = entry - d*1.5*R, r = Math.abs(entry - stop); return { d, kind, entry, stop, tp: entry + d*1.5*r }; };
+  if (["LONG", "SHORT", "PUMP", "DUMP"].includes(m.state) && m.plan && fin(m.plan.stop) && !(C.dir === -m.d && Math.abs(C.big) >= 0.4))
+    return { act: m.d > 0 ? "GİR LONG" : "GİR SHORT", d: m.d, kind: m.state === "PUMP" || m.state === "DUMP" ? "kırılım" : "A+ kurulum", entry: m.plan.entry, stop: m.plan.stop, tp: m.plan.tp };
+  if (m.state === "SIKIŞMA" && m.plan && fin(m.plan.longAbove)) return { act: "BEKLE", d: 0, wait: "kırılımı bekle", kind: "sıkışma", longAbove: m.plan.longAbove, shortBelow: m.plan.shortBelow, prefer: C.dir || (m.pUp >= 0.5 ? 1 : -1) };
+  if (C.strong && sgn(C.short, 0.25) === C.dir) return Object.assign({ act: C.dir > 0 ? "GİR LONG" : "GİR SHORT", kind: "trend + kısa vade aynı yön" }, mk(C.dir, "trend", px));
+  if (C.dir && sgn(C.short, 0.25) === -C.dir){ const z = fin(x.ema21) && (x.ema21 - px)*C.dir < 0 && Math.abs(x.ema21 - px) < 3*R ? x.ema21 : px - C.dir*0.6*R;
+    return Object.assign({ act: "BEKLE", wait: "geri çekilmeyi bekle", prefer: C.dir }, mk(C.dir, "geri çekilme", z), { d: 0 }); }
+  if (C.dir) return { act: "BEKLE", d: 0, wait: C.strong ? "kısa vade teyidini bekle" : "trend güçlenmesini bekle", prefer: C.dir, kind: "teyit yok" };
+  return { act: "BEKLE", d: 0, wait: "net yön yok", kind: "kararsız" }; }
+/* plain-Turkish summary lines (max 3). L = interval labels, f = price formatter, extra = most important item text or null */
+function summary(I, C, L, extra){ const lst = (ts, d) => ts.filter(t => I[t] && fin(I[t].d) && sgn(I[t].d, 0.25) === d).map(t => L[t] || t);
+  const out = [], bd = sgn(C.big, 0.2), sd = sgn(C.short, 0.2);
+  if (bd){ const t = lst(G_BIG, bd); out.push(`Büyük resim ${bd > 0 ? "yukarı" : "aşağı"}${t.length ? ` (${t.slice(0, 4).join(", ")} ${bd > 0 ? "LONG" : "SHORT"})` : ""}.`); }
+  else out.push("Büyük resim kararsız (1s–1G karışık).");
+  /* short + mid (1dk–30dk) = timing */ const TT = G_SHORT.concat(G_MID), ups = lst(TT, 1), dns = lst(TT, -1), rng = a => a.length ? `${a[0]}${a.length > 1 ? "–" + a[a.length - 1] : ""}` : "";
+  const td = ups.length >= dns.length + 2 ? 1 : dns.length >= ups.length + 2 ? -1 : 0, tl = td ? ` (${rng(td > 0 ? ups : dns)} ${td > 0 ? "LONG" : "SHORT"})` : "";
+  out.push(!td ? (ups.length || dns.length ? `Kısa vade karışık${ups.length ? ` (${rng(ups)} ↑` : " ("}${ups.length && dns.length ? ", " : ""}${dns.length ? `${rng(dns)} ↓` : ""}).` : "Kısa vade yatay (1dk–30dk kararsız).")
+    : bd && td === bd ? `Kısa vade de ${td > 0 ? "yukarı" : "aşağı"}${tl} — aynı yön.` : bd ? `Kısa vade ${td > 0 ? "tepki yükselişinde" : "geri çekiliyor"}${tl}.` : `Kısa vade ${td > 0 ? "yukarı" : "aşağı"}${tl}.`); void sd;
+  if (extra) out.push(extra); return out.slice(0, 3); }
+/* walk-forward replay of GENEL YÖN on one coin: K = { tf: closed bars }, main = interval the trades are taken on.
+   At every closed main candle only bars closed by then are used (interval votes + reliabilities); GİR (trend) entries are taken on a change
+   into GİR, exit at stop / target / after maxB candles, fee FEE round trip. Used live as the gate for "GİR (trend)" and offline for the report. */
+function gReplay(K, main, o = {}){ const maxB = o.maxB || 10, fee = o.fee ?? FEE, from = o.from || 0, lastLE = (a, x) => { let lo = 0, hi = a.length - 1, r = -1; while (lo <= hi){ const m = (lo + hi) >> 1; if (a[m] <= x){ r = m; lo = m + 1; } else hi = m - 1; } return r; };
+  const P = {}; for (const t of G_ALL){ const b = (K[t] || []).filter(x => x.x !== false); if (b.length < 40) continue; const H = prepHigher(b), c = b.map(x => x.c), ST = [], cum = [0];
+    for (let j = 0; j + 3 < b.length; j++){ const v = H.v[j]; if (!fin(v) || Math.abs(v) < 0.5) continue; const m = c[j + 3] - c[j]; if (!m) continue; ST.push(b[j + 3].T); cum.push(cum[cum.length - 1] + ((m > 0) === (v > 0) ? 1 : 0)); }
+    P[t] = { H, Ts: b.map(x => x.T), ST, cum }; }
+  const b = (K[main] || []).filter(x => x.x !== false), A = SCM.atr(b), E = SCM.ema(b.map(x => x.c), 21), out = { dir: { n: 0, ok: 0 }, str: { n: 0, ok: 0 }, tr: [], pb: [], lab: {}, flips: 0 };
+  const sim = (i, d, en, st, tp, intra) => { for (let k = i + (intra ? 0 : 1); k <= Math.min(b.length - 1, i + maxB); k++){ const x = b[k], hs = d > 0 ? x.l <= st : x.h >= st, ht = d > 0 ? x.h >= tp : x.l <= tp;
+      if (hs) return { r: "SL", pnl: d*(st - en)/en*100 - fee, t: b[i].t }; if (intra && k === i) continue; if (ht) return { r: "TP", pnl: d*(tp - en)/en*100 - fee, t: b[i].t }; }
+    const k = Math.min(b.length - 1, i + maxB); return { r: "T", pnl: d*(b[k].c - en)/en*100 - fee, t: b[i].t, open: k - i < maxB }; };
+  let prev = "", prevL = "";
+  for (let i = 30; i < b.length - 1; i++){ if (b[i].T < from) continue; const Tc = b[i].T, I = {};
+    for (const t in P){ const p = P[t], j = lastLE(p.Ts, Tc); if (j < 30 || !fin(p.H.v[j])) continue; const n = lastLE(p.ST, Tc) + 1; I[t] = { d: p.H.v[j], rel: { n, acc: n ? p.cum[n]/n : null } }; }
+    if (!Object.keys(I).length) continue; const C = consensus(I), px = b[i].c, a = action(C, { main: {}, px, atr: A[i], ema21: E[i] });
+    out.lab[C.label] = (out.lab[C.label] || 0) + 1; if (prevL && C.label !== prevL) out.flips++; prevL = C.label;
+    if (i + 3 < b.length && C.dir){ const ok = sgn(b[i + 3].c - px) === C.dir; out.dir.n++; out.dir.ok += ok; if (C.strong){ out.str.n++; out.str.ok += ok; } }
+    const key = a.act + (a.wait || ""); if (a.act !== "BEKLE" && key !== prev) out.tr.push(sim(i, a.d, px, a.stop, a.tp));
+    if (a.wait === "geri çekilmeyi bekle" && key !== prev) for (let k = i + 1; k <= Math.min(b.length - 1, i + 5); k++) if ((a.prefer > 0 && b[k].l <= a.entry) || (a.prefer < 0 && b[k].h >= a.entry)){ out.pb.push(sim(k, a.prefer, a.entry, a.stop, a.tp, true)); break; }
+    prev = key; }
+  const st = x => { const n = x.length, tp = x.filter(r => r.r === "TP").length, sl = x.filter(r => r.r === "SL").length, w = x.filter(r => r.pnl > 0).length, net = x.reduce((q, r) => q + r.pnl, 0); return { n, tp, sl, win: n ? w/n : null, net, avg: n ? net/n : null }; };
+  out.T = st(out.tr); out.PB = st(out.pb); out.days = b.length ? (b[b.length - 1].T - Math.max(from, b[Math.min(30, b.length - 1)].T))/864e5 : 0; return out; }
+/* gate: the consensus GİR rule is shown as GİR only when it held on this coin + interval: ≥20 entries, ≥55 % winners, positive average after fees */
+const gGate = g => !!(g && g.T && g.T.n >= 20 && g.T.win >= 0.55 && g.T.avg > 0);
+return { gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
 });

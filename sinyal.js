@@ -1,4 +1,4 @@
-/* NEON//TERMINAL v7.13 — ⏱ SİNYAL tab UI: AKILLI SİNYAL (self-learning, A+ only), squeeze → PUMP/DUMP, big chart, mascot "VOLTİ".
+/* NEON//TERMINAL v7.14 — ⏱ SİNYAL tab UI: GENEL YÖN (all intervals → one direction + plain summary + ŞİMDİ NE YAPMALI + instant alert), AKILLI SİNYAL (self-learning, A+ only), squeeze → PUMP/DUMP, big chart, mascot "VOLTİ".
    Binance USDⓈ-M FUTURES public data only (fapi.binance.com REST, fstream.binance.com /market + /public WebSockets). No spot, no keys, no orders, no wallet. */
 "use strict";
 window.SCALP = (() => {
@@ -7,8 +7,9 @@ const FUT = "https://fapi.binance.com", WSF = "wss://fstream.binance.com", { TF_
 const QUICK = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "PAXGUSDT"], HK = "neon.scalp.hist", SK = "neon.scalp.stats", LK = "neon.sinyal.learn";
 const fin = x => typeof x === "number" && isFinite(x), clip = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x)), sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0;
 const tf0 = localStorage.getItem("neon.scalp.tf");
+function alLoad(){ let o = {}; try { o = JSON.parse(localStorage.getItem("neon.sinyal.al") || "{}"); } catch(e){} return { snd: o.snd !== false, vib: o.vib !== false, ntf: !!o.ntf }; }
 const S = { sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : "trend", b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
-  W: null, D: null, ws: [], wsOk: false, lastTick: 0, started: false, gen: 0, off: 0, err: null, snd: localStorage.getItem("neon.scalp.snd") === "1", lastFinal: 0, list: [], poll: null, ov: {}, ovAt: 0, ovBusy: false, view: { n: 50, off: 0 } };
+  W: null, D: null, ws: [], wsOk: false, lastTick: 0, started: false, gen: 0, off: 0, err: null, snd: true, al: alLoad(), ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", alAt: {}, lastFinal: 0, list: [], poll: null, ov: {}, ovAt: 0, ovBusy: false, view: { n: 50, off: 0 } };
 const tfs = () => [S.tf].concat(higher(S.tf)), key = () => S.sym + "@" + S.tf, base = () => S.b[S.tf] || [];
 let DP = 2; const fp = x => !fin(x) ? "—" : (+x).toFixed(DP), now = () => Date.now() + S.off, big = x => !fin(x) ? "—" : x >= 1e9 ? (x/1e9).toFixed(2) + "B" : x >= 1e6 ? (x/1e6).toFixed(1) + "M" : x >= 1e3 ? (x/1e3).toFixed(0) + "k" : x.toFixed(0);
 const bars = a => a.map(k => ({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5], T: +k[6], tb: +k[9], x: true }));
@@ -41,13 +42,15 @@ function html(){ return `<div class="sg-top"><div class="can-search sc-search"><
   <div id="sc-list" class="can-list hidden"></div>
   <div class="tfbar sc-quick">${QUICK.map(s => `<button type="button" data-sq="${s}">${s === "PAXGUSDT" ? "ALTIN" : s.replace("USDT", "")}</button>`).join("")}</div>
   <div class="tfbar sc-tfs" role="toolbar" aria-label="Mum aralığı">${TF_SEL.map(t => `<button type="button" data-stf="${t}" class="${t === S.tf ? "on" : ""}">${TF_LBL[t]}</button>`).join("")}</div>
-  <div class="sg-mode"><div class="seg sg-seg"><button type="button" data-md="trend" class="${S.mode === "trend" ? "on" : ""}">TREND</button><button type="button" data-md="rev" class="${S.mode === "rev" ? "on" : ""}">DÖNÜŞ</button></div><label class="snd sg-snd"><input type="checkbox" id="sc-snd" ${S.snd ? "checked" : ""}> 🔔</label><span id="sc-st" class="dim sg-st"></span></div></div>
-  <div class="sg-hero"><div id="sg-masc" class="masc st-wait">${MASC}<div class="masc-name">VOLTİ</div></div><div id="sg-card" class="sg-card"><div class="empty">yükleniyor…</div></div></div>
-  <div id="sg-bubble" class="sg-bubble">Merhaba! Ben VOLTİ. Grafiği okuyorum…</div>
-  <div id="sg-alerts" class="sg-alerts"></div>
+  <div class="sg-mode"><div class="seg sg-seg"><button type="button" data-md="trend" class="${S.mode === "trend" ? "on" : ""}">TREND</button><button type="button" data-md="rev" class="${S.mode === "rev" ? "on" : ""}">DÖNÜŞ</button></div><span class="sg-als"><label title="sesli uyarı"><input type="checkbox" id="al-snd" ${S.al.snd ? "checked" : ""}>🔊</label><label title="titreşim"><input type="checkbox" id="al-vib" ${S.al.vib ? "checked" : ""}>📳</label><button type="button" id="al-ntf" class="mini" title="tarayıcı bildirimi">${S.al.ntf ? "🔔" : "🔕"}</button></span><span id="sc-st" class="dim sg-st"></span></div></div>
+  <div id="sg-gen" class="sg-gen"><div class="sg-hero"><div id="sg-masc" class="masc st-wait">${MASC}<div class="masc-name">VOLTİ</div></div><div id="sg-gcard" class="sg-gcard"><div class="empty">GENEL YÖN hesaplanıyor…</div></div></div>
+   <div id="sg-bubble" class="sg-bubble">Merhaba! Ben VOLTİ. Tüm aralıkları okuyorum…</div>
+   <div id="sg-now" class="sg-now"></div></div>
+  <div id="sg-card" class="sg-card sg-mcard"><div class="empty">yükleniyor…</div></div>
   <div class="sg-chartwrap"><canvas id="sc-cv" class="sg-cv"></canvas><div class="sg-zoom"><button type="button" data-z="-1">－</button><button type="button" data-z="1">＋</button><button type="button" data-z="0">⟲</button></div></div>
-  <div id="sc-ov" class="sc-ov"></div>
   <div class="sg-det"><div class="sg-det-h">DETAYLAR</div>
+   <details class="keys"><summary>🧭 GENEL YÖN nasıl hesaplanır · geçmiş testi</summary><div id="sd-gen"></div></details>
+   <details class="keys"><summary>⚡ Canlı uyarılar</summary><div id="sg-alerts" class="sg-alerts"></div></details>
    <details class="keys"><summary>🧠 Neden bu sinyal?</summary><div id="sd-why"></div></details>
    <details class="keys"><summary>⚖ Öğrenilen ağırlıklar</summary><div id="sd-w"></div></details>
    <details class="keys"><summary>🕯 Mum formasyonları</summary><div id="sd-pat"></div></details>
@@ -76,12 +79,13 @@ async function loadDer(sym, my){ const o = p => fj(p).catch(() => null), per = d
   S.der = { fund: pr ? +pr.lastFundingRate : NaN, oiCh: oc, per: TF_LBL[per], ls: ls && ls[0] ? +ls[0].longShortRatio : NaN, tk: tl, at: Date.now() }; }
 async function loadBook(sym, my){ try { const d = await fj(`/fapi/v1/depth?symbol=${sym}&limit=500`); if (my !== S.gen) return; S.book = d; S.bookAt = Date.now(); const w = SMT.walls(d, S.bookMem, Date.now()); S.bookMem = w.mem; S.wl = w;
     const mid = w.mid, band = mid*0.0025; let b = 0, a = 0; for (const [p, q] of d.bids) if (mid - +p <= band) b += +q*+p; for (const [p, q] of d.asks) if (+p - mid <= band) a += +q*+p; S.imb = b + a ? (b - a)/(b + a) : 0; } catch(e){} }
-function onKline(k, tf){ const a = S.b[tf]; if (!a || !a.length) return; const x = { t: +k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v, T: +k.T, tb: +k.V, x: !!k.x }, l = a[a.length - 1];
-  if (x.t === l.t) a[a.length - 1] = x; else if (x.t > l.t){ if (!l.x){ l.x = true; if (tf === S.tf) finalize(); } a.push(x); if (a.length > 1200) a.shift(); } else return;
-  if (tf === S.tf){ S.lastTick = Date.now(); if (x.x) finalize(); } }
+function onKline(k, tf){ const x0 = { t: +k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v, T: +k.T, tb: +k.V, x: !!k.x }; let fin1 = false, upd = false;
+  for (const [a, cap] of [[S.b[tf], 1200], [S.ovB[tf] !== S.b[tf] ? S.ovB[tf] : null, 520]]){ if (!a || !a.length) continue; const x = { ...x0 }, l = a[a.length - 1];
+    if (x.t === l.t){ a[a.length - 1] = x; upd = true; } else if (x.t > l.t){ if (!l.x){ l.x = true; if (a === S.b[tf]) fin1 = true; } a.push(x); if (a.length > cap) a.shift(); upd = true; } }
+  if (!upd) return; if (tf === S.tf){ if (fin1) finalize(); S.lastTick = Date.now(); if (x0.x) finalize(); } }
 function closeWs(){ (S.ws || []).forEach(w => { try { w.onclose = null; w.close(); } catch(e){} }); S.ws = []; S.wsOk = false; }
 /* Binance USDⓈ-M WebSocket split (2026): klines on /market */
-function connect(sym){ closeWs(); S.wsAt = Date.now(); const s = sym.toLowerCase(), my = S.gen, streams = tfs().map(t => `${s}@kline_${t}`); if (sym !== "BTCUSDT") streams.push(`btcusdt@kline_${S.tf}`);
+function connect(sym){ closeWs(); S.wsAt = Date.now(); const s = sym.toLowerCase(), my = S.gen, streams = Array.from(new Set(tfs().concat(TF_SEL))).map(t => `${s}@kline_${t}`); if (sym !== "BTCUSDT") streams.push(`btcusdt@kline_${S.tf}`);
   let ws; try { ws = new WebSocket(WSF + "/market/stream?streams=" + streams.join("/")); } catch(e){ startPoll(); return; } S.ws = [ws];
   ws.onopen = () => { if (my !== S.gen) return; S.wsOk = true; S.wsAt = Date.now(); paintSt(); };
   ws.onmessage = ev => { if (my !== S.gen) return; try { const m = JSON.parse(ev.data), d = m.data || m; if (!d.k) return; if (d.s === "BTCUSDT" && sym !== "BTCUSDT") onBtc(d.k); else { onKline(d.k, d.k.i); stopPoll(); } } catch(e){} };
@@ -91,13 +95,13 @@ function startPoll(){ if (S.poll) return; S.poll = setInterval(async () => { con
     for (const r of k){ const T = +r[6]; onKline({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5], T, V: r[9], x: T < now() }, tf); } S.pollErr = 0; } catch(e){ S.pollErr = (S.pollErr || 0) + 1; paintSt(e.message); } }, 3000); }
 function stopPoll(){ if (S.poll){ clearInterval(S.poll); S.poll = null; } }
 async function start(sym, tf){ sym = String(sym || S.sym).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (!sym) return; if (tf && TF_SEL.includes(tf)) S.tf = tf; const my = ++S.gen;
-  Object.assign(S, { sym, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
+  Object.assign(S, { sym, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
   localStorage.setItem("neon.scalp.sym", sym); localStorage.setItem("neon.scalp.tf", S.tf);
   const q = $("#sc-q"); if (q) q.value = sym; document.querySelectorAll("[data-stf]").forEach(x => x.classList.toggle("on", x.dataset.stf === S.tf)); paintHead(); paintAll();
   try { await loadList(); const info = S.list.find(x => x.s === sym); if (S.list.length && !info) throw new Error(sym + " Binance USDⓈ-M vadelide USDT perp olarak yok");
     await loadKlines(sym, my); if (my !== S.gen) return; if (!base().length) throw new Error("mum verisi yok");
     const lp = base()[base().length - 1].c; DP = info ? Math.max(0, Math.min(8, Math.round(-Math.log10(info.tick)))) : Math.max(0, Math.min(8, 5 - Math.floor(Math.log10(lp || 1))));
-    await Promise.all([loadDer(sym, my), loadBook(sym, my), loadBtc(my)]); if (my !== S.gen) return; connect(sym); compute(true); resolveAll(); if (S.W) saveLearn(S.W); S.ovAt = 0; }
+    await Promise.all([loadDer(sym, my), loadBook(sym, my), loadBtc(my)]); if (my !== S.gen) return; connect(sym); compute(true); resolveAll(); if (S.W) saveLearn(S.W); loadOv(sym, my); }
   catch(e){ if (my === S.gen){ S.err = e.message; paintAll(); } } }
 /* ---------------- engine ---------------- */
 function liveDerVotes(){ const D = S.der, v = {}; if (fin(D.fund)) v.fund = D.fund > 0.0005 ? -1 : D.fund > 0.0002 ? -0.4 : D.fund < -0.0003 ? 1 : D.fund < 0 ? 0.3 : 0;
@@ -125,28 +129,88 @@ function decide(R){ const W = R.W, L = W.live, P = R.P, b = P.b, i = L.i, px = b
   if (L.aplus){ if (dsum*L.d <= -1.5){ out.state = "BEKLE"; out.lean = L.d; out.reason = "canlı türev/defter verisi ters yönde"; } else { out.state = L.d > 0 ? "LONG" : "SHORT"; out.d = L.d; out.conf = L.setup; out.plan = { entry: L.plan.entry, stop: L.plan.stop, tp: L.plan.tp, tp2: L.plan.tp2 }; return out; } }
   out.state = "BEKLE"; out.lean = out.lean || (Math.abs(L.sc.S) >= 0.1 ? L.d : 0); out.reason = out.reason || L.why[0] || "net kurulum yok"; out.conf = L.setup; return out; }
 let lastRun = 0;
-function compute(force){ if (!base().length) return; const t = Date.now(); if (!force && t - lastRun < 2500) return; lastRun = t;
-  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; }
+function compute(force){ if (!base().length) return; const t = Date.now(); if (!force && t - lastRun < 2000) return; lastRun = t;
+  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; summarize(); }
   catch(e){ S.err = "hesap hatası: " + e.message; } if (visible()) paintAll(); }
 function finalize(){ const b = base().filter(x => x.x), l = b[b.length - 1]; if (!l || l.t <= S.lastFinal) return; S.lastFinal = l.t; let R, D; try { R = run(true); if (!R) return; D = decide(R); } catch(e){ return; }
   saveLearn(R.W); const all = H.load(), L = all[key()] = all[key()] || []; if (L.length && L[0].t >= l.t) return; const prev = L[0], act = ["LONG", "SHORT", "PUMP", "DUMP"].includes(D.state) && D.plan && fin(D.plan.stop);
   L.unshift({ tf: S.tf, t: l.t, side: act ? (D.d > 0 ? "LONG" : "SHORT") : "BEKLE", state: D.state, mode: S.mode, conf: D.conf && fin(D.conf.hit) ? Math.round(D.conf.hit*100) : null, entry: l.c, stop: act ? D.plan.stop : null, tp1: act ? D.plan.tp : null, res: {} });
-  H.save(all); resolveAll(); if (act && S.snd && (!prev || prev.state !== D.state)) alarm(D.d > 0 ? "LONG" : "SHORT"); }
+  H.save(all); resolveAll(); void prev; }
 function resolveAll(){ const all = H.load(), k = key(), L = all[k]; if (!L) return; let ch = false; const b1 = base();
   for (const s of L){ s.tf = s.tf || S.tf; if (s.side === "BEKLE" || !fin(s.stop)) continue; for (const h of [2, 3, 5]){ if (s.res[h]) continue; const r = SCM.outcome(s, b1, h); if (r){ s.res[h] = r; ch = true; ST.bump(k, h, r); } } }
   if (ch){ H.save(all); paintHist(); } }
-function alarm(side){ try { navigator.vibrate && navigator.vibrate(side === "LONG" ? [80, 60, 80] : [200]); } catch(e){}
-  try { const C = window.AudioContext || window.webkitAudioContext; if (!C) return; const ac = alarm.ac = alarm.ac || new C(), o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = side === "LONG" ? 880 : 330; g.gain.value = 0.08; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.25); } catch(e){} }
-/* ---------------- all-intervals overview (REST, sequential, once a minute while visible) ---------------- */
-async function overview(){ if (S.ovBusy || !visible() || Date.now() - S.ovAt < 60000) return; S.ovBusy = true; S.ovAt = Date.now(); const sym = S.sym, my = S.gen, K = {};
-  try { for (const t of TF_ALL){ if (my !== S.gen) return; try { K[t] = bars(await fj(`/fapi/v1/klines?symbol=${sym}&interval=${t}&limit=499`)); const l = K[t][K[t].length - 1]; if (l && l.T > now()) l.x = false; } catch(e){ K[t] = null; } }
-    const o = {}; for (const t of TF_SEL){ await new Promise(r => setTimeout(r, 0)); if (my !== S.gen) return; const [h1, h2] = higher(t); let st = null;
-      try { if (K[t] && K[t].length >= 150){ const P = SMT.prep(K[t], { tms: TF_MS[t], h1: K[h1], h2: K[h2] }), W = SMT.walk(P, { mode: S.mode }), L = W.live;
-          st = L.sq || L.sqRecent ? ((L.sq || L.sqRecent).d > 0 ? "PUMP" : "DUMP") : L.squeeze ? "SIKIŞMA" : L.aplus ? (L.d > 0 ? "LONG" : "SHORT") : "BEKLE"; o[t] = { st, lean: L.d }; } } catch(e){} if (!o[t]) o[t] = null; }
-    if (my === S.gen){ S.ov = o; paintOv(); } } finally { S.ovBusy = false; } }
+function alarm(side){ if (S.al.vib) try { navigator.vibrate && navigator.vibrate(side === "LONG" ? [120, 80, 120, 80, 120] : [300, 100, 300]); } catch(e){}
+  if (S.al.snd) try { const C = window.AudioContext || window.webkitAudioContext; if (!C) return; const ac = alarm.ac = alarm.ac || new C(), o = ac.createOscillator(), g = ac.createGain(); ac.resume && ac.resume(); o.frequency.value = side === "LONG" ? 880 : 330; g.gain.value = 0.09; o.connect(g); g.connect(ac.destination); o.start(); o.frequency.setValueAtTime(side === "LONG" ? 1175 : 247, ac.currentTime + 0.18); o.stop(ac.currentTime + 0.4); } catch(e){} }
+/* ---------------- v7.14 all intervals: REST once (sequential, 499 bars), then live via the same /market WS; recomputed every ~15 s ---------------- */
+async function loadOv(sym, my){ for (const t of TF_SEL){ if (my !== S.gen) return; if (S.b[t] && S.b[t].length >= 300){ S.ovB[t] = S.b[t]; continue; }
+    try { const a = bars(await fj(`/fapi/v1/klines?symbol=${sym}&interval=${t}&limit=499`)), l = a[a.length - 1]; if (l && l.T > now()) l.x = false; if (my === S.gen) S.ovB[t] = a; } catch(e){} await new Promise(r => setTimeout(r, 120)); }
+  if (my === S.gen){ S.ovCalcAt = 0; ovCalc(true); } }
+const dOf = (st, v) => st === "LONG" || st === "PUMP" ? 1 : st === "SHORT" || st === "DUMP" ? -1 : st === "SIKIŞMA" ? (v || 0)*0.5 : v;
+async function ovCalc(force){ if (S.ovBusy || (!force && Date.now() - S.ovCalcAt < 15000)) return; S.ovBusy = true; S.ovCalcAt = Date.now(); const my = S.gen;
+  try { for (const t of TF_SEL){ await new Promise(r => setTimeout(r, 0)); if (my !== S.gen) return; if (t === S.tf) continue; const K = S.ovB[t]; if (!K || K.length < 60){ S.ovR[t] = null; continue; }
+      try { const H = SMT.prepHigher(K), v = H ? H.v[H.v.length - 1] : null, rel = SMT.tfRel(H, K.map(x => x.c), 3); let st = "BEKLE", pUp = null;
+        if (K.length >= 150){ const [h1, h2] = higher(t), P = SMT.prep(K, { tms: TF_MS[t], h1: S.ovB[h1], h2: S.ovB[h2] }), L = SMT.walk(P, { mode: S.mode }).live;
+          st = L.sq || L.sqRecent ? ((L.sq || L.sqRecent).d > 0 ? "PUMP" : "DUMP") : L.squeeze ? "SIKIŞMA" : L.aplus ? (L.d > 0 ? "LONG" : "SHORT") : "BEKLE";
+          if (st === "SIKIŞMA" && L.squeeze.box){ const bx = L.squeeze.box, i = P.n - 1, px = P.c[i]; pUp = SMT.squeezeDir({ pos: clip(((px - bx.lo)/(bx.hi - bx.lo || 1) - 0.5)*2), cvd: clip((P.cvd[i] - P.cvd[bx.from])/((P.vs20[i] || 1)*bx.len)*4), mtf: L.a.T.mtf }).pUp; } }
+        S.ovR[t] = { st, v, d: dOf(st, v), rel, pUp }; } catch(e){ S.ovR[t] = null; } }
+    if (my === S.gen && (Date.now() - S.gRAt > 120000 || !S.gR)){ S.gRAt = Date.now(); const K = { ...S.ovB }; K[S.tf] = base(); try { S.gR = SMT.gReplay(K, S.tf); } catch(e){ S.gR = null; } }
+    if (my === S.gen) summarize(); } finally { S.ovBusy = false; } }
+/* ---------------- GENEL YÖN: one direction + summary + action ---------------- */
+function mainItem(){ const b = base(); if (b.length < 60 || !S.D) return null; const H = SMT.prepHigher(b), v = H.v[H.v.length - 1]; return { st: S.D.state, v, d: dOf(S.D.state, v), rel: SMT.tfRel(H, b.map(x => x.c), 3), pUp: S.D.pUp, main: true }; }
+function extraItem(I){ const D = S.D, L1 = TF_LBL[S.tf], px = D ? D.px : null; if (!D) return null;
+  if (D.state === "PUMP" || D.state === "DUMP") return `${L1}'da yatay kutu ${D.state === "PUMP" ? "yukarı" : "aşağı"} kırıldı (${D.state}).`;
+  if (D.state === "SIKIŞMA") return `${L1}'da sıkışma var, ${D.pUp >= 0.5 ? "yukarı" : "aşağı"} kırılım olasılığı %${Math.round(Math.max(D.pUp, 1 - D.pUp)*100)}.`;
+  if (D.L && D.L.fake) return `${L1}'da SAHTE KIRILIM: ${D.L.fake.d > 0 ? "yukarı" : "aşağı"} kırılım kutuya geri döndü.`;
+  const sq = TF_SEL.filter(t => I[t] && I[t].st === "SIKIŞMA" && TF_MS[t] >= 9e5); if (sq.length){ const t = sq[0], p = I[t].pUp; return `${TF_LBL[t]}'da sıkışma var${fin(p) ? `, ${p >= 0.5 ? "yukarı" : "aşağı"} kırılım olasılığı %${Math.round(Math.max(p, 1 - p)*100)}` : ""}.`; }
+  const A = D.L && D.L.a, info = A && A.info; if (info && info.btc) return `BTC ${info.btc.dir > 0 ? "yukarı" : "aşağı"} kırdı, ${S.sym.replace("USDT", "")} henüz takip etmedi (BTC öncülük).`;
+  const pt = info && (info.pats || []).find(p => p.ctx); if (pt) return `${L1} mumunda ${pt.n} (${pt.d > 0 ? "yukarı" : "aşağı"} işaret, bağlamlı).`;
+  if (S.liq && fin(px)){ const c = [...(S.liq.above || []).slice(0, 1).map(x => ({ ...x, up: 1 })), ...(S.liq.below || []).slice(0, 1).map(x => ({ ...x, up: 0 }))].filter(x => fin(x.p)).sort((a, z) => Math.abs(a.p - px) - Math.abs(z.p - px))[0];
+    if (c) return `Likidasyon mıknatısı ${c.up ? "yukarıda" : "aşağıda"} ${fp(c.p)} (%${(Math.abs(c.p/px - 1)*100).toFixed(1)} uzakta).`; }
+  if (info && info.lvl) return `Fiyat kilit seviyede (${info.lvl.replace("dH", "gün tepesi").replace("dL", "gün dibi").replace("pH", "dünkü tepe").replace("pL", "dünkü dip").replace("wO", "hafta açılışı")}).`;
+  return null; }
+function summarize(){ if (!S.D || !S.R) return; const I = {}; for (const t of TF_SEL) if (S.ovR[t]) I[t] = S.ovR[t]; const mi = mainItem(); if (mi) I[S.tf] = mi;
+  const C = SMT.consensus(I), P = S.R.P, n = P.n - 1; let A = SMT.action(C, { main: S.D, px: S.D.px, atr: P.A[n], ema21: P.e21[n] });
+  if (A.kind === "trend" && !SMT.gGate(S.gR)){ const T = S.gR && S.gR.T; A = { act: "BEKLE", d: 0, prefer: C.dir, kind: "kapı", wait: "A+ onayını bekle",
+    note: T && T.n ? `${C.label} ama bu kural ${S.sym.replace("USDT", "")} ${TF_LBL[S.tf]}'da geçmişte %${Math.round(T.win*100)} kazandırdı (${T.n} giriş, ücret sonrası ${T.net >= 0 ? "+" : ""}${T.net.toFixed(1)}%)` : `${C.label} ama bu kural için yeterli geçmiş yok` }; }
+  S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); if (visible()) paintGen(); checkAlert(); }
+function actKey(){ const A = S.A, C = S.G; if (!A || !C) return ""; if (A.act !== "BEKLE") return A.act; if (C.strong) return C.label; return ""; }
+function checkAlert(){ const k = actKey(); if (k === S.curKey){ S.pendKey = ""; return; } if (!k){ S.curKey = ""; S.pendKey = ""; return; }
+  if (S.pendKey !== k){ S.pendKey = k; return; } /* must hold on two consecutive updates (≈2+ s) so a flicker does not ring */
+  S.curKey = k; S.pendKey = ""; if (Date.now() - (S.alAt[k] || 0) < 600000) return; S.alAt[k] = Date.now(); fireAlert(k); }
+function fireAlert(k, test){ const up = /LONG/.test(k), coin = S.sym.replace("USDT", ""), A = S.A || {}, body = (test ? "[TEST] " : "") + `${coin} ${TF_LBL[S.tf]}: ${k}` + (fin(A.entry) && A.act !== "BEKLE" ? ` · giriş ${fp(A.entry)} stop ${fp(A.stop)} hedef ${fp(A.tp)}` : "");
+  alarm(up ? "LONG" : "SHORT"); const g = $("#sg-gen"); if (g){ g.classList.remove("flash"); void g.offsetWidth; g.classList.add("flash"); setTimeout(() => g.classList.remove("flash"), 6000); }
+  S.lastAlert = { k, at: Date.now(), body, test: !!test };
+  if (S.al.ntf && window.Notification && Notification.permission === "granted"){ const o = { body, tag: "neon-sinyal", renotify: true };
+    try { navigator.serviceWorker && navigator.serviceWorker.getRegistration ? navigator.serviceWorker.getRegistration().then(r => r ? r.showNotification("NEON SİNYAL · " + k, o) : new Notification("NEON SİNYAL · " + k, o)).catch(() => { try { new Notification("NEON SİNYAL · " + k, o); } catch(e){} }) : new Notification("NEON SİNYAL · " + k, o); } catch(e){} }
+  return body; }
+const ARW = { "GÜÇLÜ LONG": "⇈", LONG: "↑", "NÖTR": "↔", SHORT: "↓", "GÜÇLÜ SHORT": "⇊" };
+function paintGen(){ const gc = $("#sg-gcard"), bub = $("#sg-bubble"), nw = $("#sg-now"), m = $("#sg-masc"); if (!gc) return;
+  if (S.err){ gc.innerHTML = `<div class="err-line">✖ ${esc(S.err)}<br><small>Vadeli veri alınamadı — spot'a geçilmez.</small></div><button type="button" id="sc-retry" class="mini wide">↻ TEKRAR DENE</button>`; $("#sc-retry").onclick = () => start(S.sym);
+    m.className = "masc st-short"; bub.textContent = "Veri gelmedi… tekrar deneyelim mi?"; bub.className = "sg-bubble dn"; nw.innerHTML = ""; return; }
+  const C = S.G, A = S.A; if (!C || !A){ gc.innerHTML = `<div class="empty">GENEL YÖN hesaplanıyor…</div>`; return; }
+  const cls = C.dir > 0 ? "up" : C.dir < 0 ? "dn" : "y", have = TF_SEL.filter(t => S.I[t]).length, w = Math.min(50, Math.abs(C.G)*50);
+  const dots = TF_SEL.map(t => { const x = S.I[t], d = x ? sgn(Math.abs(x.d) >= 0.25 ? x.d : 0) : null, ic = !x ? "·" : x.st === "PUMP" ? "🚀" : x.st === "DUMP" ? "💥" : x.st === "SIKIŞMA" ? "◇" : d > 0 ? (x.st === "LONG" ? "▲" : "↑") : d < 0 ? (x.st === "SHORT" ? "▼" : "↓") : "•";
+    return `<button type="button" data-stf="${t}" class="gd ${!x ? "na" : x.st === "SIKIŞMA" ? "m" : d > 0 ? "up" : d < 0 ? "dn" : "n"}${t === S.tf ? " on" : ""}" title="${TF_LBL[t]} ${x ? x.st + " · eğilim " + (x.d || 0).toFixed(2) : "veri yok"}"><i>${ic}</i><small>${TF_LBL[t]}</small></button>`; }).join("");
+  gc.innerHTML = `<div class="sg-glab">GENEL YÖN <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${have}/12 aralık</small></div>
+    <div class="sg-gdir ${cls}"><span class="sg-arw">${ARW[C.label]}</span><span>${C.label}</span></div>
+    <div class="sg-bar" title="−100 SHORT … +100 LONG"><span class="sg-bar0"></span><span class="sg-barf ${cls}" style="${C.G >= 0 ? "left:50%" : "right:50%"};width:${w}%"></span></div>
+    <div class="dim sg-gsub">güç <b class="${cls}">%${C.strength}</b> · büyük ${C.big >= 0 ? "+" : ""}${Math.round(C.big*100)} · kısa ${C.short >= 0 ? "+" : ""}${Math.round(C.short*100)}${fin(C.relAvg) ? ` · aralık isabeti ~%${Math.round(C.relAvg*100)}` : ""}</div>
+    <div class="sg-dots">${dots}</div>`;
+  bub.innerHTML = S.sum.map(esc).join("<br>"); bub.className = "sg-bubble " + cls;
+  const T = (e, s, t) => fin(s) ? ` <span>giriş <b>${fp(e)}</b></span><span>stop <b class="dn">${fp(s)}</b></span><span>hedef <b class="up">${fp(t)}</b></span>` : "";
+  let h; if (A.act !== "BEKLE") h = `<b class="sg-act ${A.d > 0 ? "up" : "dn"}">${A.act}</b> <small class="dim">${esc(A.kind)}</small>${T(A.entry, A.stop, A.tp)}`;
+  else if (A.wait === "kırılımı bekle") h = `<b class="sg-act m">BEKLE</b> <small>kırılımı bekle</small> <span>↑ <b class="up">${fp(A.longAbove)}</b> üstü LONG</span><span>↓ <b class="dn">${fp(A.shortBelow)}</b> altı SHORT</span>`;
+  else if (A.wait === "geri çekilmeyi bekle") h = `<b class="sg-act y">BEKLE</b> <small>geri çekilmeyi bekle → ${A.prefer > 0 ? "LONG" : "SHORT"}</small>${T(A.entry, A.stop, A.tp)} <small class="dim">(doğrulanmamış bölge)</small>`;
+  else h = `<b class="sg-act y">BEKLE</b> <small>${esc(A.wait)}${A.note ? " — " + esc(A.note) : ""}</small>`;
+  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI?</div><div class="sg-nowl">${h}</div>`; nw.className = "sg-now " + (A.act === "GİR LONG" ? "up" : A.act === "GİR SHORT" ? "dn" : "");
+  const D = S.D; m.className = "masc " + (A.act === "GİR LONG" ? (D && D.state === "PUMP" ? "st-pump" : "st-long") : A.act === "GİR SHORT" ? (D && D.state === "DUMP" ? "st-dump" : "st-short") : A.wait === "kırılımı bekle" ? "st-sqz" : "st-wait");
+  const sd = $("#sd-gen"); if (sd && sd.closest("details").open) paintGenDet(); }
+function paintGenDet(){ const el = $("#sd-gen"); if (!el) return; const g = S.gR, C = S.G, P2 = x => fin(x) ? "%" + (x*100).toFixed(1) : "—";
+  const rows = TF_SEL.map(t => { const x = S.I && S.I[t]; return `<tr><td>${TF_LBL[t]}</td><td class="${x && x.d > 0.25 ? "up" : x && x.d < -0.25 ? "dn" : ""}">${x ? x.st + " " + (x.d >= 0 ? "+" : "") + x.d.toFixed(2) : "—"}</td><td>${x && x.rel && x.rel.n ? P2(SMT.relAcc(x.rel)) + ` <small>${x.rel.n}</small>` : "—"}</td><td>${(SMT.GW[t]).toFixed(2)}</td></tr>`; }).join("");
+  el.innerHTML = `<div class="dim" style="font-size:11px;line-height:1.45">Her aralığın trend oyu (EMA9/21, SuperTrend, MACD, fiyat/EMA21; A+ / PUMP / DUMP varsa ±1) birleştirilir: <b>büyük resim 1s–1G %60</b>, orta 15–30dk %25, kısa 1–5dk %15 (zamanlama). Her aralığın ağırlığı kendi ölçülen isabetiyle (sonraki 3 mum, az örnekte %50'ye çekilir) ölçeklenir. |G| ≥ 20 → LONG/SHORT, ≥ 50 ve büyük+orta aynı yön → GÜÇLÜ. <b>GİR</b> yalnızca A+ / PUMP-DUMP (kendi geçmişi geçen) ya da GÜÇLÜ + kısa vade aynı yön <i>ve</i> bu kural bu coin + aralıkta geçmişte ≥%55 kazandırıp ücret sonrası artıdaysa (≥20 giriş).</div>
+    <table class="can-t"><tr><th>aralık</th><th>durum · oy</th><th>isabet</th><th>taban ağ.</th></tr>${rows}</table>
+    ${g && g.T ? `<div style="margin-top:6px;font-size:11.5px">Yüklü veriyle geçmiş testi (${TF_LBL[S.tf]}, ~${g.days.toFixed(1)} gün, ileriye bakmadan): yön isabeti (3 mum) <b>${P2(g.dir.n ? g.dir.ok/g.dir.n : null)}</b> (${g.dir.n}) · GÜÇLÜ ${P2(g.str.n ? g.str.ok/g.str.n : null)} · GİR(trend) ${g.T.n} giriş, kazanan ${P2(g.T.win)}, ücret sonrası toplam <b class="${g.T.net >= 0 ? "up" : "dn"}">${g.T.net.toFixed(2)}%</b> → ${SMT.gGate(g) ? '<b class="up">kapı açık</b>' : '<b class="y">kapı kapalı (GİR gösterilmez)</b>'}<br><small class="dim">Kısa aralıkların yüklü geçmişi kısa (1dk ≈ 8 saat); eski mumlarda eksik aralıklar hariç tutulur.</small></div>` : `<div class="dim">geçmiş testi hesaplanıyor…</div>`}`; }
 const SC = { LONG: "up", PUMP: "up", SHORT: "dn", DUMP: "dn", "SIKIŞMA": "m", BEKLE: "y" }, ICO = { LONG: "▲", SHORT: "▼", PUMP: "🚀", DUMP: "💥", "SIKIŞMA": "🗜", BEKLE: "◆" };
-function paintOv(){ const el = $("#sc-ov"); if (!el) return; el.innerHTML = `<div class="sc-ovr">${TF_SEL.map(t => { const x = S.ov[t], c = x ? SC[x.st] : "dim";
-  return `<button type="button" data-stf="${t}" class="sc-ovc ${c}${t === S.tf ? " on" : ""}"><small>${TF_LBL[t]}</small><b>${x ? ICO[x.st] : "…"}</b></button>`; }).join("")}</div><div class="dim sc-ovh">tüm aralıklar (dakikada bir, canlı türev verisi olmadan) — dokun = seç</div>`; }
 /* ---------------- paint ---------------- */
 const visible = () => document.body.dataset.pg === "scalp" && !document.hidden, row = (k, v, c) => `<div><span>${k}</span><b class="${c || ""}">${v}</b></div>`, pc = x => fin(x) ? "%" + Math.round(x*100) : "—";
 const cdf = ms => { ms = Math.max(0, ms); const s = Math.ceil(ms/1000), h = Math.floor(s/3600), m = Math.floor(s % 3600/60), x = s % 60; return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0"); };
@@ -161,9 +225,8 @@ function speech(D){ const c = (D.state === "LONG" || D.state === "SHORT") && D.c
     case "DUMP": return `DUMP! Yatay kutu aşağı kırıldı. ${D.conf && D.conf.n ? `Aşağı kırılımlar %${Math.round((D.conf.hit || 0)*100)} tuttu (${D.conf.n}).` : "Bu coinde kırılım geçmişi az."} Stop kutunun üstünde.`;
     case "SIKIŞMA": return `Dikkat! Fiyat sıkıştı, patlama yakın. Yukarı ihtimali %${Math.round(D.pUp*100)}. Kutu kırılınca haber veririm.`;
     default: return `Şimdilik bekle — ${esc(({ "öğrenilmiş skor zayıf": "bu coinde şu an işe yarayan göstergeler net bir yön göstermiyor", "göstergeler çelişiyor": "göstergeler birbirini tutmuyor", "kurulum ücret sonrası zararda": "bu kurulum geçmişte ücretten sonra para kaybettirdi" })[D.reason] || D.reason || "")}${D.lean ? ` (hafif ${D.lean > 0 ? "yukarı" : "aşağı"} eğilim)` : ""}.`; } }
-function paintMain(){ const card = $("#sg-card"), m = $("#sg-masc"), bub = $("#sg-bubble"), al = $("#sg-alerts"); if (!card) return;
-  if (S.err){ card.innerHTML = `<div class="err-line">✖ ${esc(S.err)}<br><small>Vadeli veri alınamadı — spot'a geçilmez.</small></div><button type="button" id="sc-retry" class="mini wide">↻ TEKRAR DENE</button>`; $("#sc-retry").onclick = () => start(S.sym);
-    m.className = "masc st-short"; bub.textContent = "Veri gelmedi… tekrar deneyelim mi?"; return; }
+function paintMain(){ const card = $("#sg-card"), al = $("#sg-alerts"); if (!card) return; paintGen();
+  if (S.err){ card.innerHTML = ""; return; }
   const D = S.D; if (!D){ card.innerHTML = `<div class="empty">${TF_LBL[S.tf]} mumlar yükleniyor, öğreniyorum…</div>`; return; }
   const b = base(), l = b[b.length - 1], left = l ? l.T + 1 - now() : 0, cls = SC[D.state], P = D.plan;
   const sub = D.state === "LONG" || D.state === "SHORT" ? `geçmişte <b>${pc(D.conf.hit)}</b> tuttu (${D.conf.n} örnek) · ücret sonrası ort. ${fin(D.conf.net) ? (D.conf.net >= 0 ? "+" : "") + D.conf.net.toFixed(2) + "%" : "—"}`
@@ -174,8 +237,8 @@ function paintMain(){ const card = $("#sg-card"), m = $("#sg-masc"), bub = $("#s
     : P && fin(P.longAbove) ? `<div class="sg-line"><span>↑ <b class="up">${fp(P.longAbove)}</b> üstü kapanış</span><span>↓ <b class="dn">${fp(P.shortBelow)}</b> altı kapanış</span></div>` : "";
   card.innerHTML = `<div class="sg-sym"><b>${esc(S.sym.replace("USDT", ""))}</b> <span class="sc-px">${fp(D.px)}</span> <small class="dim">${TF_LBL[S.tf]} · ${S.mode === "rev" ? "DÖNÜŞ" : "TREND"}</small></div>
     <div class="sg-state ${cls}">${D.state}</div><div class="sg-sub">${sub}</div>${line}<div class="dim sg-cd">mum kapanışına <b id="sc-cd">${cdf(left)}</b>${P && fin(P.stop) ? ` · çıkış en geç ${dur(SMT.H_OUT*TF_MS[S.tf])}` : ""}</div>`;
-  const st = { LONG: "st-long", SHORT: "st-short", PUMP: "st-pump", DUMP: "st-dump", "SIKIŞMA": "st-sqz", BEKLE: "st-wait" }[D.state]; m.className = "masc " + st; bub.innerHTML = speech(D); bub.className = "sg-bubble " + cls;
-  al.innerHTML = D.alerts.slice(0, 4).map(a => `<span class="sg-al ${a.c}">${esc(a.t)}</span>`).join(""); }
+  card.insertAdjacentHTML("beforeend", `<div class="sg-sp dim">${speech(D)}</div>`);
+  if (al) al.innerHTML = (D.alerts.length ? "" : '<span class="dim">şu an uyarı yok</span>') + D.alerts.slice(0, 4).map(a => `<span class="sg-al ${a.c}">${esc(a.t)}</span>`).join(""); }
 /* ---------------- big chart ---------------- */
 function paintChart(){ const cv = $("#sc-cv"); if (!cv) return; const w = cv.clientWidth || 360, h = cv.clientHeight || 420, dpr = window.devicePixelRatio || 1; if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
   const x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h); const R = S.R, D = S.D; if (!R || !D) return; const P = R.P, all = P.b, N = Math.max(20, Math.min(160, S.view.n)), off = Math.max(0, Math.min(all.length - N, S.view.off));
@@ -239,22 +302,28 @@ function paintHist(){ const el = $("#sc-hist"); if (!el) return; const k = key()
     <div class="sc-hl"><table class="can-t"><tr><th>mum</th><th>durum</th><th>giriş</th><th>2</th><th>3</th><th>5</th></tr>${act.length ? act.map(s => `<tr><td>${when(s.t)}</td><td class="${s.side === "LONG" ? "up" : "dn"}">${esc(s.state || s.side)}${s.conf ? ` <small>%${s.conf}</small>` : ""}</td><td>${fp(s.entry)}</td>${[2, 3, 5].map(h => `<td>${oc(s.res[h])}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="6" class="dim">henüz canlı sinyal yok — A+ ve PUMP/DUMP mum kapanışında buraya yazılır (sekme açıkken). BEKLE mumları: ${L.length - act.length}</td></tr>`}</table></div>
     <button type="button" id="sc-clr" class="mini">bu coin + aralığın geçmişini sıfırla</button>`;
   $("#sc-clr").onclick = () => { if (!confirm(S.sym + " · " + TF_LBL[S.tf] + " sinyal geçmişi silinsin mi? (yalnızca bu cihaz)")) return; const a = H.load(); delete a[k]; H.save(a); const o = ST.load(); delete o[k]; localStorage.setItem(SK, JSON.stringify(o)); paintHist(); }; }
-function paintAll(){ paintHead(); paintSt(); paintMain(); paintChart(); paintOv(); if (S.D) paintDetails(); paintHist(); }
+function paintAll(){ paintHead(); paintSt(); paintMain(); paintChart(); if (S.D) paintDetails(); paintHist(); }
 function tick(){ if (!S.started) return; if (!visible()) return; const b = base(), l = b[b.length - 1], cd = $("#sc-cd"); if (cd && l) cd.textContent = cdf(l.T + 1 - now());
   if (l && !S.err && !S.poll && ((!S.wsOk && now() > l.T + 5000) || (S.wsOk && Date.now() - Math.max(S.lastTick, S.wsAt || 0) > 10000))) startPoll();
   if (Date.now() - (S.der.at || 0) > 60000 && S.D){ S.der.at = Date.now(); loadDer(S.sym, S.gen); }
   if (Date.now() - (S.bookAt || 0) > 20000 && S.D){ S.bookAt = Date.now(); loadBook(S.sym, S.gen); }
   if (S.sym !== "BTCUSDT" && Date.now() - (S.btcAt || 0) > 300000 && S.D){ S.btcAt = Date.now(); loadBtc(S.gen); }
-  compute(); paintSt(); if (S.D) overview(); }
+  compute(); paintSt(); if (S.D && Object.keys(S.ovB).length) ovCalc(); }
 function bind(){ const q = $("#sc-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); loadList().then(() => paintList("")); };
   q.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const r = search(q.value)[0]; pick(r ? r.s : q.value); } };
   $("#sc-list").onclick = e => { const b = e.target.closest("[data-ss]"); if (b) pick(b.dataset.ss); };
   $("#sc-go").onclick = () => { const v = q.value.trim().toUpperCase(), r = search(v); pick(r.some(x => x.s === v) ? v : r[0] ? r[0].s : v); };
   document.querySelector(".sc-quick").onclick = e => { const b = e.target.closest("[data-sq]"); if (b) pick(b.dataset.sq); };
   const box = $("#scalp-box"); box.addEventListener("click", e => { const b = e.target.closest("[data-stf]"); if (b && b.dataset.stf !== S.tf) start(S.sym, b.dataset.stf);
-    const md = e.target.closest("[data-md]"); if (md && md.dataset.md !== S.mode){ S.mode = md.dataset.md; localStorage.setItem("neon.sinyal.mode", S.mode); document.querySelectorAll("[data-md]").forEach(x => x.classList.toggle("on", x === md)); S.ovAt = 0; compute(true); }
+    const md = e.target.closest("[data-md]"); if (md && md.dataset.md !== S.mode){ S.mode = md.dataset.md; localStorage.setItem("neon.sinyal.mode", S.mode); document.querySelectorAll("[data-md]").forEach(x => x.classList.toggle("on", x === md)); S.ovCalcAt = 0; compute(true); ovCalc(true); }
     const z = e.target.closest("[data-z]"); if (z){ const k = +z.dataset.z; if (k === 0) S.view = { n: 50, off: 0 }; else S.view.n = Math.max(20, Math.min(160, Math.round(S.view.n*(k > 0 ? 0.75 : 1.33)))); paintChart(); } });
-  $("#sc-snd").onchange = e => { S.snd = e.target.checked; localStorage.setItem("neon.scalp.snd", S.snd ? "1" : "0"); if (S.snd) alarm("LONG"); };
+  const alSave = () => { try { localStorage.setItem("neon.sinyal.al", JSON.stringify(S.al)); } catch(e){} };
+  $("#al-snd").onchange = e => { S.al.snd = e.target.checked; alSave(); if (S.al.snd) alarm("LONG"); };
+  $("#al-vib").onchange = e => { S.al.vib = e.target.checked; alSave(); if (S.al.vib) try { navigator.vibrate && navigator.vibrate(80); } catch(x){} };
+  $("#al-ntf").onclick = async () => { const b = $("#al-ntf"); if (S.al.ntf){ S.al.ntf = false; alSave(); b.textContent = "🔕"; return; } if (!window.Notification){ alert("Bu tarayıcı bildirim desteklemiyor."); return; }
+    let p = Notification.permission; if (p === "default") try { p = await Notification.requestPermission(); } catch(e){} S.al.ntf = p === "granted"; alSave(); b.textContent = S.al.ntf ? "🔔" : "🔕"; if (!S.al.ntf) alert("Bildirim izni verilmedi — ses/titreşim yine çalışır."); };
+  box.addEventListener("pointerdown", () => { try { const C = window.AudioContext || window.webkitAudioContext; if (C && !alarm.ac) alarm.ac = new C(); alarm.ac && alarm.ac.resume && alarm.ac.resume(); } catch(e){} }, { once: true });
+  box.addEventListener("toggle", e => { if (e.target.querySelector && e.target.querySelector("#sd-gen") && e.target.open) paintGenDet(); }, true);
   /* drag to scroll back in time */ const cv = $("#sc-cv"); let dx = null, o0 = 0; const pos = e => (e.touches ? e.touches[0].clientX : e.clientX);
   cv.addEventListener("pointerdown", e => { dx = e.clientX; o0 = S.view.off; cv.setPointerCapture && cv.setPointerCapture(e.pointerId); }); cv.addEventListener("pointermove", e => { if (dx === null) return; const cw = (cv.clientWidth - 62)/S.view.n; S.view.off = Math.max(0, Math.round(o0 + (e.clientX - dx)/cw)); paintChart(); });
   ["pointerup", "pointercancel", "pointerleave"].forEach(t => cv.addEventListener(t, () => { dx = null; })); void pos;
@@ -266,5 +335,5 @@ function ensure(){ if (S.started){ if (visible()) paintAll(); return; } S.starte
 function init(){ const box = $("#scalp-box"); if (!box) return; box.innerHTML = html(); bind(); paintHead(); if (document.body.dataset.pg === "scalp") ensure();
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "scalp") ensure(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { ensure, start, get S(){ return S; } };
+return { ensure, start, checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "GÜÇLÜ LONG", true), get S(){ return S; } };
 })();
