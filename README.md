@@ -6,6 +6,12 @@ Telefonda çalışan, neon/"2100" görünümlü kripto analiz ve işlem terminal
 
 > ⚠️ **Yatırım tavsiyesi değildir. Sinyal garanti değildir.** Elle her işlem onay penceresinde **ONAYLA**'ya dokunduğunda gider. **OTO AL-SAT varsayılan olarak KAPALI**dır; açarsan bot yalnızca BOT CÜZDANI'ndaki parayla, koyduğun limitler içinde onay sormadan işlem yapar. pump.fun tokenlarının büyük çoğunluğu kısa sürede değerini neredeyse tamamen kaybeder; vadeli işlemler kaldıraçlıdır.
 
+## v7.12 · ⏱ SİNYAL — her aralık (1dk … 1G)
+
+SCALP sekmesi artık **⏱ SİNYAL**: mum aralığı seçilebilir (1dk, 3dk, 5dk, 15dk, 30dk, 1s, 2s, 4s, 6s, 8s, 12s, 1G; cihazda saklanır). Onay için bir üst iki aralık kullanılır (15dk → 30dk + 1s, 1G → 3G + 1H).
+Çıkış sayacı, mum kapanış sayacı ve geçmiş sonuçları **2/3/5 mum** üzerinden (gerçek süre olarak gösterilir); OI / L/S / taker periyodu aralığa göre; VWAP çapası aralığa göre (gün / hafta / ay). Geçmiş coin + aralık başına ayrı. "Tüm aralıklar" satırı her aralığın anlık LONG/SHORT/BEKLE'sini gösterir (dakikada bir, sırayla).
+**Veri yalnızca Binance USDⓈ-M vadeli** (fapi.binance.com + fstream.binance.com `/market` ve `/public`); spot uç noktası kullanılmaz, vadeli hata verirse "TEKRAR DENE" gösterilir. Altın = PAXGUSDT perp.
+
 ## v7.11 · ⏱ SCALP 2-5 DK (her mum LONG / SHORT / BEKLE)
 
 Yeni sekme: **⏱ SCALP**. Seçilen coin için her 1 dakikalık mumda LONG / SHORT / BEKLE sinyali, güven %, giriş / limit giriş / ATR stop / TP1 (1R) / TP2 (2R), mum kapanış sayacı ve 2–5 dk çıkış sayacı.

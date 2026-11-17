@@ -240,3 +240,13 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(255,
 #scalp .y{color:#ffe600}
 .sc-exit button:disabled{opacity:.35;cursor:not-allowed}
 .sc-t td:nth-child(3){white-space:nowrap}
+/* v7.12 SİNYAL intervals */
+.sc-tfs{margin-top:6px}
+.sc-tfs button.on{color:#001018;background:linear-gradient(90deg,#00f0ff,#39ff14);border-color:transparent;font-weight:700}
+.sc-ov{margin:6px 0}
+.sc-ovh{font-size:10px;margin-bottom:3px}
+.sc-ovr{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.sc-ovc{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0;border:1px solid #17384c;border-radius:8px;background:rgba(2,8,14,.6);font-family:var(--tech);cursor:pointer;color:inherit}
+.sc-ovc small{font-size:9.5px;color:#7fa9b8}.sc-ovc b{font-size:12px}.sc-ovc i{font-style:normal;font-size:9px;opacity:.8}
+.sc-ovc.on{border-color:#00f0ff;box-shadow:0 0 8px #00f0ff66}
+.sc-ovc.y{color:#ffe600}

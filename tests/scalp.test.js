@@ -28,4 +28,11 @@ ok("adx high on clean trend", M.adx(mk(80, i => 100 + i)).adx[79] > 40);
 ok("stoch rsi in 0..100", (() => { const s = M.stochRsi(c.map((x, i) => x + Math.sin(i))); return s.k[59] >= 0 && s.k[59] <= 100; })());
 ok("pattern: bullish engulfing", M.pattern([{ o: 101, c: 100, h: 101.1, l: 99.9 }, { o: 99.8, c: 101.5, h: 101.6, l: 99.7 }], 1).v === 1);
 const bt = M.backtest(up(1).slice(0, 220), tf(1, 3), tf(1, 5)); ok("backtest runs and returns stats", bt.n > 0 && bt.st[2] !== undefined, bt.sig + " signals");
+// v7.12 intervals
+ok("higher(): 15m → 30m,1h · 1d → 3d,1w · 12h → 1d,3d", M.higher("15m").join() === "30m,1h" && M.higher("1d").join() === "3d,1w" && M.higher("12h").join() === "1d,3d");
+ok("dataPeriod: 1m→5m, 3m→5m, 8h→6h, 1d→1d", M.dataPeriod("1m") === "5m" && M.dataPeriod("3m") === "5m" && M.dataPeriod("8h") === "6h" && M.dataPeriod("1d") === "1d");
+{ const hb = mk(12, i => 100, 3600e3); const sg = { tf: "1h", t: hb[2].t, side: "SHORT", entry: 100, stop: 101, tp1: 99 }; hb[4].l = 98.9; ok("outcome counts candles of the signal interval (1h)", M.outcome(sg, hb, 2).r === "TP" && M.outcome({ ...sg, t: hb[9].t }, hb, 3) === null); }
+{ const D1 = M.analyze({ tf: "1d", b1: mk(400, i => 100*Math.exp(i/4000) + nz(i), 864e5), b3: mk(150, i => 100*Math.exp(3*i/4000), 2592e5), b5: mk(80, i => 100*Math.exp(7*i/4000), 6048e5), now: 0 });
+  ok("1d analysis: no NaN, MTF label uses 3G/1H, hold in days", fin(D1) && /3G .*1H/.test(D1.votes.find(v => v.k === "mtf").val) && (!D1.plan || D1.plan.holdMs >= 2*864e5), D1.votes.find(v => v.k === "mtf").val); }
+ok("dur(): 3 dk / 2 saat / 5 gün", M.dur(18e4) === "3 dk" && M.dur(72e5) === "2 saat" && M.dur(5*864e5) === "5 gün");
 console.log(f ? f + " FAIL" : "ALL PASS"); process.exit(f ? 1 : 0);
