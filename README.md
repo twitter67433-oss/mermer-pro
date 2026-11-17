@@ -6,6 +6,16 @@ Telefonda çalışan, neon/"2100" görünümlü kripto analiz ve işlem terminal
 
 > ⚠️ **Yatırım tavsiyesi değildir. Sinyal garanti değildir.** Elle her işlem onay penceresinde **ONAYLA**'ya dokunduğunda gider. **OTO AL-SAT varsayılan olarak KAPALI**dır; açarsan bot yalnızca BOT CÜZDANI'ndaki parayla, koyduğun limitler içinde onay sormadan işlem yapar. pump.fun tokenlarının büyük çoğunluğu kısa sürede değerini neredeyse tamamen kaybeder; vadeli işlemler kaldıraçlıdır.
 
+## v7.13 · ⏱ AKILLI SİNYAL (öğrenen, yalnızca A+) + maskot VOLTİ
+
+- **Kendi kendine öğrenen ağırlıklar**: her coin + aralıkta her gösterge, o ana kadar sonucu bilinen mumlardan (ileriye bakmadan, yakın geçmiş daha ağır) puanlanır; işe yaramayan 0, ters çalışan negatif ağırlık alır. Cihazda saklanır, her mum kapanışında yenilenir.
+- **Yalnızca A+**: skor güçlü + uyum ≥%65 + üst TF ters değil + ücreti karşılayan hareket + kötü saat değil + bu kurulum geçmişte ≥%55 tuttu (≥20 örnek) ve ücret sonrası artıda → LONG/SHORT. Değilse BEKLE + eğilim. Kart "geçmişte %X tuttu (N örnek)" gösterir.
+- **TREND / DÖNÜŞ** modu. **Bağlamlı mum formasyonları** (yutan, çekiç, ters çekiç, asılı adam, kayan yıldız, doji, pin bar, sabah/akşam yıldızı, üç asker/karga, harami, cımbız, marubozu, iç/dış bar) — formasyon başına isabet, grafikte ok.
+- **SIKIŞMA → PUMP/DUMP**: BB/Keltner sıkışması, ATR düşüşü, hacim kuruması, dar kutu; yön ihtimali (CVD, taker, defter, OI, funding, likidasyon, üst TF, BTC); kutu dışı kapanış + hacim → PUMP/DUMP, geri dönüş → SAHTE KIRILIM. Stop kutunun öbür tarafı, hedef kutu yüksekliği.
+- **Likidasyon mıknatısları** (OI artışı × 10/25/50/100x tahmini), **emir defteri duvarları + spoof**, **CVD uyumsuzluğu**, **BTC öncülük**, **saat/seans etkisi**, **kilit seviyeler** (gün/dün tepe-dip, hafta açılışı).
+- Sade tasarım: maskot VOLTİ + tek sinyal kartı + büyük mum grafiği (ekranın ~%56'sı, 50 mum, yakınlaştır/kaydır); ayrıntılar "DETAYLAR" altında kapalı.
+- Veri yalnızca Binance USDⓈ-M vadeli. Emir yok, anahtar yok, cüzdan yok. Testler: `node tests/smart.test.js`.
+
 ## v7.12 · ⏱ SİNYAL — her aralık (1dk … 1G)
 
 SCALP sekmesi artık **⏱ SİNYAL**: mum aralığı seçilebilir (1dk, 3dk, 5dk, 15dk, 30dk, 1s, 2s, 4s, 6s, 8s, 12s, 1G; cihazda saklanır). Onay için bir üst iki aralık kullanılır (15dk → 30dk + 1s, 1G → 3G + 1H).

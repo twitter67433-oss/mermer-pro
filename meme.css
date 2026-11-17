@@ -250,3 +250,69 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(255,
 .sc-ovc small{font-size:9.5px;color:#7fa9b8}.sc-ovc b{font-size:12px}.sc-ovc i{font-style:normal;font-size:9px;opacity:.8}
 .sc-ovc.on{border-color:#00f0ff;box-shadow:0 0 8px #00f0ff66}
 .sc-ovc.y{color:#ffe600}
+/* v7.13 AKILLI SİNYAL */
+.sg-mode{display:flex;align-items:center;gap:8px;margin:6px 0}
+.sg-seg button{padding:7px 12px;font-size:11px}
+.sg-snd{margin:0}
+.sg-st{margin-left:auto;font-size:10px;text-align:right}
+.sg-hero{display:grid;grid-template-columns:96px 1fr;gap:10px;align-items:center;margin-top:6px}
+.sg-card{border:1px solid #1d4256;border-radius:16px;padding:10px 12px;background:linear-gradient(160deg,rgba(0,240,255,.06),rgba(255,43,214,.04));min-width:0}
+.sg-sym{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sg-state{font-family:var(--disp);font-weight:900;font-size:34px;letter-spacing:3px;line-height:1.1;margin:2px 0;text-shadow:0 0 14px currentColor}
+.sg-state.y{color:#ffe600}.sg-state.m,.m{color:#ff2bd6}
+.sg-sub{font-size:11.5px;line-height:1.35}
+.sg-line{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(0,240,255,.2)}
+.sg-cd{margin-top:4px}
+.sg-cd b{color:var(--c);font-family:var(--disp)}
+.sg-bubble{position:relative;margin:8px 0 4px;padding:8px 12px;border-radius:14px;border:1px solid currentColor;font-size:12.5px;line-height:1.4;color:#b9f7ff;background:rgba(2,10,18,.8)}
+.sg-bubble.up{color:#a8ffb0}.sg-bubble.dn{color:#ffb3c0}.sg-bubble.y{color:#fff3a0}.sg-bubble.m{color:#ffc4f1}
+.sg-bubble::before{content:"";position:absolute;top:-7px;left:38px;width:12px;height:12px;background:inherit;border-left:1px solid currentColor;border-top:1px solid currentColor;transform:rotate(45deg)}
+.sg-alerts{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.sg-al{font-size:10.5px;padding:3px 7px;border:1px solid currentColor;border-radius:8px;background:rgba(2,8,14,.6)}
+.sg-al.c{color:var(--c)}.sg-al.y{color:#ffe600}
+.sg-chartwrap{position:relative;margin:6px 0}
+.sg-cv{display:block;width:100%;height:56vh;min-height:320px;max-height:640px;border:1px solid #12324a;border-radius:14px;background:radial-gradient(ellipse at 50% 30%,rgba(0,240,255,.05),rgba(2,8,14,.7));touch-action:pan-y}
+.sg-zoom{position:absolute;top:6px;left:6px;display:flex;gap:4px}
+.sg-zoom button{width:30px;height:28px;border-radius:8px;border:1px solid #1d4256;background:rgba(2,8,14,.8);color:var(--c);font-size:14px;cursor:pointer}
+.sc-ovr{display:grid;grid-template-columns:repeat(12,1fr);gap:3px}
+.sc-ovc{padding:4px 0}.sc-ovc b{font-size:12px}
+.sg-det{margin-top:10px}
+.sg-det-h{font-family:var(--disp);font-size:11px;letter-spacing:2px;color:var(--m);margin:8px 0 2px}
+.sg-det .keys{margin-top:6px}
+.sg-hours{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;font-size:9.5px;text-align:center}
+.sg-hours span{border:1px solid #12324a;border-radius:4px;padding:2px 0}
+@media (max-width:420px){ .sc-ovr{grid-template-columns:repeat(6,1fr)} .sg-state{font-size:28px} .sg-hero{grid-template-columns:84px 1fr} }
+/* mascot VOLTİ */
+.masc{position:relative;text-align:center;--mc:#ffe600}
+.masc-svg{width:100%;height:auto;overflow:visible;filter:drop-shadow(0 0 8px var(--mc));animation:mBob 2.6s ease-in-out infinite}
+.masc-name{font-family:var(--disp);font-size:9px;letter-spacing:2px;color:var(--mc);margin-top:-2px}
+.masc .m-head{fill:#06131c;stroke:var(--mc);stroke-width:3}
+.masc .m-visor{fill:#020a10;stroke:var(--mc);stroke-width:1.5;opacity:.95}
+.masc .m-eyes path,.masc .m-mouth{fill:none;stroke:var(--mc);stroke-width:3.5;stroke-linecap:round}
+.masc .m-eyes circle{fill:var(--mc)}.masc .m-pupil{fill:#020a10!important}
+.masc .m-body{fill:#06131c;stroke:var(--mc);stroke-width:2.5}
+.masc .m-core{fill:var(--mc);animation:mPulse 1.4s ease-in-out infinite}
+.masc .m-line,.masc .m-arms path{stroke:var(--mc);stroke-width:3.5;fill:none;stroke-linecap:round}
+.masc .m-bulb{fill:var(--mc);animation:mPulse 1s ease-in-out infinite}
+.masc .m-horns path{fill:var(--mc);opacity:.9}.masc .m-ears circle{fill:#06131c;stroke:var(--mc);stroke-width:2.5}
+.masc .m-zz text{fill:var(--mc);font:bold 11px var(--disp);animation:mZz 2.2s ease-in-out infinite}
+.masc .m-eyes,.masc .m-mouth,.masc .m-horns,.masc .m-ears,.masc .m-zz,.masc .m-arms{display:none}
+.masc.st-wait{--mc:#ffe600}.masc.st-wait .e-sleep,.masc.st-wait .mo-flat,.masc.st-wait .m-zz,.masc.st-wait .a-down{display:inline}
+.masc.st-wait .masc-svg{animation:mSway 4s ease-in-out infinite}
+.masc.st-long{--mc:#39ff14}.masc.st-long .e-happy,.masc.st-long .mo-smile,.masc.st-long .m-horns,.masc.st-long .a-down{display:inline}
+.masc.st-long .masc-svg{animation:mBob 1.2s ease-in-out infinite}
+.masc.st-short{--mc:#ff3355}.masc.st-short .e-worry,.masc.st-short .mo-sad,.masc.st-short .m-ears,.masc.st-short .a-down{display:inline}
+.masc.st-short .masc-svg{animation:mShake 2.4s ease-in-out infinite}
+.masc.st-pump{--mc:#39ff14}.masc.st-pump .e-alert,.masc.st-pump .mo-o,.masc.st-pump .m-horns,.masc.st-pump .a-up{display:inline}
+.masc.st-pump .masc-svg{animation:mJump .7s ease-in-out infinite}
+.masc.st-dump{--mc:#ff3355}.masc.st-dump .e-alert,.masc.st-dump .mo-o,.masc.st-dump .m-ears,.masc.st-dump .a-up{display:inline}
+.masc.st-dump .masc-svg{animation:mShake .5s linear infinite}
+.masc.st-sqz{--mc:#ff2bd6}.masc.st-sqz .e-alert,.masc.st-sqz .mo-flat,.masc.st-sqz .a-down{display:inline}
+.masc.st-sqz .masc-svg{animation:mBuzz .25s linear infinite}
+@keyframes mBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes mJump{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-10px) scale(1.04)}}
+@keyframes mShake{0%,100%{transform:rotate(0)}25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+@keyframes mBuzz{0%,100%{transform:translateX(0)}50%{transform:translateX(1.5px)}}
+@keyframes mSway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg) translateY(2px)}}
+@keyframes mPulse{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes mZz{0%{opacity:0;transform:translateY(4px)}50%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
