@@ -98,14 +98,14 @@ function startPoll(){ if (S.poll) return; S.poll = setInterval(async () => { con
     for (const r of k){ const T = +r[6]; onKline({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5], T, V: r[9], x: T < now() }, tf); } S.pollErr = 0; } catch(e){ S.pollErr = (S.pollErr || 0) + 1; paintSt(e.message); } }, 3000); }
 function stopPoll(){ if (S.poll){ clearInterval(S.poll); S.poll = null; } }
 async function start(sym, tf){ sym = String(sym || S.sym).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (!sym) return; if (tf && TF_SEL.includes(tf)) S.tf = tf; const my = ++S.gen;
-  Object.assign(S, { sym, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
+  Object.assign(S, { sym, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, dec: null, mv: null, decAt: 0, I: {}, sum: [], curKey: "", pendKey: "", view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
   localStorage.setItem("neon.scalp.sym", sym); localStorage.setItem("neon.scalp.tf", S.tf);
   const q = $("#sc-q"); if (q) q.value = sym; document.querySelectorAll("[data-stf]").forEach(x => x.classList.toggle("on", x.dataset.stf === S.tf)); paintHead(); paintAll();
   try { await loadList(); const info = S.list.find(x => x.s === sym); if (S.list.length && !info) throw new Error(sym + " Binance USDⓈ-M vadelide USDT perp olarak yok");
     await loadKlines(sym, my); if (my !== S.gen) return; if (!base().length) throw new Error("mum verisi yok");
     const lp = base()[base().length - 1].c; DP = info ? Math.max(0, Math.min(8, Math.round(-Math.log10(info.tick)))) : Math.max(0, Math.min(8, 5 - Math.floor(Math.log10(lp || 1))));
     await Promise.all([loadDer(sym, my), loadBook(sym, my), loadBtc(my)]); if (my !== S.gen) return; connect(sym); compute(true); resolveAll(); if (S.W) saveLearn(S.W); loadOv(sym, my); }
-  catch(e){ if (my === S.gen){ S.err = e.message; paintAll(); } } }
+  catch(e){ if (my === S.gen){ S.err = e.message; paintAll(); bump(); } } }
 /* ---------------- engine ---------------- */
 function liveDerVotes(){ const D = S.der, v = {}; if (fin(D.fund)) v.fund = D.fund > 0.0005 ? -1 : D.fund > 0.0002 ? -0.4 : D.fund < -0.0003 ? 1 : D.fund < 0 ? 0.3 : 0;
   const b = base(), n = b.length; if (fin(D.oiCh) && n > 8){ const pu = sgn(b[n - 1].c - b[n - 8].c); v.oi = D.oiCh > 0.3 ? pu : D.oiCh < -0.3 ? pu*0.3 : 0; }
@@ -133,8 +133,8 @@ function decide(R){ const W = R.W, L = W.live, P = R.P, b = P.b, i = L.i, px = b
   out.state = "BEKLE"; out.lean = out.lean || (Math.abs(L.sc.S) >= 0.1 ? L.d : 0); out.reason = out.reason || L.why[0] || "net kurulum yok"; out.conf = L.setup; return out; }
 let lastRun = 0;
 function compute(force){ if (!base().length) return; const t = Date.now(); if (!force && t - lastRun < 2000) return; lastRun = t;
-  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; summarize(); }
-  catch(e){ S.err = "hesap hatası: " + e.message; } if (visible()) paintAll(); }
+  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); bump(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; summarize(); }
+  catch(e){ S.err = "hesap hatası: " + e.message; } bump(); if (visible()) paintAll(); }
 function finalize(){ const b = base().filter(x => x.x), l = b[b.length - 1]; if (!l || l.t <= S.lastFinal) return; S.lastFinal = l.t; jTrigCheck(l); let R, D; try { R = run(true); if (!R) return; D = decide(R); } catch(e){ return; }
   saveLearn(R.W); const all = H.load(), L = all[key()] = all[key()] || []; if (L.length && L[0].t >= l.t) return; const prev = L[0], act = ["LONG", "SHORT", "PUMP", "DUMP"].includes(D.state) && D.plan && fin(D.plan.stop);
   L.unshift({ tf: S.tf, t: l.t, side: act ? (D.d > 0 ? "LONG" : "SHORT") : "BEKLE", state: D.state, mode: S.mode, conf: D.conf && fin(D.conf.hit) ? Math.round(D.conf.hit*100) : null, entry: l.c, stop: act ? D.plan.stop : null, tp1: act ? D.plan.tp : null, res: {} });
@@ -179,7 +179,7 @@ function summarize(){ if (!S.D || !S.R) return; const I = {}; for (const t of TF
     note: T && T.n ? `${C.label} ama bu kural ${S.sym.replace("USDT", "")} ${TF_LBL[S.tf]}'da geçmişte %${Math.round(T.win*100)} kazandırdı (${T.n} giriş, ücret sonrası ${T.net >= 0 ? "+" : ""}${T.net.toFixed(1)}%)` : `${C.label} ama bu kural için yeterli geçmiş yok` }; }
   const bb = base().slice(-10), f = v => fp(v); S.dec = SMT.decision(C, A, { px: S.D.px, atr: P.A[n], ema21: P.e21[n], hi: Math.max(...bb.map(k => k.h)), lo: Math.min(...bb.map(k => k.l)), f });
   S.mv = SMT.mainView(S.dec, S.D, mi, TF_LBL[S.tf]);
-  S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); if (visible()) paintGen(); checkAlert(); jFromDecision(C, A, P.A[n]); }
+  S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); S.decAt = Date.now(); bump(); if (visible()) paintGen(); checkAlert(); jFromDecision(C, A, P.A[n]); }
 function actKey(){ const A = S.A, C = S.G; if (!A || !C) return ""; if (A.act !== "BEKLE") return A.act; if (C.strong) return "YÖN " + SMT.DIRW[C.label]; return ""; }
 function checkAlert(){ const k = actKey(); if (k === S.curKey){ S.pendKey = ""; return; } if (!k){ S.curKey = ""; S.pendKey = ""; return; }
   if (S.pendKey !== k){ S.pendKey = k; return; } /* must hold on two consecutive updates (≈2+ s) so a flicker does not ring */
@@ -406,7 +406,8 @@ function paintHist(){ const el = $("#sc-hist"); if (!el) return; const k = key()
     <button type="button" id="sc-clr" class="mini">bu coin + aralığın geçmişini sıfırla</button>`;
   $("#sc-clr").onclick = () => { if (!confirm(S.sym + " · " + TF_LBL[S.tf] + " sinyal geçmişi silinsin mi? (yalnızca bu cihaz)")) return; const a = H.load(); delete a[k]; H.save(a); const o = ST.load(); delete o[k]; localStorage.setItem(SK, JSON.stringify(o)); paintHist(); }; }
 function paintAll(){ paintHead(); paintSt(); paintMain(); paintJournal(); paintChart(); if (S.D) paintDetails(); paintHist(); }
-function tick(){ if (!S.started) return; if (!visible()) return; const b = base(), l = b[b.length - 1], cd = $("#sc-cd"); if (cd && l) cd.textContent = cdf(l.T + 1 - now());
+const engineOn = () => (document.body.dataset.pg === "scalp" || document.body.dataset.pg === "analiz") && !document.hidden;
+function tick(){ if (!S.started) return; if (!engineOn()) return; const b = base(), l = b[b.length - 1], cd = $("#sc-cd"); if (cd && l) cd.textContent = cdf(l.T + 1 - now());
   if (l && !S.err && !S.poll && ((!S.wsOk && now() > l.T + 5000) || (S.wsOk && Date.now() - Math.max(S.lastTick, S.wsAt || 0) > 10000))) startPoll();
   if (Date.now() - (S.der.at || 0) > 60000 && S.D){ S.der.at = Date.now(); loadDer(S.sym, S.gen); }
   if (Date.now() - (S.bookAt || 0) > 20000 && S.D){ S.bookAt = Date.now(); loadBook(S.sym, S.gen); }
@@ -434,10 +435,15 @@ function bind(){ const q = $("#sc-q"); q.oninput = () => paintList(q.value); q.o
   window.addEventListener("resize", () => visible() && paintChart());
   let hidAt = 0; document.addEventListener("visibilitychange", () => { if (document.hidden){ hidAt = Date.now(); return; } if (S.started && hidAt && Date.now() - hidAt > 20000) start(S.sym); hidAt = 0; }); }
 function pick(sym){ const q = $("#sc-q"); q.value = sym; $("#sc-list").classList.add("hidden"); q.blur(); start(sym); }
-function ensure(){ if (S.started){ if (visible()) paintAll(); return; } S.started = true; fj("/fapi/v1/time").then(t => { S.off = +t.serverTime - Date.now(); }).catch(() => {}); start(S.sym); setInterval(tick, 1000); }
+/* v7.21: notify the ANALİZ tab (it renders the very same S.dec / S.A / S.G) */
+function bump(){ try { window.dispatchEvent(new CustomEvent("sinyal:update")); } catch(e){} }
+function boot(){ if (S.started) return false; S.started = true; fj("/fapi/v1/time").then(t => { S.off = +t.serverTime - Date.now(); }).catch(() => {}); setInterval(tick, 1000); return true; }
+function ensure(){ if (!boot()){ if (visible()) paintAll(); return; } start(S.sym); }
+/* ANALİZ tab: same engine, same state (coin / interval shared with SİNYAL) */
+function analyze(sym, tf){ boot(); return start(sym || S.sym, tf || S.tf); }
 function init(){ const box = $("#scalp-box"); if (!box) return; box.innerHTML = html(); bind(); paintHead(); if (document.body.dataset.pg === "scalp") ensure();
   /* journal + watchlist run on every tab (paper only) */ setInterval(jLive, 2000); setInterval(() => jRemote(), 60000); setTimeout(() => jRemote(), 4000); weConfig(); paintJournal();
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "scalp") ensure(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { ensure, start, _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
+return { ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
 })();

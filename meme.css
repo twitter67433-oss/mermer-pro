@@ -1,6 +1,6 @@
 /* NEON//TERMINAL v6 — MEME platform, agents, orb, GROK chat, page tabs */
-body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]){display:none!important}
-#nav{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:8px 14px 0;padding:6px;border-radius:14px;background:rgba(244,242,237,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ded7c8;box-shadow:0 6px 24px rgba(40,30,15,0.2)}
+body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]),body[data-pg="analiz"] [data-pgs]:not([data-pgs~="analiz"]),body[data-pg="analiz"] #adv-bus{display:none!important}
+#nav{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:8px 14px 0;padding:6px;border-radius:14px;background:rgba(244,242,237,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ded7c8;box-shadow:0 6px 24px rgba(40,30,15,0.2)}
 #nav button{font-family:var(--disp);font-size:10px;letter-spacing:1px;padding:10px 2px;border-radius:10px;border:1px solid #ddd6c8;background:transparent;color:#2c3a4e;cursor:pointer;white-space:nowrap;min-width:0}
 #nav button.on{color:#f3f0eb;background:linear-gradient(90deg,#1e3a5f,#0f6b45);border-color:transparent;box-shadow:none;font-weight:900}
 body.meme-on #nav button[data-go="meme"]::after{content:" ●";color:#9a7432}
@@ -374,3 +374,42 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(155,
 .jr-tf.on{background:#0f6b45;border-color:#0f6b45;color:#f6f1e6;font-weight:700}
 .jr-wst{font-size:10.5px;margin-top:5px;line-height:1.35}
 .jr-wide{display:inline-block;margin-top:2px;font-size:9.5px;font-weight:700;color:#8a4a10;border:1px solid #c98a3a;border-radius:6px;padding:0 4px;background:#fbf0de}
+
+/* v7.21 ANALİZ tab (simple) */
+#nav button{font-size:10.5px!important;letter-spacing:.02em!important;padding:10px 0!important;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#nav button.nav-main{font-weight:800}
+.az-panel h3 small{font-weight:400}
+.az-q{position:relative;margin:4px 0 10px}.az-q input{width:100%;min-width:0;font-size:17px;padding:12px 14px;border-radius:12px}
+.az-l{position:absolute;left:0;right:0;top:100%;z-index:40;max-height:300px;overflow:auto;background:#fffdf9;border:1px solid #d9cdb7;border-radius:12px;box-shadow:0 10px 24px rgba(40,30,15,.18);padding:5px;display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.az-l button{text-align:left;padding:9px 10px;border:1px solid #e6dccb;border-radius:9px;background:#fbf8f2;color:#23201c;font-size:14px;cursor:pointer}.az-l button small{display:block;font-size:10px;color:var(--dim)}
+.az-tf{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:10px}
+.az-tf button{padding:10px 0;font-size:14px;font-weight:600;border:1px solid #e1dbce;border-radius:10px;background:#fbf8f2;color:#33445b;cursor:pointer;font-family:var(--tech)}
+.az-tf button.on{background:#0f6b45;border-color:#0f6b45;color:#f6f1e6}
+.az-go{width:100%;padding:15px 0;font-family:var(--disp);font-size:20px;font-weight:800;letter-spacing:.12em;border-radius:14px;border:1px solid #b8975a;background:linear-gradient(160deg,#1f4a3a,#0f3b2c);color:#f6ecd2;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(227,204,150,.4),0 6px 16px rgba(15,59,44,.25)}
+.az-go:active{transform:scale(.99)}
+.az-r{margin-top:12px}.az-empty{text-align:center;color:var(--dim);padding:22px 8px;font-size:14px}
+.az-card{border:1px solid #b8975a;border-radius:16px;padding:14px;background:linear-gradient(160deg,#fffdf8,#f2ecdf);box-shadow:inset 0 0 0 3px rgba(255,255,255,.6),0 8px 22px rgba(60,45,20,.10)}
+.az-coin{font-family:var(--disp);font-size:20px;font-weight:700;color:#23201c}.az-coin small{font-family:var(--tech);font-size:13px;font-weight:400;color:var(--dim)}
+.az-word{font-family:var(--disp);font-weight:800;font-size:52px;line-height:1.05;letter-spacing:.02em;margin:6px 0 4px}
+.az-word.y{color:#8a6828}
+.az-lean{font-family:var(--disp);font-size:26px;font-weight:700;margin:2px 0}
+.az-lean.y{color:#6a6358}
+.az-why{font-size:11.5px;color:var(--dim);margin-bottom:6px}
+.az-trig{font-size:15px;font-weight:600;line-height:1.45;margin:6px 0}
+.az-plan{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 4px}.az-plan div{border:1px solid #e2d6c2;border-radius:10px;padding:6px;text-align:center;background:#fffdf9}
+.az-plan small{display:block;font-size:11px;color:var(--dim)}.az-plan b{font-family:var(--tech);font-size:15px}
+.az-kind{font-size:11.5px;color:var(--dim)}
+.az-conf{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:10px 0 6px;font-size:12px}.az-conf small{color:var(--dim)}
+.az-cbar{height:9px;border-radius:6px;background:#ece5d8;overflow:hidden;border:1px solid #e0d5c2}.az-cbar span{display:block;height:100%;background:#b8975a}
+.az-cbar.up span{background:#0f6b45}.az-cbar.dn span{background:#9b1c31}
+.az-rs{margin:6px 0 8px;padding-left:18px;font-size:13.5px;line-height:1.45}.az-rs li{margin:2px 0}
+.az-dots{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;margin:6px 0}
+.az-d{display:flex;flex-direction:column;align-items:center;font-size:13px;line-height:1.1;border-radius:6px;padding:2px 0}.az-d small{font-size:8.5px;color:var(--dim)}
+.az-d.up{color:#0f6b45}.az-d.dn{color:#9b1c31}.az-d.m{color:#8a6828}.az-d.n,.az-d.na{color:#9a9285}.az-d.on{outline:1px solid #b8975a}
+.az-cv{width:100%;height:120px;display:block;margin:6px 0;border-radius:10px;background:rgba(255,253,249,.7);border:1px solid #e2d6c2}
+.az-bot{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px}.az-bot .dim{margin-right:auto}
+.az-mini{padding:7px 10px;font-size:12px;border:1px solid rgba(184,151,90,.55);border-radius:9px;background:linear-gradient(180deg,#fffdf9,#f1eadc);color:#23201c;cursor:pointer}
+.az-note{font-size:11px;margin-top:6px}.az-err{color:#9b1c31;font-weight:600;margin-bottom:8px}
+.az-load .az-wait{margin:10px 0 8px;font-size:14px}
+.az-foot{margin-top:10px;font-size:11.5px;color:var(--dim);text-align:center}
+@media (max-width:420px){ .az-word{font-size:46px} }

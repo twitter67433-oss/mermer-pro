@@ -19,3 +19,4 @@ html.night .go{color:#6fdcae!important}
 html.night ::-webkit-scrollbar-thumb{background:#4a4337}
 html.night #boot{background:linear-gradient(170deg,#1c1b18,#121110)!important}
 html.night .ag{--ac:var(--acn)!important}
+html.night .az-go{background:linear-gradient(160deg,#2f5e49,#173a2d)!important;color:#f5ead0!important}
