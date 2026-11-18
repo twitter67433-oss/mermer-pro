@@ -146,8 +146,8 @@ function html(){ const o = rec();
 }
 async function paintBal(){ const el = $("#bw-bal"); if (!el || !pub()) return;
   try { const [s, px, toks] = await Promise.all([solBal(), solPrice().catch(() => null), allTokens().catch(() => null)]); bal = s; if (toks) tokList = toks; const P = pos.list();
-    el.innerHTML = `<div class="bw-sol"><small>SOL</small><b>${fmt(s, 6)}</b><span>${px ? "≈ $" + (s*px).toFixed(2) : ""}</span></div>
-      <div class="bw-toks">${!toks ? `<div class="empty">token listesi okunamadı (RPC sınırı) — sonra yenilenir</div>` : toks.length ? toks.map(t => { const p = P.find(x => x.mint === t.mint); return `<div><span>${esc(p ? p.sym : short(t.mint))}${p && p.auto ? ` <span class="pill y">OTO</span>` : ""}</span><b>${fmt(t.amt, 2)}</b><a href="https://pump.fun/coin/${esc(t.mint)}" target="_blank" rel="noopener">↗</a></div>`; }).join("") : `<div class="empty">token yok</div>`}</div>`; }
+    el.innerHTML = `<div class="bw-sol"><small>SOL</small><b>${fmt(s, 6)}</b><span>${px ? "≈ $" + (s*px).toFixed(2) : ""}</span>${window.SGB ? SGB.tag({ perp: "SOLUSDT" }) : ""}</div>
+      <div class="bw-toks">${!toks ? `<div class="empty">token listesi okunamadı (RPC sınırı) — sonra yenilenir</div>` : toks.length ? toks.map(t => { const p = P.find(x => x.mint === t.mint); return `<div><span>${esc(p ? p.sym : short(t.mint))}${p && p.auto ? ` <span class="pill y">OTO</span>` : ""} ${window.SGB ? SGB.tag({ mint: t.mint, sym: p ? p.sym : "" }) : ""}</span><b>${fmt(t.amt, 2)}</b><a href="https://pump.fun/coin/${esc(t.mint)}" target="_blank" rel="noopener">↗</a></div>`; }).join("") : `<div class="empty">token yok</div>`}</div>`; }
   catch(e){ el.innerHTML = `<div class="err-line">✖ bakiye: ${esc(e.message)} <button class="mini" onclick="WALLET.render()">↻</button></div>`; } }
 const sheet = (o) => T().confirmSheet(o);
 function bind(){ const box = $("#bot-box"); if (!box) return;

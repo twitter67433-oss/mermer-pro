@@ -62,7 +62,7 @@ function create(o){ const { SMT, SCM, fj, cb } = o, now = o.now || (() => Date.n
   function evalDirty(){ const tn = now(); for (const s of W.list){ const c = coin(s); if (!c.dirty || TF.some(t => !c.K[t])) continue; c.dirty = false; c.evAt = tn;
       for (const t of W.tfs){ if (W.skip && W.skip(s, t)) continue; try {
           c.items[t] = item(c.K, t, { SMT, SCM, mode: W.mode }); if (!c.gRAt[t] || tn - c.gRAt[t] > GR_MS){ c.gRAt[t] = tn; try { c.gR[t] = SMT.gReplay(c.K, t); } catch(e){ c.gR[t] = null; } }
-          const r = evalCoin(c.K, t, c.items, c.gR[t], { SMT }); if (!r) continue; W.last[s + "@" + t] = { act: r.A.act, word: r.dec.word, dir: r.C.label, at: tn, px: r.px };
+          const r = evalCoin(c.K, t, c.items, c.gR[t], { SMT }); if (!r) continue; W.last[s + "@" + t] = { act: r.A.act, word: r.dec.word, dir: r.C.label, d: r.C.dir, conf: r.C.strength, trig: r.dec.trig.length ? r.dec.trig[0].t : "", at: tn, px: r.px };
           if (W.auto && (r.A.act === "GİR LONG" || r.A.act === "GİR SHORT")) cb.add({ sym: s, tf: t, d: r.A.d, entry: r.px, stop: r.A.stop, tp: r.A.tp, type: jType(r.A, r.st), why: r.A.kind + " (izleme)", src: "izleme", t: tn });
           if (r.dec.word === "BEKLE" && r.dec.trig.length && !r.live.x) c.trig[t] = { candle: r.live.t, trig: r.dec.trig.slice(), atr: r.atr }; else if (c.trig[t] && c.trig[t].candle !== r.live.t) delete c.trig[t];
         } catch(e){} }

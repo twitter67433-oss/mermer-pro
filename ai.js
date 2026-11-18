@@ -80,7 +80,9 @@ async function chat(msgs, o = {}, signal){ const req = A.buildReq(E, msgs, o), p
   if (p.json) return { text: A.fullText(E.kind, p.json), native: true };
   if (!o.stream) return { text: A.fullText(E.kind, await p.res.json()) };
   return { res: p.res }; }
-function ctxMsg(){ let c = {}; try { c = window.MEME ? MEME.context() : {}; } catch(e){ c = { err: e.message }; } return { role: "system", content: "UYGULAMA DURUMU (JSON):\n" + JSON.stringify(c) }; }
+function ctxMsg(){ let c = {}; try { c = window.MEME ? MEME.context() : {}; } catch(e){ c = { err: e.message }; }
+  /* v7.22: read-only signal badges as advisory context (no order functions are given to the AI) */ try { if (window.SGB){ const g = SGB.snapshot(); if (g.length) c = { ...c, sinyal_rozetleri: { not: "yalnızca bilgi; GİR = kanıtlı kurulum, BEKLE = bekle; DEX kaynaklılar düşük güven; emir/işlem yok", liste: g } }; } } catch(e){}
+  return { role: "system", content: "UYGULAMA DURUMU (JSON):\n" + JSON.stringify(c) }; }
 async function ask(text){ if (!A.ready(E)){ addMsg("sys", `Önce aşağıdaki ⚙ AI SAĞLAYICI bölümünden sağlayıcı seç ve API anahtarını gir${E.P.keyUrl ? " (" + E.P.keyUrl + ")" : ""}.`); return; } if (busy) return; busy = true; paintBusy();
   H.push({ role: "user", content: text }); hSave(); paintMsgs(); const a = { role: "assistant", content: "" }; H.push(a); window.BUS && BUS.emit("grok");
   const t0 = performance.now(); ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 90000);

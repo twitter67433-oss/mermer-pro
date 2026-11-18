@@ -121,7 +121,7 @@ function paintV(loading){ const el = $("#can-v"); if (!el) return; const A = S.A
   if (S.err){ el.innerHTML = `<div class="err-line">✖ ${esc(S.err)}</div>`; if (bt) bt.disabled = true; return; }
   if (!A){ el.innerHTML = `<div class="empty">${loading ? "analiz ediliyor… (15dk/1s/4s/1G + türev + balina)" : "coin seç → ANALİZ"}</div>`; return; }
   const V = A.v, P = V.plan, h = A.tf["1h"], cls = V.v === "LONG" ? "up" : V.v === "SHORT" ? "dn" : "y";
-  el.innerHTML = `<div class="can-head"><div><b class="can-sym">${esc(A.sym)}</b> <span>${fp(h ? h.px : NaN)}</span> <small class="${A.chg24 >= 0 ? "up" : "dn"}">${pc(A.chg24)} 24s</small></div>
+  el.innerHTML = `<div class="can-head"><div><b class="can-sym">${esc(A.sym)}</b> ${window.SGB ? SGB.tag({ perp: A.sym }) : ""} <span>${fp(h ? h.px : NaN)}</span> <small class="${A.chg24 >= 0 ? "up" : "dn"}">${pc(A.chg24)} 24s</small></div>
     <div class="can-verd ${cls}">${V.v}<small>güven %${V.conf}</small></div></div>
     ${P && P.side ? `<div class="can-plan">${row("giriş bölgesi", fp(P.zone[0]) + " – " + fp(P.zone[1]))}${row("stop", fp(P.stop) + ` <small>(risk %${P.riskPct.toFixed(2)})</small>`, "dn")}${row("TP1", fp(P.tp1) + ` <small>R:R ${P.rr1.toFixed(1)}</small>`, "up")}${row("TP2", fp(P.tp2) + ` <small>R:R ${P.rr2.toFixed(1)}</small>`, "up")}</div>`
       : P ? `<div class="can-plan">${row("LONG için", "1s kapanış > " + fp(P.longAbove))}${row("SHORT için", "1s kapanış < " + fp(P.shortBelow))}${row("destek / direnç", fp(P.sup) + " / " + fp(P.res))}</div>` : ""}

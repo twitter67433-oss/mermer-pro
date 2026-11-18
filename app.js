@@ -128,7 +128,7 @@ function render(d, steps){
   $("#progress").classList.add("hidden"); $("#dash").classList.remove("hidden");
   document.querySelectorAll(".grid .panel").forEach(p => { p.classList.remove("show","failed"); });
   // hero
-  $("#h-sym").textContent = d.symbol; $("#h-name").textContent = ((D.analyst && D.analyst.name) || d.base) + (d.mult > 1 ? ` · 1 kontrat = ${fmtN(d.mult)} ${d.base}` : "");
+  $("#h-sym").textContent = d.symbol; { const g = $("#h-sgb"); if (g) g.innerHTML = window.SGB ? SGB.tag({ perp: d.symbol }) : ""; } $("#h-name").textContent = ((D.analyst && D.analyst.name) || d.base) + (d.mult > 1 ? ` · 1 kontrat = ${fmtN(d.mult)} ${d.base}` : "");
   $("#h-src").innerHTML = d.src === "fut" ? `<span class="src-badge perp">PERP · Binance Futures</span>` : `<span class="src-badge spot">⚠ SPOT verisi (Futures erişilemedi)</span><small class="src-why">${esc(d.spot_reason || "")}</small>`;
   renderPerp();
   $("#h-price").textContent = fmtP(d.price);
