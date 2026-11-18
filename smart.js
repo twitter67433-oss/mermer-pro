@@ -247,5 +247,28 @@ function gReplay(K, main, o = {}){ const maxB = o.maxB || 10, fee = o.fee ?? FEE
   out.T = st(out.tr); out.PB = st(out.pb); out.days = b.length ? (b[b.length - 1].T - Math.max(from, b[Math.min(30, b.length - 1)].T))/864e5 : 0; return out; }
 /* gate: the consensus GİR rule is shown as GİR only when it held on this coin + interval: ≥20 entries, ≥55 % winners, positive average after fees */
 const gGate = g => !!(g && g.T && g.T.n >= 20 && g.T.win >= 0.55 && g.T.avg > 0);
-return { gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
+/* v7.15 ONE decision: the only big action word is GİR LONG / GİR SHORT / BEKLE; direction is shown separately as YÖN.
+   BEKLE always carries direction + concrete trigger(s) and only in the direction's side (both sides only when YÖN is YATAY).
+   x: { px, atr, ema21, hi, lo (recent high/low of the selected interval incl. the live candle), f: price formatter } */
+const DIRW = { "GÜÇLÜ LONG": "GÜÇLÜ YUKARI", LONG: "YUKARI", "NÖTR": "YATAY", SHORT: "AŞAĞI", "GÜÇLÜ SHORT": "GÜÇLÜ AŞAĞI" }, DIRA = { "GÜÇLÜ LONG": "⇈", LONG: "↑", "NÖTR": "↔", SHORT: "↓", "GÜÇLÜ SHORT": "⇊" };
+function decision(C, A, x){ const f = x.f || (v => (+v).toFixed(4)), px = x.px, R = fin(x.atr) && x.atr > 0 ? x.atr : px*0.003, p = C.dir, dirW = DIRW[C.label] || "YATAY", arrow = DIRA[C.label] || "↔";
+  const base = { dir: p, dirW, arrow, yon: `${arrow} YÖN: ${dirW}`, note: A.note || null };
+  if (A.act === "GİR LONG" || A.act === "GİR SHORT"){ const t = `${A.act} · giriş ${f(A.entry)} · stop ${f(A.stop)} · hedef ${f(A.tp)}`;
+    return { ...base, word: A.act, d: A.d, trig: [], line: t, text: `${A.act} (${A.kind}) — giriş ${f(A.entry)}, stop ${f(A.stop)}, hedef ${f(A.tp)}.` }; }
+  const sq = A.wait === "kırılımı bekle", up = sq ? A.longAbove : x.hi, dn = sq ? A.shortBelow : x.lo, bx = sq ? "kutu " : "", T = [];
+  if (p >= 0 && fin(up)) T.push({ d: 1, t: `${bx}${f(up)} üstü kapanışta LONG` });
+  if (p <= 0 && fin(dn)) T.push({ d: -1, t: `${bx}${f(dn)} altı kapanışta SHORT` });
+  if (p !== 0){ let z = A.wait === "geri çekilmeyi bekle" && fin(A.entry) ? A.entry : fin(x.ema21) && (px - x.ema21)*p > 0.1*R && Math.abs(px - x.ema21) < 3*R ? x.ema21 : px - p*0.6*R;
+    let a = z - 0.25*R, b = z + 0.25*R; if (p > 0) b = Math.min(b, px - 0.05*R); else a = Math.max(a, px + 0.05*R); if (b < a){ const m = (a + b)/2; a = b = m; }
+    T.push({ d: p, t: `geri çekilmede ${f(a)}–${f(b)} ${p > 0 ? "LONG" : "SHORT"} bölgesi` }); }
+  const yl = dirW.toLocaleLowerCase("tr");
+  return { ...base, word: "BEKLE", d: 0, trig: T, line: "BEKLE → " + (T.length ? T.map(t => t.t).join(" · ") : "net tetik yok"),
+    text: `BEKLE — yön ${yl}${T.length ? ", tetik: " + T[0].t : ""}.` }; }
+/* lower (selected interval) card: same word as the top, never a silent conflict. D = { state, d } of the selected interval, mi = its trend item */
+function mainView(dec, D, mi, tfL){ D = D || {}; const stD = D.state === "LONG" || D.state === "PUMP" ? 1 : D.state === "SHORT" || D.state === "DUMP" ? -1 : 0, vd = mi && fin(mi.d) ? sgn(mi.d, 0.25) : 0, own = stD || vd;
+  const tag = D.state === "LONG" || D.state === "SHORT" ? `bu aralıkta A+ ${D.state}` : D.state === "PUMP" || D.state === "DUMP" ? `bu aralıkta ${D.state}` : D.state === "SIKIŞMA" ? "bu aralıkta sıkışma" : `bu aralık ${vd > 0 ? "yukarı eğilimli" : vd < 0 ? "aşağı eğilimli" : "yatay"}`;
+  const conflict = !!(dec.dir && own && own === -dec.dir) || !!(dec.d && stD && stD === -dec.d);
+  const sub = dec.word === "BEKLE" ? `BEKLE · yön ${dec.dirW.toLocaleLowerCase("tr")}${dec.trig.length ? ", tetik: " + dec.trig[0].t : ""}` : dec.line;
+  return { word: dec.word, sub, tag, conflict, note: conflict ? `bu aralık ters (${tfL || ""} ${own > 0 ? "yukarı" : "aşağı"}, genel yön ${dec.dirW.toLocaleLowerCase("tr")}): dikkat` : null }; }
+return { decision, mainView, DIRW, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
 });

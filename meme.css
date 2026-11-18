@@ -250,7 +250,7 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(255,
 .sc-ovc small{font-size:9.5px;color:#7fa9b8}.sc-ovc b{font-size:12px}.sc-ovc i{font-style:normal;font-size:9px;opacity:.8}
 .sc-ovc.on{border-color:#00f0ff;box-shadow:0 0 8px #00f0ff66}
 .sc-ovc.y{color:#ffe600}
-/* v7.14 AKILLI SİNYAL */
+/* v7.15 AKILLI SİNYAL */
 .sg-mode{display:flex;align-items:center;gap:8px;margin:6px 0}
 .sg-seg button{padding:7px 12px;font-size:11px}
 .sg-snd{margin:0}
@@ -341,3 +341,12 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(255,
 .sg-mcard{margin-top:6px;padding:7px 10px}.sg-mcard .sg-state{font-size:20px}.sg-mcard .sg-sym{font-size:12px}.sg-sp{font-size:11.5px;margin-top:4px;line-height:1.35}
 .sg-als{display:inline-flex;gap:6px;align-items:center}.sg-als label{font-size:13px;display:inline-flex;align-items:center;gap:1px;cursor:pointer}.sg-als .mini{padding:2px 6px}
 @media (max-width:420px){ .sg-gdir{font-size:22px} .sg-arw{font-size:32px} .gd small{font-size:7.5px} }
+/* v7.15 one decision */
+.sg-dec{padding:8px 12px;margin:6px 0 4px}
+.sg-dword{font-family:var(--disp);font-weight:900;font-size:34px;line-height:1.05;letter-spacing:.02em}
+.sg-dword.up{color:#39ff88;text-shadow:0 0 14px #39ff8888}.sg-dword.dn{color:#ff3b6b;text-shadow:0 0 14px #ff3b6b88}.sg-dword.y{color:#ffe600;text-shadow:0 0 10px #ffe60055}
+.sg-dline{font-size:12.5px;line-height:1.45;margin-top:2px}.sg-dline .up{color:#a8ffb0}.sg-dline .dn{color:#ffb3c0}
+.sg-dnote{font-size:10.5px;margin-top:3px;line-height:1.35}
+.sg-yon{font-size:17px !important;font-weight:700}
+.sg-warn{margin-top:4px;padding:3px 7px;border:1px solid #ff9f1a;border-radius:8px;color:#ffc46b;font-size:11.5px}
+@media (max-width:420px){ .sg-dword{font-size:28px} .sg-yon{font-size:15px !important} }

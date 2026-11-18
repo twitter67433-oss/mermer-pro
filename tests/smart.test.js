@@ -1,5 +1,5 @@
 // v7.13 AKILLI SİNYAL engine tests: node tests/smart.test.js
-const SMT = require("../smart.js"); let f = 0; const ok = (n, c, i) => { console.log((c ? "PASS " : "FAIL ") + n + (i !== undefined ? "  · " + i : "")); if (!c) f++; };
+const SMT = require("../smart.js"), sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0; let f = 0; const ok = (n, c, i) => { console.log((c ? "PASS " : "FAIL ") + n + (i !== undefined ? "  · " + i : "")); if (!c) f++; };
 const bar = (i, o, c, h, l, v = 10, tb) => ({ t: 1.7e12 + i*9e5, T: 1.7e12 + (i + 1)*9e5 - 1, o, c, h: h ?? Math.max(o, c)*1.001, l: l ?? Math.min(o, c)*0.999, v, tb: tb ?? v/2, x: true });
 const nz = i => Math.sin(i*1.7)*0.4 + Math.sin(i*0.37)*0.3;
 const series = (n, fn, vf = () => 10) => Array.from({ length: n }, (_, i) => bar(i, fn(i - 1), fn(i), undefined, undefined, vf(i), vf(i)*(fn(i) >= fn(i - 1) ? 0.6 : 0.4)));
@@ -47,4 +47,19 @@ let m = SMT.walls(mk(true), null, 0).mem; m = SMT.walls(mk(true), m, 5000).mem; 
   const cutK = Object.fromEntries(Object.entries(K).map(([t, b]) => [t, b.filter(x => x.T <= cut)]));
   const gA = SMT.gReplay(K, "15m", { maxB: 0 }), gB = SMT.gReplay(cutK, "15m", { maxB: 0 }); const lt = gA.tr.filter(r => r.t <= K["15m"][299].t).length;
   ok("gReplay: entries before the cut are identical with/without future data", lt === gB.tr.length, lt + " vs " + gB.tr.length); }
+// v7.15 one decision: top and lower card never contradict
+{ let bad = [], r = 12345; const rnd = () => (r = (r*16807) % 2147483647)/2147483647, states = ["LONG", "SHORT", "PUMP", "DUMP", "SIKIŞMA", "BEKLE"];
+  for (let k = 0; k < 3000; k++){ const I = Object.fromEntries(SMT.G_ALL.map(t => [t, { d: Math.round((rnd()*2 - 1)*4)/4 }])), C = SMT.consensus(I), st = states[Math.floor(rnd()*6)], d = st === "LONG" || st === "PUMP" ? 1 : st === "SHORT" || st === "DUMP" ? -1 : 0, px = 100;
+    const main = { state: st, d, pUp: rnd(), plan: st === "SIKIŞMA" ? { longAbove: 101, shortBelow: 99 } : d ? { entry: px, stop: px - d, tp: px + d } : null };
+    const A = SMT.action(C, { main, px, atr: 1, ema21: 99 + rnd()*2 }), dec = SMT.decision(C, A, { px, atr: 1, ema21: 99 + rnd()*2, hi: 101.5, lo: 98.5 }), mv = SMT.mainView(dec, main, { d: I["15m"].d }, "15dk");
+    const err = mv.word !== dec.word ? "word" : !["GİR LONG", "GİR SHORT", "BEKLE"].includes(dec.word) ? "action word" : /LONG|SHORT/.test(dec.yon) ? "YÖN uses action words"
+      : dec.dir > 0 && dec.trig.some(t => t.d < 0) ? "SHORT trigger in up" : dec.dir < 0 && dec.trig.some(t => t.d > 0) ? "LONG trigger in down" : dec.word === "BEKLE" && !dec.trig.length ? "no trigger"
+      : dec.word === "GİR LONG" && dec.dir < 0 && !mv.conflict ? "GİR LONG vs down silent" : dec.word === "GİR SHORT" && dec.dir > 0 && !mv.conflict ? "GİR SHORT vs up silent"
+      : C.dir && (d || (Math.abs(I["15m"].d) > 0.25 ? sgn(I["15m"].d) : 0)) === -C.dir && !mv.conflict ? "interval disagrees silently"
+      : dec.word === "BEKLE" && !mv.sub.startsWith("BEKLE · yön " + dec.dirW.toLocaleLowerCase("tr")) ? "lower wording" : /NaN|undefined/.test(dec.line + dec.text + mv.sub) ? "NaN" : null;
+    if (err) bad.push(err + " " + C.label + " " + st + " " + dec.word); }
+  ok("decision: top word === lower word, YÖN never an action word, triggers only on direction side, conflicts always flagged (3000 random cases)", !bad.length, bad.slice(0, 3).join(" | "));
+  const C = SMT.consensus(Object.fromEntries(SMT.G_ALL.map(t => [t, { d: 1 }]))), dec = SMT.decision(C, { act: "BEKLE", d: 0, wait: "A+ onayını bekle", prefer: 1 }, { px: 3.72, atr: 0.02, ema21: 3.70, hi: 3.7516, lo: 3.66, f: v => v.toFixed(4) });
+  ok("decision: strong up + BEKLE → 'BEKLE → 3.7516 üstü kapanışta LONG · geri çekilmede … LONG bölgesi'", /^BEKLE → 3\.7516 üstü kapanışta LONG · geri çekilmede 3\.\d{4}–3\.\d{4} LONG bölgesi$/.test(dec.line) && dec.yon === "⇈ YÖN: GÜÇLÜ YUKARI", dec.line);
+  const flat = SMT.decision(SMT.consensus({}), { act: "BEKLE", d: 0, wait: "net yön yok" }, { px: 100, atr: 1, hi: 101, lo: 99 }); ok("decision: flat → both LONG and SHORT triggers", flat.trig.length === 2 && flat.trig[0].d === 1 && flat.trig[1].d === -1, flat.line); }
 console.log(f ? f + " FAIL" : "ALL PASS"); process.exit(f ? 1 : 0);

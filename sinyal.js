@@ -1,4 +1,4 @@
-/* NEON//TERMINAL v7.14 — ⏱ SİNYAL tab UI: GENEL YÖN (all intervals → one direction + plain summary + ŞİMDİ NE YAPMALI + instant alert), AKILLI SİNYAL (self-learning, A+ only), squeeze → PUMP/DUMP, big chart, mascot "VOLTİ".
+/* NEON//TERMINAL v7.15 — ⏱ SİNYAL tab UI: ONE decision (GİR LONG / GİR SHORT / BEKLE + trigger) with YÖN shown separately; GENEL YÖN (all intervals → one direction + plain summary + ŞİMDİ NE YAPMALI + instant alert), AKILLI SİNYAL (self-learning, A+ only), squeeze → PUMP/DUMP, big chart, mascot "VOLTİ".
    Binance USDⓈ-M FUTURES public data only (fapi.binance.com REST, fstream.binance.com /market + /public WebSockets). No spot, no keys, no orders, no wallet. */
 "use strict";
 window.SCALP = (() => {
@@ -43,9 +43,9 @@ function html(){ return `<div class="sg-top"><div class="can-search sc-search"><
   <div class="tfbar sc-quick">${QUICK.map(s => `<button type="button" data-sq="${s}">${s === "PAXGUSDT" ? "ALTIN" : s.replace("USDT", "")}</button>`).join("")}</div>
   <div class="tfbar sc-tfs" role="toolbar" aria-label="Mum aralığı">${TF_SEL.map(t => `<button type="button" data-stf="${t}" class="${t === S.tf ? "on" : ""}">${TF_LBL[t]}</button>`).join("")}</div>
   <div class="sg-mode"><div class="seg sg-seg"><button type="button" data-md="trend" class="${S.mode === "trend" ? "on" : ""}">TREND</button><button type="button" data-md="rev" class="${S.mode === "rev" ? "on" : ""}">DÖNÜŞ</button></div><span class="sg-als"><label title="sesli uyarı"><input type="checkbox" id="al-snd" ${S.al.snd ? "checked" : ""}>🔊</label><label title="titreşim"><input type="checkbox" id="al-vib" ${S.al.vib ? "checked" : ""}>📳</label><button type="button" id="al-ntf" class="mini" title="tarayıcı bildirimi">${S.al.ntf ? "🔔" : "🔕"}</button></span><span id="sc-st" class="dim sg-st"></span></div></div>
-  <div id="sg-gen" class="sg-gen"><div class="sg-hero"><div id="sg-masc" class="masc st-wait">${MASC}<div class="masc-name">VOLTİ</div></div><div id="sg-gcard" class="sg-gcard"><div class="empty">GENEL YÖN hesaplanıyor…</div></div></div>
+  <div id="sg-gen" class="sg-gen"><div id="sg-now" class="sg-now"><div class="empty">karar hesaplanıyor…</div></div><div class="sg-hero"><div id="sg-masc" class="masc st-wait">${MASC}<div class="masc-name">VOLTİ</div></div><div id="sg-gcard" class="sg-gcard"><div class="empty">GENEL YÖN hesaplanıyor…</div></div></div>
    <div id="sg-bubble" class="sg-bubble">Merhaba! Ben VOLTİ. Tüm aralıkları okuyorum…</div>
-   <div id="sg-now" class="sg-now"></div></div>
+   </div>
   <div id="sg-card" class="sg-card sg-mcard"><div class="empty">yükleniyor…</div></div>
   <div class="sg-chartwrap"><canvas id="sc-cv" class="sg-cv"></canvas><div class="sg-zoom"><button type="button" data-z="-1">－</button><button type="button" data-z="1">＋</button><button type="button" data-z="0">⟲</button></div></div>
   <div class="sg-det"><div class="sg-det-h">DETAYLAR</div>
@@ -172,12 +172,14 @@ function summarize(){ if (!S.D || !S.R) return; const I = {}; for (const t of TF
   const C = SMT.consensus(I), P = S.R.P, n = P.n - 1; let A = SMT.action(C, { main: S.D, px: S.D.px, atr: P.A[n], ema21: P.e21[n] });
   if (A.kind === "trend" && !SMT.gGate(S.gR)){ const T = S.gR && S.gR.T; A = { act: "BEKLE", d: 0, prefer: C.dir, kind: "kapı", wait: "A+ onayını bekle",
     note: T && T.n ? `${C.label} ama bu kural ${S.sym.replace("USDT", "")} ${TF_LBL[S.tf]}'da geçmişte %${Math.round(T.win*100)} kazandırdı (${T.n} giriş, ücret sonrası ${T.net >= 0 ? "+" : ""}${T.net.toFixed(1)}%)` : `${C.label} ama bu kural için yeterli geçmiş yok` }; }
+  const bb = base().slice(-10), f = v => fp(v); S.dec = SMT.decision(C, A, { px: S.D.px, atr: P.A[n], ema21: P.e21[n], hi: Math.max(...bb.map(k => k.h)), lo: Math.min(...bb.map(k => k.l)), f });
+  S.mv = SMT.mainView(S.dec, S.D, mi, TF_LBL[S.tf]);
   S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); if (visible()) paintGen(); checkAlert(); }
-function actKey(){ const A = S.A, C = S.G; if (!A || !C) return ""; if (A.act !== "BEKLE") return A.act; if (C.strong) return C.label; return ""; }
+function actKey(){ const A = S.A, C = S.G; if (!A || !C) return ""; if (A.act !== "BEKLE") return A.act; if (C.strong) return "YÖN " + SMT.DIRW[C.label]; return ""; }
 function checkAlert(){ const k = actKey(); if (k === S.curKey){ S.pendKey = ""; return; } if (!k){ S.curKey = ""; S.pendKey = ""; return; }
   if (S.pendKey !== k){ S.pendKey = k; return; } /* must hold on two consecutive updates (≈2+ s) so a flicker does not ring */
   S.curKey = k; S.pendKey = ""; if (Date.now() - (S.alAt[k] || 0) < 600000) return; S.alAt[k] = Date.now(); fireAlert(k); }
-function fireAlert(k, test){ const up = /LONG/.test(k), coin = S.sym.replace("USDT", ""), A = S.A || {}, body = (test ? "[TEST] " : "") + `${coin} ${TF_LBL[S.tf]}: ${k}` + (fin(A.entry) && A.act !== "BEKLE" ? ` · giriş ${fp(A.entry)} stop ${fp(A.stop)} hedef ${fp(A.tp)}` : "");
+function fireAlert(k, test){ const up = /LONG|YUKARI/.test(k), coin = S.sym.replace("USDT", ""), A = S.A || {}, body = (test ? "[TEST] " : "") + `${coin} ${TF_LBL[S.tf]}: ${k}` + (fin(A.entry) && A.act !== "BEKLE" ? ` · giriş ${fp(A.entry)} stop ${fp(A.stop)} hedef ${fp(A.tp)}` : "");
   alarm(up ? "LONG" : "SHORT"); const g = $("#sg-gen"); if (g){ g.classList.remove("flash"); void g.offsetWidth; g.classList.add("flash"); setTimeout(() => g.classList.remove("flash"), 6000); }
   S.lastAlert = { k, at: Date.now(), body, test: !!test };
   if (S.al.ntf && window.Notification && Notification.permission === "granted"){ const o = { body, tag: "neon-sinyal", renotify: true };
@@ -191,19 +193,18 @@ function paintGen(){ const gc = $("#sg-gcard"), bub = $("#sg-bubble"), nw = $("#
   const cls = C.dir > 0 ? "up" : C.dir < 0 ? "dn" : "y", have = TF_SEL.filter(t => S.I[t]).length, w = Math.min(50, Math.abs(C.G)*50);
   const dots = TF_SEL.map(t => { const x = S.I[t], d = x ? sgn(Math.abs(x.d) >= 0.25 ? x.d : 0) : null, ic = !x ? "·" : x.st === "PUMP" ? "🚀" : x.st === "DUMP" ? "💥" : x.st === "SIKIŞMA" ? "◇" : d > 0 ? (x.st === "LONG" ? "▲" : "↑") : d < 0 ? (x.st === "SHORT" ? "▼" : "↓") : "•";
     return `<button type="button" data-stf="${t}" class="gd ${!x ? "na" : x.st === "SIKIŞMA" ? "m" : d > 0 ? "up" : d < 0 ? "dn" : "n"}${t === S.tf ? " on" : ""}" title="${TF_LBL[t]} ${x ? x.st + " · eğilim " + (x.d || 0).toFixed(2) : "veri yok"}"><i>${ic}</i><small>${TF_LBL[t]}</small></button>`; }).join("");
-  gc.innerHTML = `<div class="sg-glab">GENEL YÖN <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${have}/12 aralık</small></div>
-    <div class="sg-gdir ${cls}"><span class="sg-arw">${ARW[C.label]}</span><span>${C.label}</span></div>
-    <div class="sg-bar" title="−100 SHORT … +100 LONG"><span class="sg-bar0"></span><span class="sg-barf ${cls}" style="${C.G >= 0 ? "left:50%" : "right:50%"};width:${w}%"></span></div>
+  const dec = S.dec || { word: "BEKLE", line: "BEKLE", text: "BEKLE.", yon: "↔ YÖN: YATAY", dirW: "YATAY" }, wc = dec.word === "GİR LONG" ? "up" : dec.word === "GİR SHORT" ? "dn" : "y";
+  gc.innerHTML = `<div class="sg-glab">GENEL YÖN <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${have}/12 aralık · yön, işlem değil</small></div>
+    <div class="sg-gdir sg-yon ${cls}">${esc(dec.yon)}</div>
+    <div class="sg-bar" title="−100 AŞAĞI … +100 YUKARI"><span class="sg-bar0"></span><span class="sg-barf ${cls}" style="${C.G >= 0 ? "left:50%" : "right:50%"};width:${w}%"></span></div>
     <div class="dim sg-gsub">güç <b class="${cls}">%${C.strength}</b> · büyük ${C.big >= 0 ? "+" : ""}${Math.round(C.big*100)} · kısa ${C.short >= 0 ? "+" : ""}${Math.round(C.short*100)}${fin(C.relAvg) ? ` · aralık isabeti ~%${Math.round(C.relAvg*100)}` : ""}</div>
     <div class="sg-dots">${dots}</div>`;
-  bub.innerHTML = S.sum.map(esc).join("<br>"); bub.className = "sg-bubble " + cls;
-  const T = (e, s, t) => fin(s) ? ` <span>giriş <b>${fp(e)}</b></span><span>stop <b class="dn">${fp(s)}</b></span><span>hedef <b class="up">${fp(t)}</b></span>` : "";
-  let h; if (A.act !== "BEKLE") h = `<b class="sg-act ${A.d > 0 ? "up" : "dn"}">${A.act}</b> <small class="dim">${esc(A.kind)}</small>${T(A.entry, A.stop, A.tp)}`;
-  else if (A.wait === "kırılımı bekle") h = `<b class="sg-act m">BEKLE</b> <small>kırılımı bekle</small> <span>↑ <b class="up">${fp(A.longAbove)}</b> üstü LONG</span><span>↓ <b class="dn">${fp(A.shortBelow)}</b> altı SHORT</span>`;
-  else if (A.wait === "geri çekilmeyi bekle") h = `<b class="sg-act y">BEKLE</b> <small>geri çekilmeyi bekle → ${A.prefer > 0 ? "LONG" : "SHORT"}</small>${T(A.entry, A.stop, A.tp)} <small class="dim">(doğrulanmamış bölge)</small>`;
-  else h = `<b class="sg-act y">BEKLE</b> <small>${esc(A.wait)}${A.note ? " — " + esc(A.note) : ""}</small>`;
-  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI?</div><div class="sg-nowl">${h}</div>`; nw.className = "sg-now " + (A.act === "GİR LONG" ? "up" : A.act === "GİR SHORT" ? "dn" : "");
-  const D = S.D; m.className = "masc " + (A.act === "GİR LONG" ? (D && D.state === "PUMP" ? "st-pump" : "st-long") : A.act === "GİR SHORT" ? (D && D.state === "DUMP" ? "st-dump" : "st-short") : A.wait === "kırılımı bekle" ? "st-sqz" : "st-wait");
+  bub.innerHTML = [dec.text].concat(S.sum).slice(0, 4).map((x, k) => k ? esc(x) : `<b>${esc(x)}</b>`).join("<br>"); bub.className = "sg-bubble " + wc;
+  const lv = dec.word === "BEKLE" ? `<div class="sg-dline">→ ${dec.trig.length ? dec.trig.map(t => `<span class="${t.d > 0 ? "up" : "dn"}">${esc(t.t)}</span>`).join(" · ") : "net tetik yok"}</div>`
+    : `<div class="sg-dline"><span>giriş <b>${fp(A.entry)}</b></span> · <span>stop <b class="dn">${fp(A.stop)}</b></span> · <span>hedef <b class="up">${fp(A.tp)}</b></span> <small class="dim">${esc(A.kind)}</small></div>`;
+  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI? <small class="dim">· ${esc(dec.yon)}</small></div><div class="sg-dword ${wc}">${dec.word}</div>${lv}${dec.note ? `<div class="dim sg-dnote">${esc(dec.note)}</div>` : ""}`;
+  nw.className = "sg-now sg-dec " + wc;
+  const D = S.D; m.className = "masc " + (dec.word === "GİR LONG" ? (D && D.state === "PUMP" ? "st-pump" : "st-long") : dec.word === "GİR SHORT" ? (D && D.state === "DUMP" ? "st-dump" : "st-short") : A.wait === "kırılımı bekle" ? "st-sqz" : "st-wait");
   const sd = $("#sd-gen"); if (sd && sd.closest("details").open) paintGenDet(); }
 function paintGenDet(){ const el = $("#sd-gen"); if (!el) return; const g = S.gR, C = S.G, P2 = x => fin(x) ? "%" + (x*100).toFixed(1) : "—";
   const rows = TF_SEL.map(t => { const x = S.I && S.I[t]; return `<tr><td>${TF_LBL[t]}</td><td class="${x && x.d > 0.25 ? "up" : x && x.d < -0.25 ? "dn" : ""}">${x ? x.st + " " + (x.d >= 0 ? "+" : "") + x.d.toFixed(2) : "—"}</td><td>${x && x.rel && x.rel.n ? P2(SMT.relAcc(x.rel)) + ` <small>${x.rel.n}</small>` : "—"}</td><td>${(SMT.GW[t]).toFixed(2)}</td></tr>`; }).join("");
@@ -232,12 +233,13 @@ function paintMain(){ const card = $("#sg-card"), al = $("#sg-alerts"); if (!car
   const sub = D.state === "LONG" || D.state === "SHORT" ? `geçmişte <b>${pc(D.conf.hit)}</b> tuttu (${D.conf.n} örnek) · ücret sonrası ort. ${fin(D.conf.net) ? (D.conf.net >= 0 ? "+" : "") + D.conf.net.toFixed(2) + "%" : "—"}`
     : D.state === "PUMP" || D.state === "DUMP" ? `${D.sub} · geçmiş kırılımlar ${D.conf.n ? pc(D.conf.hit) + " (" + D.conf.n + ")" : "az örnek"}`
     : D.state === "SIKIŞMA" ? `patlama yakın · <b class="${D.pUp >= 0.5 ? "up" : "dn"}">${D.pUp >= 0.5 ? "yukarı" : "aşağı"} %${Math.round(Math.max(D.pUp, 1 - D.pUp)*100)}</b>`
-    : `${esc(D.reason)}${D.lean ? ` · eğilim <b class="${D.lean > 0 ? "up" : "dn"}">${D.lean > 0 ? "yukarı" : "aşağı"}</b>` : ""}`;
+    : `${esc(D.reason)}`;
   const line = P && fin(P.stop) ? `<div class="sg-line"><span>Giriş <b>${fp(P.entry)}</b></span><span>Stop <b class="dn">${fp(P.stop)}</b></span><span>Hedef <b class="up">${fp(P.tp)}</b></span></div>`
     : P && fin(P.longAbove) ? `<div class="sg-line"><span>↑ <b class="up">${fp(P.longAbove)}</b> üstü kapanış</span><span>↓ <b class="dn">${fp(P.shortBelow)}</b> altı kapanış</span></div>` : "";
-  card.innerHTML = `<div class="sg-sym"><b>${esc(S.sym.replace("USDT", ""))}</b> <span class="sc-px">${fp(D.px)}</span> <small class="dim">${TF_LBL[S.tf]} · ${S.mode === "rev" ? "DÖNÜŞ" : "TREND"}</small></div>
-    <div class="sg-state ${cls}">${D.state}</div><div class="sg-sub">${sub}</div>${line}<div class="dim sg-cd">mum kapanışına <b id="sc-cd">${cdf(left)}</b>${P && fin(P.stop) ? ` · çıkış en geç ${dur(SMT.H_OUT*TF_MS[S.tf])}` : ""}</div>`;
-  card.insertAdjacentHTML("beforeend", `<div class="sg-sp dim">${speech(D)}</div>`);
+  const V = S.mv, go = V && V.word !== "BEKLE", wcls = !V ? cls : V.word === "GİR LONG" ? "up" : V.word === "GİR SHORT" ? "dn" : "y"; void line;
+  card.innerHTML = `<div class="sg-sym"><b>${esc(S.sym.replace("USDT", ""))}</b> <span class="sc-px">${fp(D.px)}</span> <small class="dim">${TF_LBL[S.tf]} · ${S.mode === "rev" ? "DÖNÜŞ" : "TREND"} · seçili aralık</small></div>
+    <div class="sg-state ${wcls}">${V ? V.word : "…"}</div><div class="sg-sub">${V ? esc(V.sub) : ""}</div>${V && V.note ? `<div class="sg-warn">⚠ ${esc(V.note)}</div>` : ""}
+    <div class="sg-sub dim">${V ? esc(V.tag) + " · " : ""}${sub}</div><div class="dim sg-cd">mum kapanışına <b id="sc-cd">${cdf(left)}</b>${go && P && fin(P.stop) ? ` · çıkış en geç ${dur(SMT.H_OUT*TF_MS[S.tf])}` : ""}</div>`;
   if (al) al.innerHTML = (D.alerts.length ? "" : '<span class="dim">şu an uyarı yok</span>') + D.alerts.slice(0, 4).map(a => `<span class="sg-al ${a.c}">${esc(a.t)}</span>`).join(""); }
 /* ---------------- big chart ---------------- */
 function paintChart(){ const cv = $("#sc-cv"); if (!cv) return; const w = cv.clientWidth || 360, h = cv.clientHeight || 420, dpr = window.devicePixelRatio || 1; if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
@@ -335,5 +337,5 @@ function ensure(){ if (S.started){ if (visible()) paintAll(); return; } S.starte
 function init(){ const box = $("#scalp-box"); if (!box) return; box.innerHTML = html(); bind(); paintHead(); if (document.body.dataset.pg === "scalp") ensure();
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "scalp") ensure(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { ensure, start, checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "GÜÇLÜ LONG", true), get S(){ return S; } };
+return { ensure, start, checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
 })();
