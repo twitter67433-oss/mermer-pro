@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="vendor/fonts-marble.css?v=7.18">
 <link rel="stylesheet" href="style.css?v=7.18">
 <link rel="stylesheet" href="holo.css?v=7.18">
-<link rel="stylesheet" href="meme.css?v=7.22">
+<link rel="stylesheet" href="meme.css?v=7.23">
 <link rel="stylesheet" href="marble.css?v=7.19">
 <link rel="stylesheet" href="night.css?v=7.22">
 <link rel="preconnect" href="https://pumpportal.fun" crossorigin>
@@ -36,7 +36,7 @@
 </div>
 
 <header id="top">
-  <div class="brand"><span class="lux-logo">MERMER <em>TERMİNAL</em></span><small>v7.22 · MEME OTO · AKILLI SİNYAL · KOPYA · AI · PERP</small></div>
+  <div class="brand"><span class="lux-logo">MERMER <em>TERMİNAL</em></span><small>v7.23 · MEME OTO · AKILLI SİNYAL · KOPYA · AI · PERP</small></div>
   <div class="hdr-right">
     <span class="dot live"></span><span id="conn">CANLI VERİ</span>
     <span class="sep">│</span><span id="clock">--:--:--</span><small id="tzl">Berlin</small><button id="thm" type="button" aria-label="Tema">◐</button><button id="gear" type="button" aria-label="Ayarlar">⚙</button>
@@ -144,13 +144,14 @@
   <div id="links-st" class="links-st"></div>
   <div id="links-box"><div class="empty">yükleniyor…</div></div>
 </section>
-<footer>MERMER TERMİNAL · v7.22 · SİNYAL ROZETLERİ (her sekmede, yalnızca gösterim) · ANALİZ · İZLEME LİSTESİ · GECE MODU · AKILLI SİNYAL + GENEL YÖN (1dk–1G tek yön, öğrenen, yalnızca A+): yalnızca sinyal, yalnızca Binance USDⓈ-M vadeli veri, emir göndermez, olasılıksaldır · MEME OTO: SIM varsayılan (GERÇEK ile aynı ayar ve limitler, sanal para, canlı veri), GERÇEK yalnızca BOT CÜZDANI · AI yalnızca önerir · veri: Binance USDⓈ-M Futures public API, CoinGecko, Hacker News · yöntem: <a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">Jakeschincariol/day-trader-skill</a> (MIT) · yatırım tavsiyesi değildir · sinyal garanti değildir · emirler yalnızca senin onayınla, anahtarlar yalnızca bu cihazda · pump.fun verisi: PumpPortal + Solana RPC · OTO AL-SAT varsayılan KAPALI, yalnızca BOT CÜZDANI ile</footer>
+<footer>MERMER TERMİNAL · v7.23 · AÇILIŞ UYARISI · SİNYAL ROZETLERİ (her sekmede, yalnızca gösterim) · ANALİZ · İZLEME LİSTESİ · GECE MODU · AKILLI SİNYAL + GENEL YÖN (1dk–1G tek yön, öğrenen, yalnızca A+): yalnızca sinyal, yalnızca Binance USDⓈ-M vadeli veri, emir göndermez, olasılıksaldır · MEME OTO: SIM varsayılan (GERÇEK ile aynı ayar ve limitler, sanal para, canlı veri), GERÇEK yalnızca BOT CÜZDANI · AI yalnızca önerir · veri: Binance USDⓈ-M Futures public API, CoinGecko, Hacker News · yöntem: <a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">Jakeschincariol/day-trader-skill</a> (MIT) · yatırım tavsiyesi değildir · sinyal garanti değildir · emirler yalnızca senin onayınla, anahtarlar yalnızca bu cihazda · pump.fun verisi: PumpPortal + Solana RPC · OTO AL-SAT varsayılan KAPALI, yalnızca BOT CÜZDANI ile</footer>
 <div id="sheet" class="hidden" role="dialog" aria-label="Ayarlar">
   <form id="sheet-form" class="sheet-box">
     <div class="sheet-title">⚙ AYARLAR</div>
     <label>Hesap büyüklüğü ($)<input type="number" inputmode="decimal" step="any" min="10" name="account_size"></label>
     <label>İşlem başı max zarar ($)<input type="number" inputmode="decimal" step="any" min="0.1" name="max_loss_per_trade"></label>
     <label>Tutma süresi (saat)<input type="number" inputmode="decimal" step="any" min="0.5" max="72" name="hold_hours"></label>
+    <label class="sheet-chk"><input type="checkbox" id="set-splash" checked> Açılış uyarısı (eğlenceli "Trading Error" penceresi)</label>
     <div class="sheet-note">Bu cihazda saklanır (localStorage). Hiçbir yere gönderilmez.</div>
     <div class="sheet-btns"><button type="button" id="sheet-reset">VARSAYILAN</button><button type="button" id="sheet-cancel">İPTAL</button><button type="submit">KAYDET</button></div>
   </form>
@@ -181,6 +182,7 @@
 <script src="sinyal.js?v=7.21"></script>
 <script src="analiz.js?v=7.21"></script>
 <script src="badge.js?v=7.22"></script>
+<script src="splash.js?v=7.23"></script>
 <script src="ai.js?v=7.22"></script>
 <script src="nav.js?v=7.21"></script>
 </body>

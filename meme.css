@@ -422,3 +422,4 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(155,
 .pf-r .sgb{margin:3px 0 0;font-size:8.5px;padding:0 5px}.pf-r .sgb small{display:none}
 .can-head .sgb,.bw-sol .sgb{margin-left:6px}
 #h-sgb .sgb{margin-left:8px;font-size:10px}
+.sheet-box .sheet-chk{display:flex;gap:8px;align-items:center}.sheet-box .sheet-chk input{width:auto;min-width:0;margin:0;flex:0 0 auto;accent-color:#0f6b45}
