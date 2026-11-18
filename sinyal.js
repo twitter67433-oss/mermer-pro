@@ -7,7 +7,7 @@ const FUT = "https://fapi.binance.com", WSF = "wss://fstream.binance.com", { TF_
 const QUICK = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "PAXGUSDT"], HK = "neon.scalp.hist", SK = "neon.scalp.stats", LK = "neon.sinyal.learn";
 const fin = x => typeof x === "number" && isFinite(x), clip = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x)), sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0;
 const tf0 = localStorage.getItem("neon.scalp.tf");
-function alLoad(){ let o = {}; try { o = JSON.parse(localStorage.getItem("neon.sinyal.al") || "{}"); } catch(e){} return { snd: o.snd !== false, vib: o.vib !== false, ntf: !!o.ntf }; }
+function alLoad(){ let o = {}; try { o = JSON.parse(localStorage.getItem("neon.sinyal.al") || "{}"); } catch(e){} return { snd: o.snd !== false, vib: o.vib !== false, ntf: o.ntf === undefined ? !!window.NEON_NATIVE : !!o.ntf }; }
 const S = { sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : "trend", b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
   W: null, D: null, ws: [], wsOk: false, lastTick: 0, started: false, gen: 0, off: 0, err: null, snd: true, al: alLoad(), ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", alAt: {}, lastFinal: 0, list: [], poll: null, ov: {}, ovAt: 0, ovBusy: false, view: { n: 50, off: 0 } };
 const tfs = () => [S.tf].concat(higher(S.tf)), key = () => S.sym + "@" + S.tf, base = () => S.b[S.tf] || [];

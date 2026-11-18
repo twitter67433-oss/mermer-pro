@@ -18,7 +18,7 @@ const N = {
   ph: { x: .91, y: .58, l: "PHANTOM", c: "#ab9ff2", s: "Solana" },
   bt: { x: .78, y: .88, l: "BOT", c: C.g, s: "cüzdan" },
   cp: { x: .40, y: .86, l: "KOPYA", c: C.m, s: "cüzdan WS" },
-  gk: { x: .30, y: .12, l: "GROK", c: "#e8fbff", s: "xAI" } };
+  gk: { x: .30, y: .12, l: "AI", c: "#e8fbff", s: "asistan" } };
 const E = [["bn","mo"],["pf","mo"],["mo","sg"],["sg","rk"],["rk","em"],["em","bn"],["em","ph"],["em","bt"],["ph","bt"],["bt","pf"],["ph","pf"],["cp","mo"],["mo","gk"],["gk","rk"]];
 const EI = {}; E.forEach((e, i) => EI[e[0] + ">" + e[1]] = i);
 let W = 0, H = 0, dpr = 1, P = [], vis = true, raf = 0, last = 0, geo = [], t0 = performance.now();

@@ -104,7 +104,7 @@ function apply(a){ try {
   if (a.type === "sell"){ sell(a.mint); return "ONAY ekranı açıldı"; }
   if (a.type === "track"){ cmd("/api/track", { addr: a.wallet, label: a.label }, "takibe alındı (sunucu)"); return "→ sunucuya gönderildi"; }
   if (a.type === "untrack"){ cmd("/api/untrack", { addr: a.wallet }, "takipten çıkarıldı (sunucu)"); return "→ sunucuya gönderildi"; }
-  if (a.type === "buy") return "✖ SUNUCU modunda GROK'tan elle alım yok (sunucu kurallarla alır)";
+  if (a.type === "buy") return "✖ SUNUCU modunda AI'dan elle alım yok (sunucu kurallarla alır)";
   throw new Error("bilinmeyen öneri türü: " + a.type); } catch(e){ return "✖ " + e.message; } }
 /* ---------------- wallet → server ---------------- */
 async function walletUpload(){ const W = window.WALLET, b = W && W.blob && W.blob(); if (!b){ toast("Bu telefonda BOT CÜZDANI yok (CÜZDAN sekmesi)", "bad"); return; } const s = S.snap;
@@ -176,7 +176,7 @@ function mirrorBind(){ const box = $("#meme-box");
 const getC = (C, p) => p.split(".").reduce((o, k) => o && o[k], C);
 function syncInputs(force){ const s = S.snap; if (!s) return; document.querySelectorAll("#meme-box [data-r]").forEach(i => { if (!force && (i === document.activeElement || i.dataset.busy)) return; const v = getC(s.C, i.dataset.r); if (i.type === "checkbox") i.checked = !!v; else if (String(i.value) !== String(v ?? "")) i.value = v ?? ""; });
   const a = $("#rm-autostart"); if (a && a !== document.activeElement) a.checked = !!s.autoStart; }
-const srcLab = s => s === "copy" ? "KOPYA" : s === "watcher" ? "İZLEYİCİ" : s === "grok" ? "GROK" : "ELLE";
+const srcLab = s => s === "copy" ? "KOPYA" : s === "watcher" ? "İZLEYİCİ" : s === "grok" ? "AI" : "ELLE";
 let lastSlow = 0;
 function paintMirror(){ const s = S.snap; if (!s || !$("#rm-eq")) return; const real = s.mode === "GERÇEK", fresh = Date.now() - S.at < 10000;
   $("#rm-ban").className = "sv-banner " + (fresh ? "ok" : "bad"); $("#rm-ban").innerHTML = fresh ? `🖥 SUNUCU BOTU · 7/24 · ● canlı <small>${tm(S.at)}</small>` : `🖥 SUNUCU BOTU · ✖ bağlantı yok <small>son veri ${S.at ? tm(S.at) : "—"} · aşağıdaki değerler eski olabilir</small>`;
