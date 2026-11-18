@@ -79,7 +79,7 @@ async function alTick(){ const live = AL.filter(a => !a.fired); if (!live.length
 function ring(a, v){ a.fired = true; a.firedAt = Date.now(); a.fv = v; sv(ALK, AL); ALS.fired++; ALS.last = a;
   const msg = `ALARM ${a.sym}: ${a.kind === "pnl" ? "K/Z " + pc(v) : a.kind === "perp" ? "$" + fmt(v, 6) : "mcap " + fmt(v, 1) + " SOL"} ${a.op} ${a.lvl}`;
   NOTIFY.ping("bad", msg); try { navigator.vibrate && navigator.vibrate([200, 80, 200, 80, 400]); } catch(e){}
-  try { if (window.Notification && Notification.permission === "granted") new Notification("NEON ALARM", { body: msg, tag: a.id }); } catch(e){} }
+  try { if (window.Notification && Notification.permission === "granted") new Notification("MERMER ALARM", { body: msg, tag: a.id }); } catch(e){} }
 /* ===================== HABER ===================== */
 const NWK = "neon.ag.news"; const NW = { items: ld(NWK + ".i", []), seen: new Set(ld(NWK + ".s", [])), at: 0, err: {}, newN: 0, busy: false };
 async function getJ(u){ const r = await fetch(u, { signal: AbortSignal.timeout(8000), cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }
@@ -103,7 +103,7 @@ function gate(t, c, fl, m){ const out = { bonus: 0, reject: null, notes: [] };
   return out; }
 function onScored(t, c, sc){ const key = (c.e && c.e.key) || t.curve; tmRecord(t, key, c.last, sc && sc.score); }
 /* ===================== UI ===================== */
-const CARDS = [["s", "🛰", "TARAYICI", "#00f0ff"], ["e", "⏱", "GİRİŞ", "#7df9ff"], ["o", "🎯", "ÇIKIŞ", "#ff9f1c"], ["b", "⚖", "BÜTÇE", "#a0ff6a"], ["a", "🔔", "ALARM", "#ffe600"], ["n", "📰", "HABER", "#ff2bd6"], ["m", "🐋", "AKILLI PARA", "#39ff14"], ["g", "☠", "RUG DEDEKTÖRÜ", "#ff3355"], ["t", "⌛", "ZAMAN MAKİNESİ", "#b58cff"]];
+const CARDS = [["s", "🛰", "TARAYICI", "#1e3a5f"], ["e", "⏱", "GİRİŞ", "#1e3a5f"], ["o", "🎯", "ÇIKIŞ", "#a0521c"], ["b", "⚖", "BÜTÇE", "#0f6b45"], ["a", "🔔", "ALARM", "#8a6828"], ["n", "📰", "HABER", "#9a7432"], ["m", "🐋", "AKILLI PARA", "#0f6b45"], ["g", "☠", "RUG DEDEKTÖRÜ", "#9b1c31"], ["t", "⌛", "ZAMAN MAKİNESİ", "#5a3a6e"]];
 const row = (k, v, c) => `<div><span>${k}</span><b class="${c || ""}">${v}</b></div>`;
 function st(id, txt, on){ const e = document.getElementById("ags-" + id); if (!e) return; e.textContent = txt; e.className = "ag-st " + (on ? "on" : ""); const g = document.getElementById("ag-" + id); g && g.classList.toggle("live", !!on); }
 function body(id, html){ const e = document.getElementById("agb-" + id); if (e && !e.contains(document.activeElement)) e.innerHTML = html; }

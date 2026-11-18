@@ -59,7 +59,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") (function(
 const A = window.AIP, $ = s => document.querySelector(s), esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let C = A.load(localStorage), E = A.eff(C), H = (() => { try { return JSON.parse(sessionStorage.getItem("neon.xai.hist") || "[]"); } catch(e){ return []; } })(), busy = false, ctrl = null, extra = [];
 const hSave = () => sessionStorage.setItem("neon.xai.hist", JSON.stringify(H.slice(-30))), refresh = () => { E = A.eff(C); }, persist = () => { A.save(localStorage, C); refresh(); };
-const SYS = () => `Sen NEON AI'sın: NEON//TERMINAL 2100 adlı, telefonda çalışan bir pump.fun meme-coin işlem platformunun içindeki yardımcısın. Kullanıcı Onur, Türkçe konuş, kısa ve net ol.
+const SYS = () => `Sen MERMER AI'sın: MERMER TERMİNAL adlı, telefonda çalışan bir pump.fun meme-coin işlem platformunun içindeki yardımcısın. Kullanıcı Onur, Türkçe konuş, kısa ve net ol.
 Platform: SIM (sanal para, canlı veri) ve GERÇEK (BOT CÜZDANI) modları; ajanlar: İZLEYİCİ (yeni token filtreleri), KOPYACI (takip edilen cüzdanların pump.fun alımlarını kopyalar), YÜRÜTÜCÜ (PumpPortal trade-local + paralel RPC), RİSK (kayıp sonrası yarım boyut, 2 kayıp üst üste = ara, boyutu yalnızca yeni zirvede büyüt, günlük max zarar).
 KURALLAR: Asla işlem yaptığını söyleme — işlem YAPAMAZSIN. Öneri sunmak istersen cevabının sonuna tek bir blok ekle:
 \`\`\`neon

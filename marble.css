@@ -1,0 +1,75 @@
+/* MERMER TERMİNAL v7.18 — luxury marble theme (design only). Loaded last; overrides the old neon layer. */
+:root{--bg:#f3eee4;--panel:#fbf8f2;--line:#ddd3c1;--g:#0f6b45;--c:#1e3a5f;--m:#8a6a2c;--y:#8a6828;--r:#9b1c31;--txt:#2a2622;--dim:#6a6358;
+ --gold:#b8975a;--gold2:#8a6a2c;--ink:#23201c;--emer:#0f6b45;--bord:#9b1c31;--navy:#1e3a5f;
+ --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;--serif:'Playfair Display','Cormorant Garamond','Didot','Bodoni 72',Georgia,serif;
+ --mono:'JetBrains Mono','DejaVu Sans Mono',monospace;--disp:var(--serif);--tech:'JetBrains Mono','DejaVu Sans Mono',monospace;
+ --holo:linear-gradient(100deg,#7a5a22,#b8975a 45%,#d9c08a 55%,#7a5a22);--glass:linear-gradient(150deg,#fffdf9,#f6f1e7 60%,#efe8db);--edge:rgba(184,151,90,.55);--edge2:rgba(255,255,255,.7);
+ --marble:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 900' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-20 120 C90 160 140 90 230 150 S380 260 470 210 S590 240 640 200' stroke='%23b9b2a6' stroke-opacity='.35' stroke-width='1.4'/%3E%3Cpath d='M-20 128 C100 170 150 104 240 160' stroke='%23c9c2b6' stroke-opacity='.4' stroke-width='5'/%3E%3Cpath d='M40 -10 C70 120 20 220 110 330 S150 520 90 640 S120 860 60 920' stroke='%23a9a294' stroke-opacity='.28' stroke-width='1.1'/%3E%3Cpath d='M110 330 C190 360 230 330 300 390 S420 430 520 400' stroke='%23b5ae9f' stroke-opacity='.3' stroke-width='.9'/%3E%3Cpath d='M620 470 C520 500 470 560 390 560 S250 620 180 700 S60 760 -20 760' stroke='%23b0a999' stroke-opacity='.33' stroke-width='1.3'/%3E%3Cpath d='M620 480 C530 515 480 575 400 575' stroke='%23d0c9bc' stroke-opacity='.45' stroke-width='6'/%3E%3Cpath d='M390 560 C410 640 470 690 450 780 S500 880 520 920' stroke='%23b8975a' stroke-opacity='.18' stroke-width='1'/%3E%3Cpath d='M300 -10 C330 60 300 110 350 170' stroke='%23b8975a' stroke-opacity='.16' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E")}
+html,body{background:var(--bg);color:var(--txt);font-family:var(--sans)}
+body{background:var(--marble) center top/100% 100vh fixed no-repeat,radial-gradient(1100px 700px at 85% -10%,#fffdf8,transparent 60%),radial-gradient(900px 600px at -10% 110%,#e9e1d2,transparent 60%),linear-gradient(170deg,#f7f3eb,#ece5d8)!important;color:var(--txt)}
+*{text-shadow:none!important}
+#crt,#grid2100,.glitch::before,.glitch::after,#busbox::before,.panel::after{display:none!important}
+.glitch{color:var(--ink)!important;animation:none!important}
+small{color:var(--dim)}
+h1,h2,h3,h4{font-family:var(--serif)}
+/* boot */
+#boot{background:linear-gradient(170deg,#f7f3eb,#e9e1d2)!important}
+.lux-logo,.brand .lux-logo,#boot .lux-logo{font-family:var(--serif)!important;font-weight:700;letter-spacing:.14em;color:var(--ink)!important;background:none!important;-webkit-text-fill-color:currentColor!important;filter:none!important}
+.lux-logo em{font-style:italic;font-weight:500;color:var(--gold2);letter-spacing:.08em}
+#boot-logo{font-size:40px;text-align:center;border-bottom:1px solid var(--gold);padding-bottom:12px}
+#boot-lines{color:var(--dim)!important;font-family:var(--tech)}
+.boot-bar{border-color:var(--gold)!important;box-shadow:none!important;border-radius:6px;overflow:hidden}
+#boot-fill{background:var(--holo)!important;box-shadow:none!important}#boot-pct{color:var(--gold2)!important}
+/* header */
+#top{background:linear-gradient(180deg,rgba(255,253,248,.96),rgba(246,241,231,.94))!important;border-bottom:1px solid var(--gold)!important;border-image:none!important;box-shadow:0 2px 10px rgba(60,45,20,.06)}
+.brand span{font-size:20px;letter-spacing:.14em}@media (max-width:760px){.brand span.lux-logo{font-size:19px;letter-spacing:.12em}}
+.brand small{color:var(--dim);letter-spacing:.06em;font-family:var(--sans)}
+.hdr-right{color:var(--emer)!important}
+.dot{background:var(--emer)!important;box-shadow:0 0 0 3px rgba(15,107,69,.15)!important}
+#tape{background:#f8f4ec!important;border-bottom:1px solid var(--line)}
+#tape::before{background:linear-gradient(90deg,#f8f4ec,transparent)!important}#tape::after{background:linear-gradient(-90deg,#f8f4ec,transparent)!important}
+/* nav */
+#nav{background:rgba(251,248,242,.94)!important;border:1px solid var(--edge)!important;box-shadow:0 6px 18px rgba(60,45,20,.10)!important}
+#nav button{font-family:var(--serif);font-weight:600;letter-spacing:.06em;color:#4a443b!important;border-color:#e2d8c6!important;background:linear-gradient(180deg,#fffdf9,#f3ede2)!important}
+#nav button.on{color:#fbf6ea!important;background:linear-gradient(160deg,#1f4a3a,#0f3b2c)!important;border-color:var(--gold)!important;box-shadow:inset 0 0 0 1px rgba(217,192,138,.6),0 3px 8px rgba(15,59,44,.25)!important}
+/* marble cards */
+.panel,#hero,.signal,#summary .sum-grid>div,#cmd,#progress,.err-box,.mm-hero,#busbox{background:var(--glass)!important;border:1px solid var(--edge)!important;box-shadow:inset 0 1px 0 #fff,0 6px 20px rgba(60,45,20,.08)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.panel::before{background:linear-gradient(90deg,transparent,var(--gold),transparent)!important;opacity:.7!important;animation:none!important}
+.panel h3{background:none!important;color:var(--ink)!important;-webkit-text-fill-color:currentColor!important;font-family:var(--serif);font-weight:700;letter-spacing:.05em}
+.panel h3 small,.panel h3 label{color:var(--dim)!important;font-family:var(--sans)}
+button,.mini,.go,select,input,textarea{font-family:var(--sans)}
+.mini,.go,button.mini{background:linear-gradient(180deg,#fffdf9,#f1eadc)!important;border:1px solid var(--edge)!important;color:var(--ink)!important;box-shadow:0 1px 2px rgba(60,45,20,.08)!important}
+.go{color:var(--emer)!important;font-family:var(--serif);font-weight:700;letter-spacing:.06em}
+select,input,textarea{background:#fffdf9!important;color:var(--ink)!important;border:1px solid #d9cdb7!important}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(184,151,90,.45);outline-offset:1px}
+input[type=checkbox],input[type=radio]{accent-color:var(--emer)}
+a{color:var(--navy)}
+.up,.long,.buy{color:var(--emer)!important}.dn,.short,.sell{color:var(--bord)!important}.y{color:#8a6828!important}
+table th{color:var(--dim);font-family:var(--sans);font-weight:600}
+table td,table th{border-color:#e6dccb!important}
+details>summary{font-family:var(--serif);font-weight:600;color:var(--ink)}
+.keys,details.keys{background:rgba(255,253,248,.7)!important;border:1px solid #e2d6c2!important}
+footer{color:var(--dim)!important;border-top:1px solid var(--line);font-family:var(--sans)}
+/* ---------- SİNYAL ---------- */
+.sg-now{background:linear-gradient(160deg,#fffdf8,#f2ecdf)!important;border:1px solid var(--gold)!important;box-shadow:inset 0 0 0 3px rgba(255,255,255,.6),0 8px 22px rgba(60,45,20,.10)!important}
+.sg-dword{font-family:var(--serif)!important;font-weight:800!important;letter-spacing:.04em!important}
+.sg-bubble{background:#fffdf9!important;border:1px solid var(--edge)!important;color:var(--ink)!important;box-shadow:0 4px 12px rgba(60,45,20,.08)!important;font-family:var(--sans)}
+.sg-bubble::before,.sg-bubble::after{border-right-color:var(--gold)!important}
+/* VOLTİ — marble & gold statue */
+.masc-svg{filter:drop-shadow(0 3px 4px rgba(60,45,20,.25))!important}
+.masc .m-head,.masc .m-body,.masc .m-ears circle{fill:url(#mMarble)!important;stroke:var(--gold)!important}
+.masc .m-visor{fill:#f6f1e6!important;stroke:var(--gold)!important;opacity:1!important}
+.masc .m-pupil{fill:#fffdf8!important}
+.masc .m-core,.masc .m-bulb{fill:url(#mGold)!important;animation:none!important}
+.masc .m-horns path{fill:url(#mGold)!important}
+.masc-name{color:var(--gold2)!important;font-family:var(--serif)!important;font-weight:700;letter-spacing:.2em}
+/* SANAL TAKİP */
+.jr-warn{border-color:var(--gold)!important;color:#5c4a24!important;background:#fbf5e6}
+.jr-sum div{background:#fffdf9!important;border-color:#e2d6c2!important}.jr-sum small{color:var(--dim)!important}
+.jr-t td small{color:var(--dim)!important}
+/* chart frames */
+canvas{border-color:#e2d6c2!important}
+.mm-eqc canvas,.mm-tl,.mm-tape,.tlog{background:#fffdf9!important;border-color:#e2d6c2!important}
+::selection{background:rgba(184,151,90,.3)}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#d6c9b2;border-radius:6px}::-webkit-scrollbar-track{background:transparent}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}

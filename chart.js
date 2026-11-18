@@ -27,22 +27,22 @@ function tzOff(ts){ const d = new Date(ts*1000), TZ = Intl.DateTimeFormat().reso
 const intraday = () => SEC[tf] < 86400;
 function emaAll(n){ const k = 2/(n + 1), out = []; let e = null; for (const b of bars){ e = e === null ? b.c : b.c*k + e*(1 - k); out.push(e); } return out; }
 function vwapAll(){ const out = []; let day = null, pv = 0, v = 0; for (const b of bars){ const d = Math.floor(b.t/86400); if (d !== day){ day = d; pv = 0; v = 0; } const tp = (b.h + b.l + b.c)/3; pv += tp*b.v; v += b.v; out.push(v ? pv/v : b.c); } return out; }
-const vcol = b => b.c >= b.o ? "rgba(57,255,20,.38)" : "rgba(255,51,85,.38)";
+const vcol = b => b.c >= b.o ? "rgba(15,107,69,.38)" : "rgba(155,28,49,.38)";
 function plan(){ const S = D && D.data.signal; return S && S.dir === "SHORT" ? S.active : (D && (D.data.plan || (S && S.active))); }
 function build(){
   const el = $("#chart"); if (chart){ chart.remove(); chart = null; }
   chart = LightweightCharts.createChart(el, { autoSize: true,
-    layout: { background: { type: "solid", color: "transparent" }, textColor: "#6fa5b5", fontFamily: "Share Tech Mono, monospace" },
-    grid: { vertLines: { color: "#0e2230" }, horzLines: { color: "#0e2230" } },
-    crosshair: { mode: 0, vertLine: { color: "#ff2bd6", labelBackgroundColor: "#ff2bd6" }, horzLine: { color: "#00f0ff", labelBackgroundColor: "#00a8b5" } },
-    rightPriceScale: { borderColor: "#12324a", scaleMargins: { top: .08, bottom: .22 } }, timeScale: { borderColor: "#12324a", timeVisible: intraday(), secondsVisible: false, rightOffset: 6 } });
+    layout: { background: { type: "solid", color: "transparent" }, textColor: "#364760", fontFamily: "Share Tech Mono, monospace" },
+    grid: { vertLines: { color: "#eae5dc" }, horzLines: { color: "#eae5dc" } },
+    crosshair: { mode: 0, vertLine: { color: "#9a7432", labelBackgroundColor: "#9a7432" }, horzLine: { color: "#1e3a5f", labelBackgroundColor: "#1e3a5f" } },
+    rightPriceScale: { borderColor: "#e3ddd1", scaleMargins: { top: .08, bottom: .22 } }, timeScale: { borderColor: "#e3ddd1", timeVisible: intraday(), secondsVisible: false, rightOffset: 6 } });
   const pf = { type: "price", precision: prec, minMove: Math.pow(10, -prec) };
-  cs = chart.addCandlestickSeries({ upColor: "#39ff14", downColor: "#ff3355", borderUpColor: "#39ff14", borderDownColor: "#ff3355", wickUpColor: "#39ff14aa", wickDownColor: "#ff3355aa", priceFormat: pf,
+  cs = chart.addCandlestickSeries({ upColor: "#0f6b45", downColor: "#9b1c31", borderUpColor: "#0f6b45", borderDownColor: "#9b1c31", wickUpColor: "#0f6b45aa", wickDownColor: "#9b1c31aa", priceLineColor: "#b8975a", priceLineWidth: 2, priceFormat: pf,
     autoscaleInfoProvider: orig => { const r = orig(); const P = ov.lv && plan(); if (r && P && intraday()){ const pr = r.priceRange; pr.minValue = Math.min(pr.minValue, P.stop, P.target, P.entry); pr.maxValue = Math.max(pr.maxValue, P.stop, P.target, P.entry); } return r; } });
   vs = chart.addHistogramSeries({ priceFormat: { type: "volume" }, priceScaleId: "vol", lastValueVisible: false, priceLineVisible: false });
   chart.priceScale("vol").applyOptions({ scaleMargins: { top: .82, bottom: 0 } });
   const ln = (c, w) => chart.addLineSeries({ color: c, lineWidth: w || 1, priceFormat: pf, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-  e20 = ln("#ffe600"); e50 = ln("#ff2bd6"); vw = ln("#9d7bff", 2);
+  e20 = ln("#8a6828"); e50 = ln("#9a7432"); vw = ln("#5a3a6e", 2);
   chart.subscribeCrosshairMove(p => { const o = $("#ch-ohlc"); if (!o) return; const b = p && p.time ? bars.find(x => x.t + off === p.time) : bars[bars.length - 1]; o.innerHTML = b ? ohlc(b) : ""; });
   const cv = $("#orbox"); el.appendChild(cv);
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(drawOR));
@@ -55,7 +55,7 @@ function applyOv(){ if (!chart) return;
   vs.applyOptions({ visible: ov.vol }); e20.applyOptions({ visible: ov.ema20 }); e50.applyOptions({ visible: ov.ema50 }); vw.applyOptions({ visible: ov.vwap && intraday() });
   for (const l of lines) try { cs.removePriceLine(l); } catch(e){} lines = [];
   const P = plan(); if (ov.lv && P){ const L = (p, c, t, s) => lines.push(cs.createPriceLine({ price: p, color: c, lineWidth: 2, lineStyle: s, axisLabelVisible: true, title: t }));
-    const pre = P.side === "short" ? "SHORT " : ""; L(P.target, "#39ff14", pre + "HEDEF", 2); L(P.entry, "#00f0ff", pre + "GİRİŞ", 0); L(P.stop, "#ff3355", pre + "STOP", 2); }
+    const pre = P.side === "short" ? "SHORT " : ""; L(P.target, "#0f6b45", pre + "HEDEF", 2); L(P.entry, "#1e3a5f", pre + "GİRİŞ", 0); L(P.stop, "#9b1c31", pre + "STOP", 2); }
   drawOR(); }
 function setAll(){
   off = bars.length ? tzOff(bars[bars.length - 1].t) : 0;
@@ -65,7 +65,7 @@ function setAll(){
   e20.setData(bars.map((b, i) => ({ time: b.t + off, value: E20[i] }))); e50.setData(bars.map((b, i) => ({ time: b.t + off, value: E50[i] })));
   vw.setData(intraday() ? bars.map((b, i) => ({ time: b.t + off, value: VW[i] })) : []);
   const E = D && D.data.entry; if (E && E.trigger && SEC[tf] <= 3600){ const t = Math.floor((E.trigger.t - 300)/SEC[tf])*SEC[tf];
-    if (bars.some(b => b.t === t)) cs.setMarkers([{ time: t + off, position: "belowBar", color: "#ffe600", shape: "arrowUp", text: "TETİK" }]); else cs.setMarkers([]); } else cs.setMarkers([]);
+    if (bars.some(b => b.t === t)) cs.setMarkers([{ time: t + off, position: "belowBar", color: "#8a6828", shape: "arrowUp", text: "TETİK" }]); else cs.setMarkers([]); } else cs.setMarkers([]);
   const n = bars.length, show = { "1m": 180, "3m": 160, "5m": 200, "15m": 160, "30m": 140, "1h": 140 }[tf] || 120;
   chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - show), to: n + 5 });
   const o = $("#ch-ohlc"); if (o && n) o.innerHTML = ohlc(bars[n - 1]);
@@ -104,9 +104,9 @@ function drawOR(){
   let x1 = ts.timeToCoordinate(Math.floor(E.or_start/st)*st + off), x2 = ts.timeToCoordinate(Math.floor((E.or_end - 1)/st)*st + off);
   if (x1 === null && x2 === null) return; if (x1 === null) x1 = 0; if (x2 === null) x2 = cv.width - 60; x2 += Math.max(4, (ts.options().barSpacing || 6)/2);
   const y1 = cs.priceToCoordinate(E.or_high), y2 = cs.priceToCoordinate(E.or_low); if (y1 === null || y2 === null) return;
-  g.fillStyle = "rgba(255,230,0,0.10)"; g.strokeStyle = "rgba(255,230,0,0.85)"; g.lineWidth = 1; g.setLineDash([4, 3]);
+  g.fillStyle = "rgba(138,104,40,0.10)"; g.strokeStyle = "rgba(138,104,40,0.85)"; g.lineWidth = 1; g.setLineDash([4, 3]);
   g.fillRect(x1, y1, Math.max(2, x2 - x1), y2 - y1); g.strokeRect(x1, y1, Math.max(2, x2 - x1), y2 - y1);
-  g.setLineDash([]); g.fillStyle = "#ffe600"; g.font = "11px Share Tech Mono"; g.fillText("AÇILIŞ ARALIĞI", x1 + 3, y1 - 4); }
+  g.setLineDash([]); g.fillStyle = "#8a6828"; g.font = "11px Share Tech Mono"; g.fillText("AÇILIŞ ARALIĞI", x1 + 3, y1 - 4); }
 return { render, onKline, poll, get tf(){ return tf; }, TFS, _bars: () => bars };
 })();
 window.CHART = CHART;

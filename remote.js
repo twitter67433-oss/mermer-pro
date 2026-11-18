@@ -147,7 +147,7 @@ function mirrorHTML(){ return `<div class="sv-banner" id="rm-ban">🖥 SUNUCU BO
   <div class="mm-hero rm-hero"><div class="mm-bal"><div class="mm-badges"><span class="mode-badge" id="rm-badge"></span><span id="rm-auto" class="pill"></span></div><div class="mm-big"><span id="rm-eq">—</span><small>SOL</small></div><div class="mm-usd" id="rm-usd"></div><div class="mm-dep" id="rm-dep"></div></div></div>
   <div class="mm-kpis" id="rm-kpis"></div>
   <div class="mm-eqc"><div class="sub-h">HESAP EĞRİSİ <small>sunucu · ▲ alış · ▼ satış · ◆ risk</small></div><canvas id="rm-eqcv"></canvas></div>
-  <div class="sub-h">AJANLAR</div><div class="ags">${AG("w", "👁", "İZLEYİCİ", "#00f0ff")}${AG("c", "🔁", "KOPYACI", "#ff2bd6")}${AG("x", "⚡", "YÜRÜTÜCÜ", "#ffe600")}${AG("r", "⛨", "RİSK", "#39ff14")}</div>
+  <div class="sub-h">AJANLAR</div><div class="ags">${AG("w", "👁", "İZLEYİCİ", "#1e3a5f")}${AG("c", "🔁", "KOPYACI", "#9a7432")}${AG("x", "⚡", "YÜRÜTÜCÜ", "#8a6828")}${AG("r", "⛨", "RİSK", "#0f6b45")}</div>
   <div class="sub-h">AÇIK POZİSYONLAR <small id="rm-posn"></small></div><div id="rm-pos" class="pos-list"></div>
   <div class="sub-h">SON HATALAR</div><div id="rm-err" class="mm-tl rm-err"></div>
   <div class="sub-h">BU GECE <small>zaman çizelgesi · sunucu</small></div><div id="rm-tl" class="mm-tl"></div>
@@ -215,15 +215,15 @@ function paintMirror(){ const s = S.snap; if (!s || !$("#rm-eq")) return; const 
     const wl = $("#rm-wal"); if (!wl.contains(document.activeElement)) wl.innerHTML = A.cp.list.length ? A.cp.list.map(w => `<div class="wal ${w.on ? "" : "off"}"><div class="wal-h"><b>${esc(w.label)}</b><a href="https://solscan.io/account/${esc(w.addr)}" target="_blank" rel="noopener">${short(w.addr)} ↗</a><label class="sw" title="kopyala"><input type="checkbox" data-rwt="${esc(w.addr)}" ${w.on ? "checked" : ""}><span></span></label></div><div class="wal-f"><span>oturum: ${w.n} işlem · ${w.buys}A / ${w.sells}S</span><button type="button" class="mini s" data-rwd="${esc(w.addr)}" aria-label="sil">✕</button></div></div>`).join("") : `<div class="empty">sunucuda takip edilen cüzdan yok</div>`; } }
 function drawEq(s){ const c = $("#rm-eqcv"); if (!c) return; const r = c.getBoundingClientRect(); if (!r.width) return; const dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(r.width*dpr)){ c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); const Wd = r.width, H = r.height; g.clearRect(0, 0, Wd, H); const P_ = s.eq || [], d = s.dep;
-  if (P_.length < 2){ g.fillStyle = "#4f7b8a"; g.font = "10px 'Share Tech Mono', monospace"; g.fillText("eğri birkaç saniye içinde oluşur…", 8, H/2); return; }
+  if (P_.length < 2){ g.fillStyle = "#415674"; g.font = "10px 'Share Tech Mono', monospace"; g.fillText("eğri birkaç saniye içinde oluşur…", 8, H/2); return; }
   const t0 = P_[0][0], t1 = P_[P_.length - 1][0], vs = P_.map(p => p[1]).concat(d ? [d] : []), lo = Math.min(...vs), hi = Math.max(...vs), sp = (hi - lo) || Math.max(1e-6, hi*0.002);
   const X_ = t => 4 + (t - t0)/((t1 - t0) || 1)*(Wd - 8), Y_ = v => H - 14 - (v - lo)/sp*(H - 28);
-  if (d){ g.strokeStyle = "rgba(255,230,0,.4)"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, Y_(d)); g.lineTo(Wd, Y_(d)); g.stroke(); g.setLineDash([]); }
-  const upc = P_[P_.length - 1][1] >= (d || P_[0][1]), col = upc ? "#39ff14" : "#ff3355";
-  g.beginPath(); P_.forEach((p, i) => i ? g.lineTo(X_(p[0]), Y_(p[1])) : g.moveTo(X_(p[0]), Y_(p[1]))); g.strokeStyle = col; g.lineWidth = 1.8; g.shadowColor = col; g.shadowBlur = 8; g.stroke(); g.shadowBlur = 0;
-  for (const m of s.mk || []){ const x = X_(m.t); let i = P_.findIndex(p => p[0] >= m.t); if (i < 0) i = P_.length - 1; const y = Y_(P_[i][1]); g.fillStyle = m.k === "buy" ? "#00f0ff" : m.k === "risk" ? "#ffe600" : m.p >= 0 ? "#39ff14" : "#ff3355"; g.beginPath();
+  if (d){ g.strokeStyle = "rgba(138,104,40,.4)"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, Y_(d)); g.lineTo(Wd, Y_(d)); g.stroke(); g.setLineDash([]); }
+  const upc = P_[P_.length - 1][1] >= (d || P_[0][1]), col = upc ? "#0f6b45" : "#9b1c31";
+  g.beginPath(); P_.forEach((p, i) => i ? g.lineTo(X_(p[0]), Y_(p[1])) : g.moveTo(X_(p[0]), Y_(p[1]))); g.strokeStyle = col; g.lineWidth = 1.8; g.shadowColor = col; g.shadowBlur = 0; g.stroke(); g.shadowBlur = 0;
+  for (const m of s.mk || []){ const x = X_(m.t); let i = P_.findIndex(p => p[0] >= m.t); if (i < 0) i = P_.length - 1; const y = Y_(P_[i][1]); g.fillStyle = m.k === "buy" ? "#1e3a5f" : m.k === "risk" ? "#8a6828" : m.p >= 0 ? "#0f6b45" : "#9b1c31"; g.beginPath();
     if (m.k === "buy"){ g.moveTo(x, y - 10); g.lineTo(x - 4, y - 3); g.lineTo(x + 4, y - 3); } else if (m.k === "risk"){ g.moveTo(x, y - 5); g.lineTo(x + 4, y); g.lineTo(x, y + 5); g.lineTo(x - 4, y); } else { g.moveTo(x, y + 10); g.lineTo(x - 4, y + 3); g.lineTo(x + 4, y + 3); } g.fill(); }
-  g.fillStyle = "#6fa5b5"; g.font = "9px 'Share Tech Mono', monospace"; g.textAlign = "right"; g.fillText(fmt(hi, 4), Wd - 4, 10); g.fillText(fmt(lo, 4), Wd - 4, H - 3); g.textAlign = "left"; g.fillText(tm(t0).slice(0, 5), 4, H - 3); }
+  g.fillStyle = "#364760"; g.font = "9px 'Share Tech Mono', monospace"; g.textAlign = "right"; g.fillText(fmt(hi, 4), Wd - 4, 10); g.fillText(fmt(lo, 4), Wd - 4, H - 3); g.textAlign = "left"; g.fillText(tm(t0).slice(0, 5), 4, H - 3); }
 /* ---------------- render plumbing ---------------- */
 function render(){ const box = $("#meme-box"); if (!box) return; if (!P){ S.rendered = false; return; } box.innerHTML = mirrorHTML(); mirrorBind(); S.rendered = true; lastSlow = 0; paint(); }
 function full(){ const sb = $("#srv-box"); if (sb){ sb.innerHTML = srvHTML(); srvBind(); } const h = $("#srv-h"); if (h) h.textContent = P ? "eşli · telefondaki motor boşta" : "eşli değil";

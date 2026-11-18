@@ -6,7 +6,7 @@ const BUS = (() => {
 const cv = document.getElementById("bus"); if (!cv) return { emit(){}, stat(){} };
 const ctx = cv.getContext("2d");
 const RM = matchMedia("(prefers-reduced-motion: reduce)");
-const C = { c: "#00f0ff", m: "#ff2bd6", g: "#39ff14", y: "#ffe600", r: "#ff3355", v: "#9d7bff", o: "#ff9f1c", w: "#e8fbff" };
+const C = { c: "#1e3a5f", m: "#9a7432", g: "#0f6b45", y: "#8a6828", r: "#9b1c31", v: "#5a3a6e", o: "#a0521c", w: "#25231f" };
 // node layout in unit coords (mobile-first); label, color, sub-label key
 const N = {
   bn: { x: .08, y: .26, l: "BINANCE", c: C.y, s: "PERP WS" },
@@ -15,10 +15,10 @@ const N = {
   sg: { x: .55, y: .16, l: "SİNYAL", c: C.g, s: "11 beceri" },
   rk: { x: .90, y: .22, l: "RİSK", c: C.c, s: "limitler" },
   em: { x: .58, y: .62, l: "EMİR", c: C.m, s: "ONAYLA" },
-  ph: { x: .91, y: .58, l: "PHANTOM", c: "#ab9ff2", s: "Solana" },
+  ph: { x: .91, y: .58, l: "PHANTOM", c: "#253243", s: "Solana" },
   bt: { x: .78, y: .88, l: "BOT", c: C.g, s: "cüzdan" },
   cp: { x: .40, y: .86, l: "KOPYA", c: C.m, s: "cüzdan WS" },
-  gk: { x: .30, y: .12, l: "AI", c: "#e8fbff", s: "asistan" } };
+  gk: { x: .30, y: .12, l: "AI", c: "#25231f", s: "asistan" } };
 const E = [["bn","mo"],["pf","mo"],["mo","sg"],["sg","rk"],["rk","em"],["em","bn"],["em","ph"],["em","bt"],["ph","bt"],["bt","pf"],["ph","pf"],["cp","mo"],["mo","gk"],["gk","rk"]];
 const EI = {}; E.forEach((e, i) => EI[e[0] + ">" + e[1]] = i);
 let W = 0, H = 0, dpr = 1, P = [], vis = true, raf = 0, last = 0, geo = [], t0 = performance.now();
@@ -48,13 +48,13 @@ function emit(kind, o = {}){
     case "order": { stats.em++; glow.em = 1; const path = o.to === "pf" ? (o.from === "bt" ? ["em","bt","pf"] : ["em","ph","pf"]) : o.to === "ph" ? ["em","ph"] : o.to === "bt" ? ["em","bt"] : ["em","bn"];
       for (let k = 0; k < 8; k++) setTimeout(() => chain(path, C.m, { v: 1.2, s: 2.8 }), k*70); break; }
     case "bot": glow.bt = 1; spawn("em", "bt", C.g, { s: 2.2 }); break;
-    case "fund": glow.ph = 1; for (let k = 0; k < 6; k++) setTimeout(() => spawn("ph", "bt", "#ab9ff2", { s: 2.6 }), k*90); break;
+    case "fund": glow.ph = 1; for (let k = 0; k < 6; k++) setTimeout(() => spawn("ph", "bt", "#253243", { s: 2.6 }), k*90); break;
     case "liq": glow.bn = 1; for (let k = 0; k < 3; k++) setTimeout(() => spawn("bn", "mo", o.side === "SELL" ? C.r : C.g, { s: 3.2, v: 1.6 }), k*60); break;
     case "depth": glow.bn = Math.min(1, glow.bn + .2); break;
     case "pump": cnt.pf++; glow.pf = Math.min(1, glow.pf + .6); spawn("pf", "mo", C.o, { s: 2 }); break;
     case "copy": cnt.cp++; glow.cp = 1; spawn("cp", "mo", o.buy ? C.g : C.r, { s: 2.4, v: 1.3 }); break;
-    case "grok": glow.gk = 1; for (let k = 0; k < 4; k++) setTimeout(() => chain(["mo","gk","rk"], "#e8fbff", { s: 2.2 }), k*90); break;
-    case "phantom": glow.ph = 1; spawn("em", "ph", "#ab9ff2", { s: 2.4 }); break;
+    case "grok": glow.gk = 1; for (let k = 0; k < 4; k++) setTimeout(() => chain(["mo","gk","rk"], "#25231f", { s: 2.2 }), k*90); break;
+    case "phantom": glow.ph = 1; spawn("em", "ph", "#253243", { s: 2.4 }); break;
     case "state": state[o.node] = o.on; requestDraw(); return;
   }
   if (!raf && !RM.matches) loop();
@@ -74,32 +74,32 @@ function frame(t){ raf = 0; if (!vis || document.hidden) return; const dt = Math
 function draw(t){
   if (!W) return; const T = (t - t0)/1000; ctx.clearRect(0, 0, W, H);
   // grid floor
-  ctx.globalCompositeOperation = "source-over"; ctx.lineWidth = 1; ctx.strokeStyle = "rgba(0,240,255,.06)";
+  ctx.globalCompositeOperation = "source-over"; ctx.lineWidth = 1; ctx.strokeStyle = "rgba(30,58,95,.06)";
   const gs = 22, off = RM.matches ? 0 : (T*8) % gs; ctx.beginPath();
   for (let x = -off; x < W; x += gs){ ctx.moveTo(x, 0); ctx.lineTo(x, H); } for (let y = off; y < H; y += gs){ ctx.moveTo(0, y); ctx.lineTo(W, y); } ctx.stroke();
   // paths
   for (const g of geo){ ctx.beginPath(); g.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
-    ctx.strokeStyle = "rgba(120,200,255,.16)"; ctx.lineWidth = 2.2; ctx.stroke();
-    ctx.setLineDash([3, 9]); ctx.lineDashOffset = RM.matches ? 0 : -T*24; ctx.strokeStyle = "rgba(0,240,255,.28)"; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
+    ctx.strokeStyle = "rgba(30,58,95,.16)"; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.setLineDash([3, 9]); ctx.lineDashOffset = RM.matches ? 0 : -T*24; ctx.strokeStyle = "rgba(30,58,95,.28)"; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]); }
   // particles (additive)
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = "source-over";
   for (const p of P){ const [x, y] = at(geo[p.g], p.t);
     if (p.tail.length > 1){ ctx.beginPath(); p.tail.forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b)); ctx.lineTo(x, y); ctx.strokeStyle = p.c; ctx.globalAlpha = .45; ctx.lineWidth = p.s; ctx.stroke(); ctx.globalAlpha = 1; }
-    const r = p.s*3.2, gr = ctx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "#ffffff"); gr.addColorStop(.25, p.c); gr.addColorStop(1, "rgba(0,0,0,0)");
+    const r = p.s*3.2, gr = ctx.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "#201e1a"); gr.addColorStop(.25, p.c); gr.addColorStop(1, "rgba(40,30,15,0)");
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill(); }
   // nodes
   for (const k in N){ const n = N[k], { x, y } = pos(k), gl = glow[k] || 0, on = k === "bt" ? !!((window.WALLET && WALLET.unlocked()) || (window.MEME && MEME.on)) : k === "cp" ? !!(window.COPY && COPY.live) : k === "gk" ? !!(window.GROK && GROK.ready()) : state[k] !== false, R = 13 + gl*3;
-    const halo = ctx.createRadialGradient(x, y, 2, x, y, R*2.6); halo.addColorStop(0, hexA(n.c, .35 + gl*.5)); halo.addColorStop(1, "rgba(0,0,0,0)");
+    const halo = ctx.createRadialGradient(x, y, 2, x, y, R*2.6); halo.addColorStop(0, hexA(n.c, .35 + gl*.5)); halo.addColorStop(1, "rgba(40,30,15,0)");
     ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(x, y, R*2.6, 0, 6.283); ctx.fill();
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "rgba(4,10,18,.92)"; hex(x, y, R); ctx.fill();
-    ctx.strokeStyle = on ? n.c : "rgba(140,160,170,.5)"; ctx.lineWidth = 1.6 + gl*1.4; hex(x, y, R); ctx.stroke();
+    ctx.fillStyle = "rgba(243,241,235,.92)"; hex(x, y, R); ctx.fill();
+    ctx.strokeStyle = on ? n.c : "rgba(51,68,91,.5)"; ctx.lineWidth = 1.6 + gl*1.4; hex(x, y, R); ctx.stroke();
     if (!RM.matches){ ctx.save(); ctx.translate(x, y); ctx.rotate(T*(k === "mo" ? 1.1 : .5)); ctx.strokeStyle = hexA(n.c, .55); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, R + 5, 0, 1.4); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, R + 5, 3.14, 4.4); ctx.stroke(); ctx.restore(); }
-    ctx.fillStyle = on ? "#e8fbff" : "#6b8794"; ctx.font = "600 9px Orbitron, 'Share Tech Mono', monospace"; ctx.textAlign = "center"; ctx.fillText(n.l, x, y + R + 13);
+    ctx.fillStyle = on ? "#25231f" : "#3c4f6a"; ctx.font = "600 9px Orbitron, 'Share Tech Mono', monospace"; ctx.textAlign = "center"; ctx.fillText(n.l, x, y + R + 13);
     const sub = k === "bn" ? (rate.bn ? rate.bn + " tick/sn" : n.s) : k === "pf" ? (rate.pf ? rate.pf + " token/sn" : n.s) : k === "bt" ? (window.MEME && MEME.on ? "OTO ● " + MEME.mode : window.WALLET && WALLET.exists() ? (WALLET.unlocked() ? "açık" : "kilitli") : "SIM") : k === "cp" ? (window.COPY ? (COPY.list.length ? COPY.list.length + " cüzdan" : "cüzdan yok") : n.s) : k === "gk" ? (window.GROK && GROK.ready() ? "bağlı" : "anahtar yok") : n.s;
     ctx.fillStyle = hexA(n.c, .8); ctx.font = "9px 'Share Tech Mono', monospace"; ctx.fillText(sub, x, y + R + 24);
     ctx.fillStyle = n.c; ctx.beginPath(); ctx.arc(x, y, 3 + gl*2.5, 0, 6.283); ctx.fill();
-    ctx.globalCompositeOperation = "lighter"; }
+    ctx.globalCompositeOperation = "source-over"; }
   ctx.globalCompositeOperation = "source-over";
 }
 function hex(x, y, r){ ctx.beginPath(); for (let i = 0; i < 6; i++){ const a = Math.PI/6 + i*Math.PI/3; const px = x + r*Math.cos(a), py = y + r*Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); }
@@ -110,7 +110,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && !r
 RM.addEventListener && RM.addEventListener("change", () => { P = []; resize(); if (!RM.matches) loop(); });
 resize(); if (!RM.matches) loop();
 // ambient: a slow heartbeat so the bus is alive before any data arrives
-setInterval(() => { if (!document.hidden && vis && !RM.matches && P.length < 3) chain(["mo","sg","rk","em"], "rgba(0,240,255,.8)", { s: 1.2, v: .7 }); }, 2600);
+setInterval(() => { if (!document.hidden && vis && !RM.matches && P.length < 3) chain(["mo","sg","rk","em"], "rgba(30,58,95,.8)", { s: 1.2, v: .7 }); }, 2600);
 return { emit, get fps(){ return 0; }, _P: () => P.length };
 })();
 window.BUS = BUS;

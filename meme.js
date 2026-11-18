@@ -472,7 +472,7 @@ function fxLayer(){ return document.getElementById("mm-fx"); }
 let fxAc = null;
 function fxBoom(){ if (fxMute() || fxReduce()) return; try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; fxAc = fxAc || new AC(); if (fxAc.state === "suspended") fxAc.resume(); const t0 = fxAc.currentTime, o = fxAc.createOscillator(), g = fxAc.createGain();
     o.type = "sine"; o.frequency.setValueAtTime(110, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + 0.22); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.018); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3); o.connect(g); g.connect(fxAc.destination); o.start(t0); o.stop(t0 + 0.32); } catch(e){} }
-function fxBurst(){ const layer = fxLayer(); if (!layer || fxReduce()) return; const cols = ["#39ff14", "#00f0ff", "#ffe600", "#ff2bd6", "#fff"]; const n = 28, cx = innerWidth/2, cy = innerHeight*0.38;
+function fxBurst(){ const layer = fxLayer(); if (!layer || fxReduce()) return; const cols = ["#0f6b45", "#1e3a5f", "#8a6828", "#9a7432", "#201e1a"]; const n = 28, cx = innerWidth/2, cy = innerHeight*0.38;
   for (let i = 0; i < n; i++){ const d = document.createElement("i"); d.className = "mm-dot"; const ang = (Math.PI*2*i)/n + Math.random()*0.4, dist = 70 + Math.random()*140;
     d.style.setProperty("--x", cx + "px"); d.style.setProperty("--y", cy + "px"); d.style.setProperty("--dx", Math.cos(ang)*dist + "px"); d.style.setProperty("--dy", Math.sin(ang)*dist + "px"); d.style.setProperty("--c", cols[i%cols.length]); layer.appendChild(d); setTimeout(() => d.remove(), 900); } }
 function fxPop(txt){ const layer = fxLayer(); if (!layer) return; const el = document.createElement("div"); el.className = "mm-pop"; el.textContent = txt; layer.appendChild(el); setTimeout(() => el.remove(), fxReduce() ? 1400 : 1000); }
@@ -505,7 +505,7 @@ function html(){ const real = isReal(), ex = X().C;
     <div class="sub-h">AÇIK POZİSYONLAR <small id="mm-posn"></small></div><div id="mm-pos" class="pos-list"></div>
     <div class="sub-h">SON İŞLEMLER</div><div id="mm-tape" class="mm-tape"></div>
     <div class="sub-h">AJANLAR <small>dokun → ayrıntı · emir yalnızca YÜRÜTÜCÜ'den, RİSK kontrolüyle</small></div>
-    <div class="ags compact" id="mm-ags">${AG("w", "👁", "İZLEYİCİ", "#00f0ff")}${(window.AGENTS ? AGENTS.CARDS : []).map(c => AG(...c)).join("")}${AG("r", "⛨", "RİSK", "#39ff14")}${AG("x", "⚡", "YÜRÜTÜCÜ", "#ffe600")}${AG("c", "🔁", "KOPYACI", "#ff2bd6")}</div>
+    <div class="ags compact" id="mm-ags">${AG("w", "👁", "İZLEYİCİ", "#1e3a5f")}${(window.AGENTS ? AGENTS.CARDS : []).map(c => AG(...c)).join("")}${AG("r", "⛨", "RİSK", "#0f6b45")}${AG("x", "⚡", "YÜRÜTÜCÜ", "#8a6828")}${AG("c", "🔁", "KOPYACI", "#9a7432")}</div>
     <details class="mm-adv keys" id="mm-adv"><summary>Gelişmiş</summary>
     <div class="mm-eqc"><div class="sub-h">HESAP EĞRİSİ <small>▲ alış · ▼ satış · ◆ risk</small></div><canvas id="mm-eqcv"></canvas></div>
     <div class="sub-h">BU GECE <small>zaman çizelgesi</small></div><div id="mm-tl" class="mm-tl"></div>
@@ -661,19 +661,19 @@ let wQ = false; const paintWalletsQ = () => { if (wQ) return; wQ = true; setTime
 function sampleEq(){ const e = equity(); if (e === null) return; const t = Date.now(), last = EQ[EQ.length - 1]; if (last && t - last[0] < 4000) return; EQ.push([t, +e.toFixed(6)]); }
 function drawEq(){ const c = $("#mm-eqcv"); if (!c) return; const r = c.getBoundingClientRect(); if (!r.width) return; const dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(r.width*dpr) || c.height !== Math.round(r.height*dpr)){ c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); const Wd = r.width, H = r.height; g.clearRect(0, 0, Wd, H);
-  const d = depBase(); const P = EQ.slice(-720); if (P.length < 2){ g.fillStyle = "#4f7b8a"; g.font = "10px 'Share Tech Mono', monospace"; g.fillText("eğri birkaç saniye içinde oluşur…", 8, H/2); return; }
+  const d = depBase(); const P = EQ.slice(-720); if (P.length < 2){ g.fillStyle = "#415674"; g.font = "10px 'Share Tech Mono', monospace"; g.fillText("eğri birkaç saniye içinde oluşur…", 8, H/2); return; }
   const t0 = P[0][0], t1 = P[P.length - 1][0], vs = P.map(p => p[1]).concat(d ? [d] : []), lo = Math.min(...vs), hi = Math.max(...vs), sp = (hi - lo) || Math.max(1e-6, hi*0.002);
   const X_ = t => 4 + (t - t0)/((t1 - t0) || 1)*(Wd - 8), Y_ = v => H - 14 - (v - lo)/sp*(H - 28);
-  g.strokeStyle = "rgba(0,240,255,.06)"; g.lineWidth = 1; g.beginPath(); for (let i = 1; i < 4; i++){ g.moveTo(0, H*i/4); g.lineTo(Wd, H*i/4); } g.stroke();
-  if (d){ g.strokeStyle = "rgba(255,230,0,.4)"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, Y_(d)); g.lineTo(Wd, Y_(d)); g.stroke(); g.setLineDash([]); g.fillStyle = "#ffe600aa"; g.font = "9px 'Share Tech Mono', monospace"; g.fillText("yatırım " + fmt(d, 3), 6, Math.max(9, Y_(d) - 3)); }
-  const up = P[P.length - 1][1] >= (d || P[0][1]), col = up ? "#39ff14" : "#ff3355";
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, up ? "rgba(57,255,20,.28)" : "rgba(255,51,85,.28)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+  g.strokeStyle = "rgba(30,58,95,.06)"; g.lineWidth = 1; g.beginPath(); for (let i = 1; i < 4; i++){ g.moveTo(0, H*i/4); g.lineTo(Wd, H*i/4); } g.stroke();
+  if (d){ g.strokeStyle = "rgba(138,104,40,.4)"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, Y_(d)); g.lineTo(Wd, Y_(d)); g.stroke(); g.setLineDash([]); g.fillStyle = "#8a6828aa"; g.font = "9px 'Share Tech Mono', monospace"; g.fillText("yatırım " + fmt(d, 3), 6, Math.max(9, Y_(d) - 3)); }
+  const up = P[P.length - 1][1] >= (d || P[0][1]), col = up ? "#0f6b45" : "#9b1c31";
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, up ? "rgba(15,107,69,.28)" : "rgba(155,28,49,.28)"); gr.addColorStop(1, "rgba(40,30,15,0)");
   g.beginPath(); P.forEach((p, i) => i ? g.lineTo(X_(p[0]), Y_(p[1])) : g.moveTo(X_(p[0]), Y_(p[1]))); g.lineTo(X_(t1), H); g.lineTo(X_(t0), H); g.closePath(); g.fillStyle = gr; g.fill();
-  g.beginPath(); P.forEach((p, i) => i ? g.lineTo(X_(p[0]), Y_(p[1])) : g.moveTo(X_(p[0]), Y_(p[1]))); g.strokeStyle = col; g.lineWidth = 1.8; g.shadowColor = col; g.shadowBlur = 8; g.stroke(); g.shadowBlur = 0;
+  g.beginPath(); P.forEach((p, i) => i ? g.lineTo(X_(p[0]), Y_(p[1])) : g.moveTo(X_(p[0]), Y_(p[1]))); g.strokeStyle = col; g.lineWidth = 1.8; g.shadowColor = col; g.shadowBlur = 0; g.stroke(); g.shadowBlur = 0;
   for (const m of MK){ if (m.t < t0 || m.t > t1) continue; const x = X_(m.t); let i = P.findIndex(p => p[0] >= m.t); if (i < 0) i = P.length - 1; const y = Y_(P[i][1]);
-    g.fillStyle = m.k === "buy" ? "#00f0ff" : m.k === "risk" ? "#ffe600" : m.p >= 0 ? "#39ff14" : "#ff3355"; g.beginPath();
+    g.fillStyle = m.k === "buy" ? "#1e3a5f" : m.k === "risk" ? "#8a6828" : m.p >= 0 ? "#0f6b45" : "#9b1c31"; g.beginPath();
     if (m.k === "buy"){ g.moveTo(x, y - 10); g.lineTo(x - 4, y - 3); g.lineTo(x + 4, y - 3); } else if (m.k === "risk"){ g.moveTo(x, y - 5); g.lineTo(x + 4, y); g.lineTo(x, y + 5); g.lineTo(x - 4, y); } else { g.moveTo(x, y + 10); g.lineTo(x - 4, y + 3); g.lineTo(x + 4, y + 3); } g.fill(); }
-  g.fillStyle = "#6fa5b5"; g.font = "9px 'Share Tech Mono', monospace"; g.textAlign = "right"; g.fillText(fmt(hi, 4), Wd - 4, 10); g.fillText(fmt(lo, 4), Wd - 4, H - 3); g.textAlign = "left"; g.fillText(tm(t0).slice(0, 5), 4, H - 3); }
+  g.fillStyle = "#364760"; g.font = "9px 'Share Tech Mono', monospace"; g.textAlign = "right"; g.fillText(fmt(hi, 4), Wd - 4, 10); g.fillText(fmt(lo, 4), Wd - 4, H - 3); g.textAlign = "left"; g.fillText(tm(t0).slice(0, 5), 4, H - 3); }
 /* ---- central orb (fibonacci sphere, additive glow, energy from real events) ---- */
 let orbRaf = 0, orbPts = null, orbVis = true, orbIO = null;
 const RMq = matchMedia("(prefers-reduced-motion: reduce)");
@@ -686,9 +686,9 @@ function orbFrame(t){ orbRaf = 0; const c = $("#orb"); if (!c || !orbPts || docu
   const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width){ orbRaf = requestAnimationFrame(orbFrame); return; } if (c.width !== Math.round(r.width*dpr)){ c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); const Wd = r.width, H = r.height; g.clearRect(0, 0, Wd, H);
   orbE = Math.max(orbE*Math.pow(0.35, dt/1000), ST.orb); ST.orb = 0; const T = (t - orbT0)/1000, spin = RMq.matches ? 0.6 : T*(0.25 + orbE*1.2) + (ST.on ? T*0.2 : 0);
-  const tp = todayPnl(), hue = tp > 0 ? "57,255,20" : tp < 0 ? "255,51,85" : "0,240,255", cx = Wd*0.5, cy = H*0.5, R0 = Math.min(Wd, H)*0.36*(1 + orbE*0.12 + (RMq.matches ? 0 : Math.sin(T*2)*0.015));
-  const halo = g.createRadialGradient(cx, cy, R0*0.2, cx, cy, R0*1.8); halo.addColorStop(0, `rgba(${hue},${(0.16 + orbE*0.3).toFixed(3)})`); halo.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = halo; g.fillRect(0, 0, Wd, H);
-  g.globalCompositeOperation = "lighter"; const cs = Math.cos(spin), sn = Math.sin(spin), ct = Math.cos(0.42), st = Math.sin(0.42);
+  const tp = todayPnl(), hue = tp > 0 ? "15,107,69" : tp < 0 ? "155,28,49" : "184,151,90", cx = Wd*0.5, cy = H*0.5, R0 = Math.min(Wd, H)*0.36*(1 + orbE*0.12 + (RMq.matches ? 0 : Math.sin(T*2)*0.015));
+  const halo = g.createRadialGradient(cx, cy, R0*0.2, cx, cy, R0*1.8); halo.addColorStop(0, `rgba(${hue},${(0.16 + orbE*0.3).toFixed(3)})`); halo.addColorStop(1, "rgba(40,30,15,0)"); g.fillStyle = halo; g.fillRect(0, 0, Wd, H);
+  g.globalCompositeOperation = "source-over"; const cs = Math.cos(spin), sn = Math.sin(spin), ct = Math.cos(0.42), st = Math.sin(0.42);
   for (const p of orbPts){ const x = p[0]*cs - p[2]*sn, z = p[0]*sn + p[2]*cs, y = p[1]; const y2 = y*ct - z*st, z2 = y*st + z*ct, k = (z2 + 1.6)/2.6;
     const wob = 1 + orbE*0.22*Math.sin(T*7 + p[1]*6); g.fillStyle = `rgba(${hue},${(0.12 + k*0.75).toFixed(2)})`; g.beginPath(); g.arc(cx + x*R0*wob, cy + y2*R0*wob, 0.6 + k*1.5, 0, 6.283); g.fill(); }
   g.strokeStyle = `rgba(${hue},.35)`; g.lineWidth = 1; for (let i = 0; i < 2; i++){ g.beginPath(); g.ellipse(cx, cy, R0*(1.25 + i*0.18), R0*(0.3 + i*0.06), (RMq.matches ? 0 : T)*(i ? -0.3 : 0.2), 0, 6.283); g.stroke(); }

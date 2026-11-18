@@ -40,13 +40,13 @@ function draw(){ const cv = $("#heat"); if (!cv || !grid) return; const r = cv.g
   let mx = 1; for (const c of hist) for (let i = 0; i < NB; i++) mx = Math.max(mx, c.b[i], c.a[i]); const lm = Math.log1p(mx);
   const cw = W/MAXC, ch = H/NB, x0 = W - n*cw, Y = p => H - (p - grid.lo)/(grid.hi - grid.lo)*H;
   hist.forEach((c, k) => { const x = x0 + k*cw; for (let i = 0; i < NB; i++){ const y = H - (i + 1)*ch;
-    if (c.b[i] > 0){ const a = Math.log1p(c.b[i])/lm; g.fillStyle = `rgba(0,240,255,${(a*a*.95).toFixed(3)})`; g.fillRect(x, y, cw + .5, ch + .5); }
-    if (c.a[i] > 0){ const a = Math.log1p(c.a[i])/lm; g.fillStyle = `rgba(255,43,214,${(a*a*.95).toFixed(3)})`; g.fillRect(x, y, cw + .5, ch + .5); } } });
-  g.beginPath(); hist.forEach((c, k) => { const x = x0 + k*cw + cw/2, y = Y(c.mid); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.strokeStyle = "#ffe600"; g.lineWidth = 1.5; g.shadowColor = "#ffe600"; g.shadowBlur = 6; g.stroke(); g.shadowBlur = 0;
+    if (c.b[i] > 0){ const a = Math.log1p(c.b[i])/lm; g.fillStyle = `rgba(30,58,95,${(a*a*.95).toFixed(3)})`; g.fillRect(x, y, cw + .5, ch + .5); }
+    if (c.a[i] > 0){ const a = Math.log1p(c.a[i])/lm; g.fillStyle = `rgba(154,116,50,${(a*a*.95).toFixed(3)})`; g.fillRect(x, y, cw + .5, ch + .5); } } });
+  g.beginPath(); hist.forEach((c, k) => { const x = x0 + k*cw + cw/2, y = Y(c.mid); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.strokeStyle = "#8a6828"; g.lineWidth = 1.5; g.shadowColor = "#8a6828"; g.shadowBlur = 0; g.stroke(); g.shadowBlur = 0;
   const t0 = n ? hist[0].t : Date.now(), t1 = n ? hist[n - 1].t : Date.now();
   for (const L of liqs){ if (L.t < t0 - 4000 || L.p < grid.lo || L.p > grid.hi) continue; const x = n > 1 ? x0 + (L.t - t0)/(t1 - t0 || 1)*(n - 1)*cw + cw/2 : W - 4, rr = Math.min(9, 2 + Math.log10(1 + L.usd/1000)*2.2);
-    g.beginPath(); g.arc(Math.min(W - 2, x), Y(L.p), rr, 0, 6.283); g.fillStyle = L.side === "SELL" ? "rgba(255,51,85,.85)" : "rgba(57,255,20,.85)"; g.fill(); }
-  g.fillStyle = "#6fa5b5"; g.font = "10px Share Tech Mono"; g.textAlign = "left";
+    g.beginPath(); g.arc(Math.min(W - 2, x), Y(L.p), rr, 0, 6.283); g.fillStyle = L.side === "SELL" ? "rgba(155,28,49,.85)" : "rgba(15,107,69,.85)"; g.fill(); }
+  g.fillStyle = "#364760"; g.font = "10px Share Tech Mono"; g.textAlign = "left";
   for (let k = 0; k <= 4; k++){ const p = grid.lo + (grid.hi - grid.lo)*k/4; g.fillText(p.toFixed(dec), W + 4, Math.min(H - 2, Math.max(9, Y(p) + 3))); }
   g.fillText("◉ likidasyon  ▮ alış  ▮ satış", 4, 11); }
 function onLiq(o){ if (!o || o.s !== sym) return; const p = +o.ap || +o.p, q = +o.z || +o.q, L = { t: +o.T || Date.now(), p, usd: p*q, side: o.S };
@@ -67,7 +67,7 @@ async function oi(){ if (!sym) return; const s = sym, box = $("#oi-box");
       <div class="plan-foot">Kaynak: Binance futures/data (5 dk) · ${new Date().toLocaleTimeString("tr-TR", { timeZone: TZ })} · Kalabalık tek yöne yığıldığında (örn. %75+ long) ters yönde likidasyon dalgası riski artar; bu bir sinyal değil, bağlam bilgisidir.</div>`;
     const c = $("#oi-spark"), v = h.map(x => +x.sumOpenInterestValue); if (c && v.length > 1){ const dpr = Math.min(2, devicePixelRatio || 1); c.width = 140*dpr; c.height = 44*dpr; const g2 = c.getContext("2d"); g2.scale(dpr, dpr);
       const lo = Math.min(...v), hi = Math.max(...v), sp = hi - lo || 1; g2.beginPath(); v.forEach((y, i) => { const X = i/(v.length - 1)*138 + 1, Y = 42 - (y - lo)/sp*40; i ? g2.lineTo(X, Y) : g2.moveTo(X, Y); });
-      g2.strokeStyle = ch >= 0 ? "#39ff14" : "#ff3355"; g2.lineWidth = 1.5; g2.shadowColor = g2.strokeStyle; g2.shadowBlur = 5; g2.stroke(); }
+      g2.strokeStyle = ch >= 0 ? "#0f6b45" : "#9b1c31"; g2.lineWidth = 1.5; g2.shadowColor = g2.strokeStyle; g2.shadowBlur = 0; g2.stroke(); }
   } catch(e){ box.innerHTML = `<div class="err-line">✖ OI / long-short verisi alınamadı: ${esc(e.message)}</div>`; } }
 const cvh = $("#heat"); if (cvh){ if ("IntersectionObserver" in window) new IntersectionObserver(es => { vis = es[0].isIntersecting; if (vis) draw(); }).observe(cvh); else vis = true; new ResizeObserver(() => draw()).observe(cvh); }
 return { onAnalysis, onLiq, _h: () => hist.length };

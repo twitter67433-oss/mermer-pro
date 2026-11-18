@@ -37,7 +37,7 @@ loadTape(); setInterval(loadTape, 30000);
 
 /* ---------------- boot ---------------- */
 const BOOT = [
- ["NEON//BIOS 2100 · v5  (c) 2026", ""], ["11 beceri çekirdeği ..................", "ok"],
+ ["MERMER TERMİNAL · v7.18  (c) 2026", ""], ["11 beceri çekirdeği ..................", "ok"],
  ["Binance public API hattı .............", "ok"], ["CoinGecko analist modülü .............", "ok"],
  ["Zaman makinesi worker'ı ..............", "ok"], ["7/24 kripto seans adaptörü ...........", "ok"],
  ["Canlı akış (WebSocket) ................", "ok"], ["Veri yolu · ışık ağı ..................", "ok"], ["pump.fun canlı akış (PumpPortal) ......", "ok"], ["BOT CÜZDANI ....... PIN İLE ŞİFRELİ", "warn"], ["OTO AL-SAT ................. KAPALI", "warn"], ["Emir motoru ........ YALNIZ ONAYLA İLE", "warn"], ["Cüzdan ......... YALNIZ SEN BAĞLARSAN", "warn"],
@@ -134,10 +134,10 @@ function render(d, steps){
   $("#h-price").textContent = fmtP(d.price);
   const chg = d.chg24;
   const hc = $("#h-chg"); hc.textContent = pct(chg) + " 24s"; hc.className = "chg " + cls(chg);
-  const b = []; if (D.entry) b.push(`<span class="badge" style="color:${D.entry.status==="triggered"?"#39ff14":D.entry.status==="waiting"?"#ffe600":"#ff2bd6"}">${esc(D.entry.label)}</span>`);
-  if (D.risk) b.push(`<span class="badge" style="color:${D.risk.ok?"#39ff14":"#ff3355"}">RİSK: ${esc(D.risk.verdict)}</span>`);
-  if (D.scan && D.scan.setup) b.push(`<span class="badge" style="color:#00f0ff">${esc(D.scan.setup)}</span>`);
-  if (D.signal) b.push(`<span class="badge" style="color:${D.signal.dir==="LONG"?"#39ff14":D.signal.dir==="SHORT"?"#ff3355":"#ffe600"}">SİNYAL: ${D.signal.dir}</span>`);
+  const b = []; if (D.entry) b.push(`<span class="badge" style="color:${D.entry.status==="triggered"?"#0f6b45":D.entry.status==="waiting"?"#8a6828":"#9a7432"}">${esc(D.entry.label)}</span>`);
+  if (D.risk) b.push(`<span class="badge" style="color:${D.risk.ok?"#0f6b45":"#9b1c31"}">RİSK: ${esc(D.risk.verdict)}</span>`);
+  if (D.scan && D.scan.setup) b.push(`<span class="badge" style="color:#1e3a5f">${esc(D.scan.setup)}</span>`);
+  if (D.signal) b.push(`<span class="badge" style="color:${D.signal.dir==="LONG"?"#0f6b45":D.signal.dir==="SHORT"?"#9b1c31":"#8a6828"}">SİNYAL: ${D.signal.dir}</span>`);
   $("#h-badges").innerHTML = b.join("");
   try { renderSignal(D.signal, d); } catch(e){ console.error(e); $("#signal").innerHTML = `<div class="err-line">✖ sinyal çizilemedi: ${esc(e.message)}</div>`; }
   try { window.BUS && BUS.emit("signal", { dir: D.signal ? D.signal.dir : "BEKLE" }); } catch(e){}
@@ -164,7 +164,7 @@ function render(d, steps){
   // summary
   const errs = Object.values(steps).filter(s => !s.ok).map(s => s.n);
   $("#sum-grid").innerHTML = d.summary.map(([k,v]) => `<div><small>${esc(k)}</small><span>${esc(v)}</span></div>`).join("") +
-    (errs.length ? `<div style="border-color:#ff3355"><small>HATA</small><span class="dn">adım ${errs.join(", ")}</span></div>` : "");
+    (errs.length ? `<div style="border-color:#9b1c31"><small>HATA</small><span class="dn">adım ${errs.join(", ")}</span></div>` : "");
   $("#sum-disc").textContent = "⚠ " + d.disclaimer; const s = $("#summary"); s.classList.remove("show"); setTimeout(() => s.classList.add("show"), 1000);
 }
 
@@ -191,21 +191,21 @@ function renderRSI(s){
   const g = $("#gauge"); const r = num(s.rsi); const arc = (a0,a1,c,w=14) => { const p = a => [100+80*Math.cos(Math.PI*(1-a)), 105-80*Math.sin(Math.PI*(1-a))];
     const [x0,y0] = p(a0), [x1,y1] = p(a1); return `<path d="M${x0} ${y0} A80 80 0 0 1 ${x1} ${y1}" stroke="${c}" stroke-width="${w}" fill="none"/>`; };
   g.innerHTML = `<defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-   <g filter="url(#glow)" opacity=".9">${arc(0,.3,"#39ff14")}${arc(.3,.7,"#0f4a5c")}${arc(.7,1,"#ff3355")}</g>
-   <text x="22" y="118" fill="#39ff14" font-size="9" font-family="Share Tech Mono">AŞIRI SATIM</text><text x="140" y="118" fill="#ff3355" font-size="9" font-family="Share Tech Mono">AŞIRI ALIM</text>
-   <line id="needle" x1="100" y1="105" x2="100" y2="35" stroke="#ffe600" stroke-width="3" filter="url(#glow)" style="transform-origin:100px 105px;transform:rotate(-90deg);transition:transform 1.6s cubic-bezier(.2,1.4,.4,1)"/>
-   <circle cx="100" cy="105" r="6" fill="#ffe600"/><text id="rsival" x="100" y="88" fill="#fff" font-size="22" text-anchor="middle" font-family="Share Tech Mono">—</text>
-   <text x="100" y="62" fill="#4f7b8a" font-size="9" text-anchor="middle" font-family="Share Tech Mono">RSI 14</text>`;
+   <g filter="url(#glow)" opacity=".9">${arc(0,.3,"#0f6b45")}${arc(.3,.7,"#dfd8cb")}${arc(.7,1,"#9b1c31")}</g>
+   <text x="22" y="118" fill="#0f6b45" font-size="9" font-family="Share Tech Mono">AŞIRI SATIM</text><text x="140" y="118" fill="#9b1c31" font-size="9" font-family="Share Tech Mono">AŞIRI ALIM</text>
+   <line id="needle" x1="100" y1="105" x2="100" y2="35" stroke="#8a6828" stroke-width="3" filter="url(#glow)" style="transform-origin:100px 105px;transform:rotate(-90deg);transition:transform 1.6s cubic-bezier(.2,1.4,.4,1)"/>
+   <circle cx="100" cy="105" r="6" fill="#8a6828"/><text id="rsival" x="100" y="88" fill="#201e1a" font-size="22" text-anchor="middle" font-family="Share Tech Mono">—</text>
+   <text x="100" y="62" fill="#415674" font-size="9" text-anchor="middle" font-family="Share Tech Mono">RSI 14</text>`;
   if (r !== null){ setTimeout(() => g.querySelector("#needle").style.transform = `rotate(${-90 + r*1.8}deg)`, 200); countUp(g.querySelector("#rsival"), r, v => v.toFixed(1)); }
   $("#scan-info").innerHTML = [["SMA20", fmtP(s.sma20)], ["20g zirve", fmtP(s.hi20)], ["1 gün", `<span class="${cls(s.chg1)}">${pct(s.chg1)}</span>`],
     ["7 gün", `<span class="${cls(s.chg7)}">${pct(s.chg7)}</span>`], ["30 gün", `<span class="${cls(s.chg30)}">${pct(s.chg30)}</span>`], ["Kurulum", esc(s.setup || "—")]]
     .map(([k,v]) => `<span class="k">${k}</span><span class="v">${v}</span>`).join("");
   const c = $("#spark"); const W = c.clientWidth || 300; c.width = W; const ctx = c.getContext("2d"); const pts = (s.closes||[]).map(x => x[1]);
   if (pts.length > 1){ const mn = Math.min(...pts), mx = Math.max(...pts); const y = v => 55 - (v-mn)/(mx-mn||1)*50;
-    const grd = ctx.createLinearGradient(0,0,0,60); grd.addColorStop(0,"#00f0ff55"); grd.addColorStop(1,"#00f0ff00");
-    ctx.beginPath(); pts.forEach((v,i) => ctx[i?"lineTo":"moveTo"](i/(pts.length-1)*W, y(v))); ctx.strokeStyle = "#00f0ff"; ctx.lineWidth = 1.5; ctx.shadowColor = "#00f0ff"; ctx.shadowBlur = 6; ctx.stroke();
+    const grd = ctx.createLinearGradient(0,0,0,60); grd.addColorStop(0,"#1e3a5f55"); grd.addColorStop(1,"#1e3a5f00");
+    ctx.beginPath(); pts.forEach((v,i) => ctx[i?"lineTo":"moveTo"](i/(pts.length-1)*W, y(v))); ctx.strokeStyle = "#1e3a5f"; ctx.lineWidth = 1.5; ctx.shadowColor = "#1e3a5f"; ctx.shadowBlur = 0; ctx.stroke();
     ctx.lineTo(W,60); ctx.lineTo(0,60); ctx.fillStyle = grd; ctx.shadowBlur = 0; ctx.fill();
-    ctx.fillStyle = "#4f7b8a"; ctx.font = "10px Share Tech Mono"; ctx.fillText("90 gün kapanış", 4, 10); }
+    ctx.fillStyle = "#415674"; ctx.font = "10px Share Tech Mono"; ctx.fillText("90 gün kapanış", 4, 10); }
 }
 
 /* entry */
@@ -225,7 +225,7 @@ function planHTML(p, price){
   return `<div class="ladder"><div class="rung t"><span>HEDEF <small>${(p.reward_risk||2).toFixed(1)}R</small></span><span>${fmtP(p.target)} <small>${pct((p.target/p.entry-1)*100)}</small></span></div>
   <div class="rung e"><span>GİRİŞ</span><span>${fmtP(p.entry)}</span></div>
   <div class="rung s"><span>STOP <small>${esc(p.stop_label||"")}</small></span><span>${fmtP(p.stop)} <small>${pct((p.stop/p.entry-1)*100)}</small></span></div></div>
-  <div class="plan-foot">Birim risk ${fmtP(r)} · Pozisyonu kapat: <b style="color:#ff2bd6">${tLocal(p.flat_by_ts)} ${TZL}</b><br>exit.py'nin 15:55 ET kuralı yerine 7/24 tutma süresi.</div>`;
+  <div class="plan-foot">Birim risk ${fmtP(r)} · Pozisyonu kapat: <b style="color:#9a7432">${tLocal(p.flat_by_ts)} ${TZL}</b><br>exit.py'nin 15:55 ET kuralı yerine 7/24 tutma süresi.</div>`;
 }
 
 /* time machine */
@@ -233,22 +233,22 @@ function renderTM(t){
   $("#tm-n").textContent = fmtN(t.n) + " simülasyon · " + t.hold_hours + "s ufuk";
   const c = $("#hist"); const W = c.clientWidth || 600, H = 190; c.width = W; c.height = H; const g = c.getContext("2d");
   const bins = t.bins || [], mx = Math.max(1, ...bins), bw = W / Math.max(1,bins.length), rmin = t.r_min, rmax = t.r_max;
-  const colorOf = i => { const rv = rmin + (i+.5)*(rmax-rmin)/bins.length; return rv <= -0.95 ? "#ff3355" : rv >= (rmax - (rmax-rmin)/bins.length) ? "#39ff14" : "#00f0ff"; };
+  const colorOf = i => { const rv = rmin + (i+.5)*(rmax-rmin)/bins.length; return rv <= -0.95 ? "#9b1c31" : rv >= (rmax - (rmax-rmin)/bins.length) ? "#0f6b45" : "#1e3a5f"; };
   const t0 = performance.now();
   const frame = now => { const k = Math.min(1,(now-t0)/1100), e = 1-Math.pow(1-k,3); g.clearRect(0,0,W,H);
-    g.strokeStyle = "#0e2230"; for (let y=20;y<H-20;y+=34){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
-    bins.forEach((v,i) => { const h = (v ? Math.max(2, Math.sqrt(v/mx)*(H-40)) : 0)*e; const col = colorOf(i); g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 8; g.fillRect(i*bw+1, H-20-h, bw-2, h); });
-    g.shadowBlur = 0; g.fillStyle = "#4f7b8a"; g.font = "10px Share Tech Mono"; g.fillText(rmin.toFixed(2)+"R", 2, H-6); g.textAlign = "right"; g.fillText(rmax.toFixed(2)+"R", W-2, H-6);
-    g.textAlign = "center"; if (rmax > 0 && rmin < 0){ const x0 = (0-rmin)/(rmax-rmin)*W; g.strokeStyle = "#ffe60088"; g.setLineDash([3,3]); g.beginPath(); g.moveTo(x0,10); g.lineTo(x0,H-20); g.stroke(); g.setLineDash([]); g.fillStyle = "#ffe600"; g.fillText("0R", x0, H-6); }
-    g.textAlign = "left"; g.fillStyle = "#6fa5b5"; g.fillText("Sonuç dağılımı (R) · √ ölçek", 4, 12);
+    g.strokeStyle = "#eae5dc"; for (let y=20;y<H-20;y+=34){ g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); }
+    bins.forEach((v,i) => { const h = (v ? Math.max(2, Math.sqrt(v/mx)*(H-40)) : 0)*e; const col = colorOf(i); g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 0; g.fillRect(i*bw+1, H-20-h, bw-2, h); });
+    g.shadowBlur = 0; g.fillStyle = "#415674"; g.font = "10px Share Tech Mono"; g.fillText(rmin.toFixed(2)+"R", 2, H-6); g.textAlign = "right"; g.fillText(rmax.toFixed(2)+"R", W-2, H-6);
+    g.textAlign = "center"; if (rmax > 0 && rmin < 0){ const x0 = (0-rmin)/(rmax-rmin)*W; g.strokeStyle = "#8a682888"; g.setLineDash([3,3]); g.beginPath(); g.moveTo(x0,10); g.lineTo(x0,H-20); g.stroke(); g.setLineDash([]); g.fillStyle = "#8a6828"; g.fillText("0R", x0, H-6); }
+    g.textAlign = "left"; g.fillStyle = "#364760"; g.fillText("Sonuç dağılımı (R) · √ ölçek", 4, 12);
     if (k < 1) requestAnimationFrame(frame); };
   requestAnimationFrame(frame);
   // donut
-  const parts = [["Önce hedef", t.target, "#39ff14"], ["Önce stop", t.stop, "#ff3355"], ["Hiçbiri", t.neither, "#00f0ff"]];
+  const parts = [["Önce hedef", t.target, "#0f6b45"], ["Önce stop", t.stop, "#9b1c31"], ["Hiçbiri", t.neither, "#1e3a5f"]];
   const C = 2*Math.PI*46; let acc = 0;
-  $("#donut").innerHTML = `<circle cx="60" cy="60" r="46" stroke="#0d1f2b" stroke-width="14" fill="none"/>` + parts.map(([n,v,c]) => { const len = (num(v)||0)/100*C;
+  $("#donut").innerHTML = `<circle cx="60" cy="60" r="46" stroke="#ebe7de" stroke-width="14" fill="none"/>` + parts.map(([n,v,c]) => { const len = (num(v)||0)/100*C;
     const s = `<circle cx="60" cy="60" r="46" stroke="${c}" stroke-width="14" fill="none" stroke-dasharray="0 ${C}" data-len="${len}" stroke-dashoffset="${-acc}" transform="rotate(-90 60 60)" style="transition:stroke-dasharray 1.3s ease;filter:drop-shadow(0 0 4px ${c})"/>`; acc += len; return s; }).join("") +
-    `<text x="60" y="58" text-anchor="middle" fill="#fff" font-size="16" font-family="Share Tech Mono" id="dn-val">0%</text><text x="60" y="74" text-anchor="middle" fill="#4f7b8a" font-size="8" font-family="Share Tech Mono">HEDEF ÖNCE</text>`;
+    `<text x="60" y="58" text-anchor="middle" fill="#201e1a" font-size="16" font-family="Share Tech Mono" id="dn-val">0%</text><text x="60" y="74" text-anchor="middle" fill="#415674" font-size="8" font-family="Share Tech Mono">HEDEF ÖNCE</text>`;
   setTimeout(() => $("#donut").querySelectorAll("circle[data-len]").forEach(ci => ci.setAttribute("stroke-dasharray", `${ci.dataset.len} ${C}`)), 100);
   countUp($("#dn-val"), t.target, v => v.toFixed(1) + "%");
   $("#donut-legend").innerHTML = parts.map(([n,v,c]) => `<div><span style="color:${c}">■ ${n}</span><b class="cu" data-v="${v}">0%</b></div>`).join("");
@@ -271,16 +271,16 @@ function renderBudget(b){
 }
 /* risk */
 function renderRisk(r){
-  const ok = `<svg class="cm" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#39ff1466"/><path d="M5 10.5l3.2 3.2L15 7" fill="none" stroke="#39ff14" stroke-width="2.4" stroke-linecap="round"/></svg>`;
-  const no = `<svg class="cm" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#ff335566"/><path d="M6 6l8 8M14 6l-8 8" fill="none" stroke="#ff3355" stroke-width="2.4" stroke-linecap="round"/></svg>`;
-  $("#risk-box").innerHTML = `<ul class="checks">${r.checks.map(c => `<li>${c.ok?ok:no}<span style="color:${c.ok?"#c9ffd0":"#ffb3c0"}">${esc(c.name)}</span></li>`).join("")}</ul>
+  const ok = `<svg class="cm" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#0f6b4566"/><path d="M5 10.5l3.2 3.2L15 7" fill="none" stroke="#0f6b45" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  const no = `<svg class="cm" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="#9b1c3166"/><path d="M6 6l8 8M14 6l-8 8" fill="none" stroke="#9b1c31" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  $("#risk-box").innerHTML = `<ul class="checks">${r.checks.map(c => `<li>${c.ok?ok:no}<span style="color:${c.ok?"#2d2924":"#322e29"}">${esc(c.name)}</span></li>`).join("")}</ul>
    <div class="verdict ${r.ok?"ok":"no"}">${r.ok?"✔":"✖"} ${esc(r.verdict)}</div>`;
   document.querySelectorAll(".checks li").forEach((li,i) => setTimeout(() => li.classList.add("in"), 300 + i*160));
 }
 /* ticket */
 function renderTicket(t, d){
   const o = t.order || {};
-  $("#ticket-box").innerHTML = `<div class="receipt"><div class="rh">NEON//TERMINAL · EMİR FİŞİ</div>
+  $("#ticket-box").innerHTML = `<div class="receipt"><div class="rh">MERMER TERMİNAL · EMİR FİŞİ</div>
    <div class="rl"><span>TARİH</span><span>${tLocal(Date.now()/1000)} ${TZL}</span></div>
    <div class="rl"><span>SEMBOL</span><span>${esc(o.symbol)}</span></div>
    <div class="rl"><span>İŞLEM</span><span>ALIŞ · ${esc(o.type)}</span></div>
@@ -386,7 +386,7 @@ function renderAnalyst(a){
   const circ = num(a.circulating_supply), mx = num(a.max_supply) || num(a.total_supply); const sp = circ && mx ? Math.min(100, circ/mx*100) : null;
   const athPos = num(a.ath_change_percentage) === null ? 0 : Math.max(0, Math.min(100, 100 + a.ath_change_percentage));
   const ch = k => a["price_change_percentage_" + k + "_in_currency"];
-  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" onerror="this.remove()">` : ""}<div><b style="font-size:16px;color:#fff">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
+  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" onerror="this.remove()">` : ""}<div><b style="font-size:16px;color:#201e1a">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
   <div class="kv"><span class="k">Piyasa değeri</span><span class="v" id="an-mc">—</span><span class="k">FDV</span><span class="v">${fmtBig(a.fully_diluted_valuation)}</span>
   <span class="k">24s hacim</span><span class="v">${fmtBig(a.total_volume)} <small>(${a.market_cap ? (a.total_volume/a.market_cap*100).toFixed(1) : "—"}%)</small></span></div>
   <div class="supply"><div class="lab kv"><span class="k">Arz ${sp===null?"":"(%"+sp.toFixed(1)+")"}</span><span class="v">${fmtN(circ)} / ${mx ? fmtN(mx) : "∞"}</span></div><div class="bar"><div data-w="${sp ?? 0}"></div></div></div>
@@ -404,7 +404,7 @@ function newsHTML(n){
 /* congress */
 function congressHTML(p){
   return `<div class="big-badge expired" style="font-size:15px;animation:none">YALNIZCA MASAÜSTÜ</div>
-  <div class="empty" style="font-style:normal;color:#b9f7ff">ABD Kongre üyelerinin hisse işlemleri (STOCK Act, House Clerk PTR raporları) tarayıcıdan doğrudan okunamıyor: kaynak CORS izni vermiyor ve bu sürümün sunucusu yok.</div>
+  <div class="empty" style="font-style:normal;color:#202a38">ABD Kongre üyelerinin hisse işlemleri (STOCK Act, House Clerk PTR raporları) tarayıcıdan doğrudan okunamıyor: kaynak CORS izni vermiyor ve bu sürümün sunucusu yok.</div>
   <div class="chips">${["COIN","MSTR","IBIT","FBTC","GBTC","ETHA","MARA","RIOT","CLSK","HOOD"].map(t => `<span>${t}</span>`).join("")}</div>
   <div class="plan-foot">Masaüstü sürüm bu kripto ilişkili hisse/ETF'leri son 30 günün raporlarında tarar. STOCK Act coinlerin kendisini kapsamaz.</div>`;
 }
