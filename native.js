@@ -10,7 +10,7 @@
   let perm = "default", nid = 1000 + Math.floor(Math.random()*1e5); const mapP = s => s === "granted" ? "granted" : s === "denied" ? "denied" : "default";
   const chan = call("LocalNotifications", "createChannel", { id: "neon-signal", name: "Sinyal uyarıları", description: "AKILLI SİNYAL ve alarm bildirimleri", importance: 5, visibility: 1, vibration: true, lights: true, lightColor: "#00F0FF" }).catch(nop);
   function NativeNotification(title, o){ o = o || {}; const id = nid++; this.title = String(title || "NEON"); this.body = String(o.body || ""); this.tag = o.tag || ""; this.onclick = null;
-    chan.then(() => call("LocalNotifications", "schedule", { notifications: [{ id, title: this.title, body: this.body, channelId: "neon-signal", smallIcon: "ic_stat_neon", iconColor: "#00F0FF", autoCancel: true }] })).catch(nop);
+    chan.then(() => call("LocalNotifications", "schedule", { notifications: [{ id, title: this.title, body: this.body, channelId: "neon-signal", smallIcon: "ic_stat_neon", iconColor: "#00F0FF", autoCancel: true, isExactNotification: false }] })).catch(nop);
     this.close = () => call("LocalNotifications", "cancel", { notifications: [{ id }] }).catch(nop); }
   NativeNotification.prototype.addEventListener = nop;
   Object.defineProperty(NativeNotification, "permission", { get: () => perm });
