@@ -136,7 +136,7 @@ function render(d, steps){
   const hc = $("#h-chg"); hc.textContent = pct(chg) + " 24s"; hc.className = "chg " + cls(chg);
   const b = []; if (D.entry) b.push(`<span class="badge" style="color:${D.entry.status==="triggered"?"#0f6b45":D.entry.status==="waiting"?"#8a6828":"#9a7432"}">${esc(D.entry.label)}</span>`);
   if (D.risk) b.push(`<span class="badge" style="color:${D.risk.ok?"#0f6b45":"#9b1c31"}">RİSK: ${esc(D.risk.verdict)}</span>`);
-  if (D.scan && D.scan.setup) b.push(`<span class="badge" style="color:#1e3a5f">${esc(D.scan.setup)}</span>`);
+  if (D.scan && D.scan.setup) b.push(`<span class="badge" style="color:var(--c)">${esc(D.scan.setup)}</span>`);
   if (D.signal) b.push(`<span class="badge" style="color:${D.signal.dir==="LONG"?"#0f6b45":D.signal.dir==="SHORT"?"#9b1c31":"#8a6828"}">SİNYAL: ${D.signal.dir}</span>`);
   $("#h-badges").innerHTML = b.join("");
   try { renderSignal(D.signal, d); } catch(e){ console.error(e); $("#signal").innerHTML = `<div class="err-line">✖ sinyal çizilemedi: ${esc(e.message)}</div>`; }
@@ -164,7 +164,7 @@ function render(d, steps){
   // summary
   const errs = Object.values(steps).filter(s => !s.ok).map(s => s.n);
   $("#sum-grid").innerHTML = d.summary.map(([k,v]) => `<div><small>${esc(k)}</small><span>${esc(v)}</span></div>`).join("") +
-    (errs.length ? `<div style="border-color:#9b1c31"><small>HATA</small><span class="dn">adım ${errs.join(", ")}</span></div>` : "");
+    (errs.length ? `<div style="border-color:var(--r)"><small>HATA</small><span class="dn">adım ${errs.join(", ")}</span></div>` : "");
   $("#sum-disc").textContent = "⚠ " + d.disclaimer; const s = $("#summary"); s.classList.remove("show"); setTimeout(() => s.classList.add("show"), 1000);
 }
 
@@ -225,7 +225,7 @@ function planHTML(p, price){
   return `<div class="ladder"><div class="rung t"><span>HEDEF <small>${(p.reward_risk||2).toFixed(1)}R</small></span><span>${fmtP(p.target)} <small>${pct((p.target/p.entry-1)*100)}</small></span></div>
   <div class="rung e"><span>GİRİŞ</span><span>${fmtP(p.entry)}</span></div>
   <div class="rung s"><span>STOP <small>${esc(p.stop_label||"")}</small></span><span>${fmtP(p.stop)} <small>${pct((p.stop/p.entry-1)*100)}</small></span></div></div>
-  <div class="plan-foot">Birim risk ${fmtP(r)} · Pozisyonu kapat: <b style="color:#9a7432">${tLocal(p.flat_by_ts)} ${TZL}</b><br>exit.py'nin 15:55 ET kuralı yerine 7/24 tutma süresi.</div>`;
+  <div class="plan-foot">Birim risk ${fmtP(r)} · Pozisyonu kapat: <b style="color:var(--m)">${tLocal(p.flat_by_ts)} ${TZL}</b><br>exit.py'nin 15:55 ET kuralı yerine 7/24 tutma süresi.</div>`;
 }
 
 /* time machine */
@@ -386,7 +386,7 @@ function renderAnalyst(a){
   const circ = num(a.circulating_supply), mx = num(a.max_supply) || num(a.total_supply); const sp = circ && mx ? Math.min(100, circ/mx*100) : null;
   const athPos = num(a.ath_change_percentage) === null ? 0 : Math.max(0, Math.min(100, 100 + a.ath_change_percentage));
   const ch = k => a["price_change_percentage_" + k + "_in_currency"];
-  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" onerror="this.remove()">` : ""}<div><b style="font-size:16px;color:#201e1a">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
+  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" onerror="this.remove()">` : ""}<div><b style="font-size:16px;color:var(--ink)">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
   <div class="kv"><span class="k">Piyasa değeri</span><span class="v" id="an-mc">—</span><span class="k">FDV</span><span class="v">${fmtBig(a.fully_diluted_valuation)}</span>
   <span class="k">24s hacim</span><span class="v">${fmtBig(a.total_volume)} <small>(${a.market_cap ? (a.total_volume/a.market_cap*100).toFixed(1) : "—"}%)</small></span></div>
   <div class="supply"><div class="lab kv"><span class="k">Arz ${sp===null?"":"(%"+sp.toFixed(1)+")"}</span><span class="v">${fmtN(circ)} / ${mx ? fmtN(mx) : "∞"}</span></div><div class="bar"><div data-w="${sp ?? 0}"></div></div></div>
@@ -404,7 +404,7 @@ function newsHTML(n){
 /* congress */
 function congressHTML(p){
   return `<div class="big-badge expired" style="font-size:15px;animation:none">YALNIZCA MASAÜSTÜ</div>
-  <div class="empty" style="font-style:normal;color:#202a38">ABD Kongre üyelerinin hisse işlemleri (STOCK Act, House Clerk PTR raporları) tarayıcıdan doğrudan okunamıyor: kaynak CORS izni vermiyor ve bu sürümün sunucusu yok.</div>
+  <div class="empty" style="font-style:normal;color:var(--txt)">ABD Kongre üyelerinin hisse işlemleri (STOCK Act, House Clerk PTR raporları) tarayıcıdan doğrudan okunamıyor: kaynak CORS izni vermiyor ve bu sürümün sunucusu yok.</div>
   <div class="chips">${["COIN","MSTR","IBIT","FBTC","GBTC","ETHA","MARA","RIOT","CLSK","HOOD"].map(t => `<span>${t}</span>`).join("")}</div>
   <div class="plan-foot">Masaüstü sürüm bu kripto ilişkili hisse/ETF'leri son 30 günün raporlarında tarar. STOCK Act coinlerin kendisini kapsamaz.</div>`;
 }

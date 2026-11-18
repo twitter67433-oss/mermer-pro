@@ -178,3 +178,5 @@ function init(){ const box = $("#coinan-box"); if (!box) return; box.innerHTML =
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 return { analyze, search, toTrade, pick, get S(){ return S; } };
 })();
+/* v7.19: repaint on Gündüz/Gece switch */
+if (typeof window !== "undefined") window.addEventListener("themechange", () => { try { const c = window.COINAN && COINAN.S && COINAN.S.chart; c && c.applyOptions({ layout: { textColor: "#364760" } }); } catch(e){} });

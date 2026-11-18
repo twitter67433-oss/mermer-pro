@@ -35,6 +35,7 @@ async function depth(){ if (!sym) return; const s = sym;
       <span class="k">Spread</span><span class="v">${(asks[0][0] - bids[0][0]).toFixed(dec)} (${((asks[0][0]/bids[0][0] - 1)*1e4).toFixed(2)} bp)</span>`;
     draw(); window.BUS && BUS.emit("depth", { imb });
   } catch(e){ $("#mk-info").textContent = "derinlik: " + e.message; } }
+if (typeof window !== "undefined") window.addEventListener("themechange", () => { try { draw(); } catch(e){} });
 function draw(){ const cv = $("#heat"); if (!cv || !grid) return; const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (!r.width) return;
   cv.width = r.width*dpr; cv.height = r.height*dpr; const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); const W = r.width - 52, H = r.height, n = hist.length; g.clearRect(0, 0, r.width, H);
   let mx = 1; for (const c of hist) for (let i = 0; i < NB; i++) mx = Math.max(mx, c.b[i], c.a[i]); const lm = Math.log1p(mx);

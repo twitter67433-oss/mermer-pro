@@ -480,7 +480,7 @@ function fxWin(sol, sym){ if (!fxReduce()){ document.body.classList.add("mm-shak
 function fxBuy(){ if (fxReduce()) return; document.body.classList.add("mm-pulse"); setTimeout(() => document.body.classList.remove("mm-pulse"), 380); }
 function fxLoss(){ document.body.classList.add("mm-flash-loss"); setTimeout(() => document.body.classList.remove("mm-flash-loss"), 420); }
 /* ------------------------- UI ------------------------- */
-const AG = (id, ic, name, col) => `<div class="ag" id="ag-${id}" style="--ac:${col}"><div class="ag-h"><span class="ag-ic">${ic}</span><b>${name}</b><span class="ag-st" id="ags-${id}">—</span></div><div class="ag-b" id="agb-${id}"></div></div>`;
+const AG = (id, ic, name, col) => `<div class="ag" id="ag-${id}" style="--ac:${col};--acn:${window.THEME ? THEME.nightColor(col) : col}"><div class="ag-h"><span class="ag-ic">${ic}</span><b>${name}</b><span class="ag-st" id="ags-${id}">—</span></div><div class="ag-b" id="agb-${id}"></div></div>`;
 const inp = (p, lab) => `<label>${lab}<input data-m="${p}" inputmode="decimal" value="${esc(getP(p))}"></label>`;
 const chk = (p, lab) => `<label class="chk"><input type="checkbox" data-m="${p}" ${getP(p) ? "checked" : ""}> ${lab}</label>`;
 function goalHTML(){ const g = C.goal || {};
@@ -659,6 +659,7 @@ function paintWallets(){ const el = $("#mm-wal"); if (!el) return; if (el.contai
 let wQ = false; const paintWalletsQ = () => { if (wQ) return; wQ = true; setTimeout(() => { wQ = false; paintWallets(); }, 1500); };
 /* ---- equity curve ---- */
 function sampleEq(){ const e = equity(); if (e === null) return; const t = Date.now(), last = EQ[EQ.length - 1]; if (last && t - last[0] < 4000) return; EQ.push([t, +e.toFixed(6)]); }
+if (typeof window !== "undefined") window.addEventListener("themechange", () => { try { drawEq(); } catch(e){} });
 function drawEq(){ const c = $("#mm-eqcv"); if (!c) return; const r = c.getBoundingClientRect(); if (!r.width) return; const dpr = Math.min(2, devicePixelRatio || 1); if (c.width !== Math.round(r.width*dpr) || c.height !== Math.round(r.height*dpr)){ c.width = Math.round(r.width*dpr); c.height = Math.round(r.height*dpr); }
   const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); const Wd = r.width, H = r.height; g.clearRect(0, 0, Wd, H);
   const d = depBase(); const P = EQ.slice(-720); if (P.length < 2){ g.fillStyle = "#415674"; g.font = "10px 'Share Tech Mono', monospace"; g.fillText("eğri birkaç saniye içinde oluşur…", 8, H/2); return; }

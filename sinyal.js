@@ -299,6 +299,7 @@ function paintMain(){ const card = $("#sg-card"), al = $("#sg-alerts"); if (!car
     <div class="sg-sub dim">${V ? esc(V.tag) + " · " : ""}${sub}</div><div class="dim sg-cd">mum kapanışına <b id="sc-cd">${cdf(left)}</b>${go && P && fin(P.stop) ? ` · çıkış en geç ${dur(SMT.H_OUT*TF_MS[S.tf])}` : ""}</div>`;
   if (al) al.innerHTML = (D.alerts.length ? "" : '<span class="dim">şu an uyarı yok</span>') + D.alerts.slice(0, 4).map(a => `<span class="sg-al ${a.c}">${esc(a.t)}</span>`).join(""); }
 /* ---------------- big chart ---------------- */
+if (typeof window !== "undefined") window.addEventListener("themechange", () => { try { paintChart(); } catch(e){} });
 function paintChart(){ const cv = $("#sc-cv"); if (!cv) return; const w = cv.clientWidth || 360, h = cv.clientHeight || 420, dpr = window.devicePixelRatio || 1; if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
   const x = cv.getContext("2d"); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h); const R = S.R, D = S.D; if (!R || !D) return; const P = R.P, all = P.b, N = Math.max(20, Math.min(160, S.view.n)), off = Math.max(0, Math.min(all.length - N, S.view.off));
   const e = all.length - off, s0 = Math.max(0, e - N), b = all.slice(s0, e), axis = 62, pw = w - axis, cw = pw/b.length, top = 16, bot = h - 18;

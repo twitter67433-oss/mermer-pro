@@ -110,3 +110,5 @@ function drawOR(){
 return { render, onKline, poll, get tf(){ return tf; }, TFS, _bars: () => bars };
 })();
 window.CHART = CHART;
+/* v7.19: repaint on Gündüz/Gece switch (canvas colours are mapped by theme.js at draw time) */
+if (typeof window !== "undefined") window.addEventListener("themechange", () => { try { chart && chart.applyOptions({ layout: { textColor: "#364760" }, grid: { vertLines: { color: "#eae5dc" }, horzLines: { color: "#eae5dc" } } }); } catch(e){} });
