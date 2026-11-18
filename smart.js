@@ -256,11 +256,11 @@ function decision(C, A, x){ const f = x.f || (v => (+v).toFixed(4)), px = x.px, 
   if (A.act === "GİR LONG" || A.act === "GİR SHORT"){ const t = `${A.act} · giriş ${f(A.entry)} · stop ${f(A.stop)} · hedef ${f(A.tp)}`;
     return { ...base, word: A.act, d: A.d, trig: [], line: t, text: `${A.act} (${A.kind}) — giriş ${f(A.entry)}, stop ${f(A.stop)}, hedef ${f(A.tp)}.` }; }
   const sq = A.wait === "kırılımı bekle", up = sq ? A.longAbove : x.hi, dn = sq ? A.shortBelow : x.lo, bx = sq ? "kutu " : "", T = [];
-  if (p >= 0 && fin(up)) T.push({ d: 1, t: `${bx}${f(up)} üstü kapanışta LONG` });
-  if (p <= 0 && fin(dn)) T.push({ d: -1, t: `${bx}${f(dn)} altı kapanışta SHORT` });
+  if (p >= 0 && fin(up)) T.push({ d: 1, k: "kırılım", lv: up, t: `${bx}${f(up)} üstü kapanışta LONG` });
+  if (p <= 0 && fin(dn)) T.push({ d: -1, k: "kırılım", lv: dn, t: `${bx}${f(dn)} altı kapanışta SHORT` });
   if (p !== 0){ let z = A.wait === "geri çekilmeyi bekle" && fin(A.entry) ? A.entry : fin(x.ema21) && (px - x.ema21)*p > 0.1*R && Math.abs(px - x.ema21) < 3*R ? x.ema21 : px - p*0.6*R;
     let a = z - 0.25*R, b = z + 0.25*R; if (p > 0) b = Math.min(b, px - 0.05*R); else a = Math.max(a, px + 0.05*R); if (b < a){ const m = (a + b)/2; a = b = m; }
-    T.push({ d: p, t: `geri çekilmede ${f(a)}–${f(b)} ${p > 0 ? "LONG" : "SHORT"} bölgesi` }); }
+    T.push({ d: p, k: "geri çekilme", a, b, t: `geri çekilmede ${f(a)}–${f(b)} ${p > 0 ? "LONG" : "SHORT"} bölgesi` }); }
   const yl = dirW.toLocaleLowerCase("tr");
   return { ...base, word: "BEKLE", d: 0, trig: T, line: "BEKLE → " + (T.length ? T.map(t => t.t).join(" · ") : "net tetik yok"),
     text: `BEKLE — yön ${yl}${T.length ? ", tetik: " + T[0].t : ""}.` }; }

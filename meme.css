@@ -350,3 +350,12 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(255,
 .sg-yon{font-size:17px !important;font-weight:700}
 .sg-warn{margin-top:4px;padding:3px 7px;border:1px solid #ff9f1a;border-radius:8px;color:#ffc46b;font-size:11.5px}
 @media (max-width:420px){ .sg-dword{font-size:28px} .sg-yon{font-size:15px !important} }
+/* v7.17 SANAL TAKİP */
+.sg-jr{margin:8px 0 4px}.sg-jr>summary{font-family:var(--tech);letter-spacing:.06em}.sg-jr>summary small{letter-spacing:0;font-size:10.5px}
+.jr-warn{border:1px dashed #ffe600;color:#fff3a0;border-radius:8px;padding:5px 8px;font-size:10.5px;line-height:1.4;margin:6px 0}
+.jr-opts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;margin:4px 0}.jr-o{display:inline-flex;align-items:center;gap:3px;cursor:pointer}
+.jr-f{display:flex;gap:6px;margin:4px 0}.jr-f select{flex:1;min-width:0}
+.jr-sum{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin:6px 0}.jr-sum div{display:flex;flex-direction:column;align-items:center;border:1px solid #17384c;border-radius:8px;padding:3px 0;background:rgba(2,8,14,.6)}
+.jr-sum small{font-size:9.5px;color:#7fa9b8}.jr-sum b{font-family:var(--tech);font-size:14px}
+.jr-t td,.jr-t th{font-size:10.5px;padding:3px 3px;white-space:nowrap;vertical-align:top;line-height:1.3}.jr-t td[colspan]{white-space:normal}.sg-jr .sc-hl{overflow-x:auto}.jr-t td small{color:#7fa9b8;font-size:9px}
+@media (max-width:420px){ .jr-sum b{font-size:12px} }

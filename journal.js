@@ -1,0 +1,51 @@
+/* NEON//TERMINAL v7.17 — SANAL SİNYAL DEFTERİ (virtual signal journal). Pure logic, no DOM, no network. Exported as JRN.
+   PAPER TRACKING ONLY: it records what the SİNYAL tab said (GİR LONG / GİR SHORT, and BEKLE triggers that actually fired) and follows the
+   price to see whether target or stop came first. It never places an order, never touches keys or a wallet.
+   Rules: entry = signal price; target first → DOĞRU, stop first → YANLIŞ; if one candle touched both, STOP counts first (conservative);
+   no hit within 20 candles of the signal's interval → closed at the last price ("SÜRE"), DOĞRU only if net > 0. Net % includes 0.10 % round-trip fee. */
+"use strict";
+(function (root, factory){ const M = factory(); if (typeof module === "object" && module.exports) module.exports = M; else root.JRN = M; })(typeof self !== "undefined" ? self : this, function (){
+const FEE = 0.10, MAXN = 500, TOUT = 20, fin = x => typeof x === "number" && isFinite(x);
+const TFMS = { "1m": 6e4, "3m": 18e4, "5m": 3e5, "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5, "6h": 216e5, "8h": 288e5, "12h": 432e5, "1d": 864e5 };
+const netPct = (d, entry, exit, fee = FEE) => d*(exit - entry)/entry*100 - fee;
+/* new trade object (validated: stop and target on the correct sides) */
+function make(o){ const d = o.d > 0 ? 1 : -1, e = +o.entry, st = +o.stop, tp = +o.tp; if (!fin(e) || !fin(st) || !fin(tp) || e <= 0) return null;
+  if (d > 0 ? !(st < e && tp > e) : !(st > e && tp < e)) return null; const t = +o.t || Date.now(), ms = TFMS[o.tf] || 9e5;
+  return { id: o.id || (t.toString(36) + Math.random().toString(36).slice(2, 6)), t, sym: String(o.sym), tf: o.tf, d, entry: e, stop: st, tp, type: o.type || "A+", why: o.why || "", src: o.src || "karar",
+    exp: t + TOUT*ms, chk: t, st: "open", hi: e, lo: e }; }
+/* add with dedupe: same coin + interval + direction is not re-opened while one is open */
+function add(list, tr){ if (!tr) return { list, added: false, why: "geçersiz" }; if (list.some(x => x.st === "open" && x.sym === tr.sym && x.tf === tr.tf && x.d === tr.d)) return { list, added: false, why: "açık var" };
+  let L = [tr].concat(list); if (L.length > MAXN){ const open = L.filter(x => x.st === "open"), closed = L.filter(x => x.st !== "open").sort((a, b) => b.t - a.t); L = open.concat(closed).slice(0, MAXN).sort((a, b) => b.t - a.t); }
+  return { list: L, added: true }; }
+function close(tr, how, px, at){ tr.st = "closed"; tr.how = how; tr.exit = px; tr.cT = at; tr.net = netPct(tr.d, tr.entry, px); tr.ok = how === "TP" ? true : how === "SL" ? false : tr.net > 0; return tr; }
+/* resolve with candles (sorted, each {t,h,l,c,T}); candles that started before the entry are skipped (their pre-entry part is unknown; live ticks cover the entry candle); a candle is used if it ends after the last check.
+   Inside one candle the order of high and low is unknown → if both stop and target are touched, STOP wins. */
+function resolveBars(tr, bars, now = Date.now()){ if (!tr || tr.st !== "open") return tr;
+  for (const b of bars){ if (b.t < tr.t || (b.T || b.t) < tr.chk) continue; if (b.t > tr.exp) break; const hs = tr.d > 0 ? b.l <= tr.stop : b.h >= tr.stop, ht = tr.d > 0 ? b.h >= tr.tp : b.l <= tr.tp;
+    tr.hi = Math.max(tr.hi, b.h); tr.lo = Math.min(tr.lo, b.l);
+    if (hs) return close(tr, "SL", tr.stop, Math.min(b.T || b.t, now)); if (ht) return close(tr, "TP", tr.tp, Math.min(b.T || b.t, now));
+    if ((b.T || b.t) < now) tr.chk = (b.T || b.t) + 1; tr.last = b.c; }
+  return expire(tr, now); }
+/* live price tick */
+function tick(tr, px, now = Date.now()){ if (!tr || tr.st !== "open" || !fin(px)) return tr; tr.last = px; tr.hi = Math.max(tr.hi, px); tr.lo = Math.min(tr.lo, px);
+  if (tr.d > 0 ? px <= tr.stop : px >= tr.stop) return close(tr, "SL", tr.stop, now); if (tr.d > 0 ? px >= tr.tp : px <= tr.tp) return close(tr, "TP", tr.tp, now); return expire(tr, now); }
+function expire(tr, now){ if (tr.st === "open" && now >= tr.exp && fin(tr.last)) close(tr, "SÜRE", tr.last, tr.exp); return tr; }
+/* which kline interval to use to fill a gap from tr.chk to now (≤1500 candles) */
+function gapTf(from, now){ for (const t of ["1m", "5m", "15m", "1h", "4h", "1d"]) if ((now - from)/TFMS[t] <= 1400) return t; return "1d"; }
+/* has a BEKLE trigger fired on a just-closed candle? trig = {d, k:"kırılım", lv} or {d, k:"geri çekilme", a, b}; bar = closed candle */
+function trigFired(trig, bar){ if (!trig || !bar) return null; const d = trig.d;
+  if (trig.k === "kırılım" && fin(trig.lv)) return (d > 0 ? bar.c > trig.lv : bar.c < trig.lv) ? { entry: bar.c } : null;
+  if (trig.k === "geri çekilme" && fin(trig.a) && fin(trig.b)) return (d > 0 ? bar.l <= trig.b : bar.h >= trig.a) ? { entry: d > 0 ? Math.min(trig.b, bar.o) : Math.max(trig.a, bar.o) } : null;
+  return null; }
+/* summary (optionally filtered) */
+function stats(list, f = {}){ const L = list.filter(x => (!f.sym || x.sym === f.sym) && (!f.tf || x.tf === f.tf)), C = L.filter(x => x.st !== "open"), by = (k) => { const o = {};
+    for (const x of C){ const g = o[x[k]] = o[x[k]] || { n: 0, ok: 0, net: 0 }; g.n++; if (x.ok) g.ok++; g.net += x.net; } return o; };
+  const ok = C.filter(x => x.ok).length, net = C.reduce((s, x) => s + x.net, 0);
+  return { n: L.length, open: L.length - C.length, closed: C.length, ok, bad: C.length - ok, hit: C.length ? ok/C.length : null, net, avg: C.length ? net/C.length : null,
+    tp: C.filter(x => x.how === "TP").length, sl: C.filter(x => x.how === "SL").length, to: C.filter(x => x.how === "SÜRE").length, byTf: by("tf"), byType: by("type"), list: L }; }
+function csv(list, tz = "Europe/Berlin"){ const fmt = t => { try { return new Date(t).toLocaleString("sv-SE", { timeZone: tz }); } catch(e){ return new Date(t).toISOString(); } };
+  const rows = [["zaman (Berlin)", "coin", "aralık", "yön", "tür", "neden", "giriş", "stop", "hedef", "durum", "sonuç", "çıkış", "kapanış (Berlin)", "net %"]];
+  for (const x of list) rows.push([fmt(x.t), x.sym, x.tf, x.d > 0 ? "LONG" : "SHORT", x.type, x.why, x.entry, x.stop, x.tp, x.st === "open" ? "AÇIK" : x.ok ? "DOĞRU" : "YANLIŞ", x.how || "", x.exit ?? "", x.cT ? fmt(x.cT) : "", fin(x.net) ? x.net.toFixed(3) : ""]);
+  return rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
+return { FEE, MAXN, TOUT, TFMS, netPct, make, add, close, resolveBars, tick, gapTf, trigFired, stats, csv };
+});
