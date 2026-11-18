@@ -1,4 +1,4 @@
-/* NEON//TERMINAL v7.17 — SANAL SİNYAL DEFTERİ (virtual signal journal). Pure logic, no DOM, no network. Exported as JRN.
+/* MERMER TERMİNAL v7.20 — SANAL SİNYAL DEFTERİ (virtual signal journal). Pure logic, no DOM, no network. Exported as JRN.
    PAPER TRACKING ONLY: it records what the SİNYAL tab said (GİR LONG / GİR SHORT, and BEKLE triggers that actually fired) and follows the
    price to see whether target or stop came first. It never places an order, never touches keys or a wallet.
    Rules: entry = signal price; target first → DOĞRU, stop first → YANLIŞ; if one candle touched both, STOP counts first (conservative);
@@ -37,15 +37,26 @@ function trigFired(trig, bar){ if (!trig || !bar) return null; const d = trig.d;
   if (trig.k === "kırılım" && fin(trig.lv)) return (d > 0 ? bar.c > trig.lv : bar.c < trig.lv) ? { entry: bar.c } : null;
   if (trig.k === "geri çekilme" && fin(trig.a) && fin(trig.b)) return (d > 0 ? bar.l <= trig.b : bar.h >= trig.a) ? { entry: d > 0 ? Math.min(trig.b, bar.o) : Math.max(trig.a, bar.o) } : null;
   return null; }
-/* summary (optionally filtered) */
-function stats(list, f = {}){ const L = list.filter(x => (!f.sym || x.sym === f.sym) && (!f.tf || x.tf === f.tf)), C = L.filter(x => x.st !== "open"), by = (k) => { const o = {};
-    for (const x of C){ const g = o[x[k]] = o[x[k]] || { n: 0, ok: 0, net: 0 }; g.n++; if (x.ok) g.ok++; g.net += x.net; } return o; };
-  const ok = C.filter(x => x.ok).length, net = C.reduce((s, x) => s + x.net, 0);
-  return { n: L.length, open: L.length - C.length, closed: C.length, ok, bad: C.length - ok, hit: C.length ? ok/C.length : null, net, avg: C.length ? net/C.length : null,
-    tp: C.filter(x => x.how === "TP").length, sl: C.filter(x => x.how === "SL").length, to: C.filter(x => x.how === "SÜRE").length, byTf: by("tf"), byType: by("type"), list: L }; }
+/* v7.20 "aynı anda açılanları tek say": same coin + same direction opened within the same minute (any interval) = ONE unit.
+   A unit is open while any member is open; closed unit: net = mean of members, DOĞRU if most members were (tie → mean net > 0). */
+function units(L){ const g = new Map(); for (const x of L){ const k = x.sym + "|" + x.d + "|" + Math.floor(x.t/6e4); if (!g.has(k)) g.set(k, []); g.get(k).push(x); }
+  return [...g.values()].map(m => { if (m.length === 1) return m[0]; const open = m.some(x => x.st === "open"), hows = [...new Set(m.map(x => x.how))];
+    const u = { ...m[0], tf: m.map(x => x.tf).join("+"), n: m.length, members: m.map(x => x.id) };
+    if (open){ u.st = "open"; return u; } const net = m.reduce((s, x) => s + x.net, 0)/m.length, k = m.filter(x => x.ok).length;
+    return { ...u, st: "closed", net, ok: k*2 > m.length || (k*2 === m.length && net > 0), how: hows.length === 1 ? hows[0] : "karışık" }; }); }
+/* summary (optionally filtered). o.merge → totals and per-coin counted by units (see units()); per-interval / per-type tables always per trade. */
+function stats(list, f = {}, o = {}){ const L = list.filter(x => (!f.sym || x.sym === f.sym) && (!f.tf || x.tf === f.tf)), C = L.filter(x => x.st !== "open"), by = (arr, k) => { const r = {};
+    for (const x of arr){ const g = r[x[k]] = r[x[k]] || { n: 0, ok: 0, net: 0 }; g.n++; if (x.ok) g.ok++; g.net += x.net; } return r; };
+  const U = o.merge ? units(L) : L, UC = U.filter(x => x.st !== "open"), ok = UC.filter(x => x.ok).length, net = UC.reduce((s, x) => s + x.net, 0);
+  return { n: U.length, raw: L.length, merged: L.length - U.length, open: U.length - UC.length, closed: UC.length, ok, bad: UC.length - ok, hit: UC.length ? ok/UC.length : null, net, avg: UC.length ? net/UC.length : null,
+    tp: UC.filter(x => x.how === "TP").length, sl: UC.filter(x => x.how === "SL").length, to: UC.filter(x => x.how === "SÜRE").length, byTf: by(C, "tf"), byType: by(C, "type"), byCoin: by(UC, "sym"), list: L }; }
+/* v7.20 "geniş stop": stop farther than 5 % of the entry, or more than 3× the median stop distance of earlier records (needs ≥ 5) */
+const stopPct = tr => Math.abs(tr.entry - tr.stop)/tr.entry*100;
+function wideStop(list, tr, k = 3, cap = 5){ const p = stopPct(tr); if (p > cap) return true; const a = list.filter(x => x !== tr && fin(x.entry) && fin(x.stop)).slice(0, 200).map(stopPct).sort((x, y) => x - y);
+  if (a.length < 5) return false; const m = a.length % 2 ? a[(a.length - 1)/2] : (a[a.length/2 - 1] + a[a.length/2])/2; return m > 0 && p > k*m; }
 function csv(list, tz = "Europe/Berlin"){ const fmt = t => { try { return new Date(t).toLocaleString("sv-SE", { timeZone: tz }); } catch(e){ return new Date(t).toISOString(); } };
-  const rows = [["zaman (Berlin)", "coin", "aralık", "yön", "tür", "neden", "giriş", "stop", "hedef", "durum", "sonuç", "çıkış", "kapanış (Berlin)", "net %"]];
-  for (const x of list) rows.push([fmt(x.t), x.sym, x.tf, x.d > 0 ? "LONG" : "SHORT", x.type, x.why, x.entry, x.stop, x.tp, x.st === "open" ? "AÇIK" : x.ok ? "DOĞRU" : "YANLIŞ", x.how || "", x.exit ?? "", x.cT ? fmt(x.cT) : "", fin(x.net) ? x.net.toFixed(3) : ""]);
+  const rows = [["zaman (Berlin)", "coin", "aralık", "yön", "tür", "neden", "geniş stop", "giriş", "stop", "hedef", "durum", "sonuç", "çıkış", "kapanış (Berlin)", "net %"]];
+  for (const x of list) rows.push([fmt(x.t), x.sym, x.tf, x.d > 0 ? "LONG" : "SHORT", x.type, x.why, x.wide ? "evet" : "", x.entry, x.stop, x.tp, x.st === "open" ? "AÇIK" : x.ok ? "DOĞRU" : "YANLIŞ", x.how || "", x.exit ?? "", x.cT ? fmt(x.cT) : "", fin(x.net) ? x.net.toFixed(3) : ""]);
   return rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
-return { FEE, MAXN, TOUT, TFMS, netPct, make, add, close, resolveBars, tick, gapTf, trigFired, stats, csv };
+return { FEE, MAXN, TOUT, TFMS, netPct, make, add, close, resolveBars, tick, gapTf, trigFired, stats, units, stopPct, wideStop, csv };
 });
