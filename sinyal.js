@@ -8,10 +8,17 @@ const QUICK = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"
 const fin = x => typeof x === "number" && isFinite(x), clip = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x)), sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0;
 const tf0 = localStorage.getItem("neon.scalp.tf");
 function alLoad(){ let o = {}; try { o = JSON.parse(localStorage.getItem("neon.sinyal.al") || "{}"); } catch(e){} return { snd: o.snd !== false, vib: o.vib !== false, ntf: o.ntf === undefined ? !!window.NEON_NATIVE : !!o.ntf }; }
-const SMK = "mermer.smode", sm0 = localStorage.getItem(SMK);
-const S = { sm: sm0 === "trend" ? "trend" : "scalp", sR: null, sRAt: 0, Gt: null, sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : "trend", b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
+const SMK = "mermer.smode", SELK = "mermer.sinyal.sel";
+/* v7.25 ONE selector SCALP | TREND | DÖNÜŞ drives both states: sm (scalp/trend decision) + mode (A+ setup walk: trend/rev).
+   Migration: saved DÖNÜŞ setup → DÖNÜŞ; saved TREND mode → TREND; otherwise SCALP (default). */
+const SEL = { scalp: { sm: "scalp", mode: "trend" }, trend: { sm: "trend", mode: "trend" }, rev: { sm: "trend", mode: "rev" } }, SEL_LBL = { scalp: "SCALP", trend: "TREND", rev: "DÖNÜŞ" };
+function selLoad(){ try { const v = localStorage.getItem(SELK); if (SEL[v]) return { v, fresh: false };
+    const v2 = localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : localStorage.getItem(SMK) === "trend" ? "trend" : "scalp", fresh = v2 === "scalp"; /* first run / migration into SCALP → 5dk */
+    localStorage.setItem(SELK, v2); localStorage.setItem(SMK, SEL[v2].sm); localStorage.setItem("neon.sinyal.mode", SEL[v2].mode); return { v: v2, fresh }; } catch(e){ return { v: "scalp", fresh: true }; } }
+const sel0 = selLoad(), sm0 = sel0.fresh ? null : SEL[sel0.v].sm;
+const S = { sel: sel0.v, sm: SEL[sel0.v].sm, sR: null, sRAt: 0, Gt: null, sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: SEL[sel0.v].mode, b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
   W: null, D: null, ws: [], wsOk: false, lastTick: 0, started: false, gen: 0, off: 0, err: null, snd: true, al: alLoad(), ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", alAt: {}, lastFinal: 0, list: [], poll: null, ov: {}, ovAt: 0, ovBusy: false, view: { n: 50, off: 0 } };
-if (!sm0 && TF_MS[S.tf] >= 9e5) S.tf = "5m"; /* first run: SCALP default on a short interval */
+if (sel0.fresh && TF_MS[S.tf] > 3e5) S.tf = "5m"; /* first run: SCALP default on a short interval */
 const tfs = () => [S.tf].concat(higher(S.tf)), key = () => S.sym + "@" + S.tf, base = () => S.b[S.tf] || [];
 let DP = 2; const fp = x => !fin(x) ? "—" : (+x).toFixed(DP), now = () => Date.now() + S.off, big = x => !fin(x) ? "—" : x >= 1e9 ? (x/1e9).toFixed(2) + "B" : x >= 1e6 ? (x/1e6).toFixed(1) + "M" : x >= 1e3 ? (x/1e3).toFixed(0) + "k" : x.toFixed(0);
 const bars = a => a.map(k => ({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5], T: +k[6], tb: +k[9], x: true }));
@@ -46,7 +53,7 @@ function html(){ return `<div class="sg-top"><div class="can-search sc-search"><
   <div id="sc-list" class="can-list hidden"></div>
   <div class="tfbar sc-quick">${QUICK.map(s => `<button type="button" data-sq="${s}">${s === "PAXGUSDT" ? "ALTIN" : s.replace("USDT", "")}</button>`).join("")}</div>
   <div class="tfbar sc-tfs" role="toolbar" aria-label="Mum aralığı">${TF_SEL.map(t => `<button type="button" data-stf="${t}" class="${t === S.tf ? "on" : ""}">${TF_LBL[t]}</button>`).join("")}</div>
-  <div class="sg-mode"><div class="seg sg-seg"><button type="button" data-md="trend" class="${S.mode === "trend" ? "on" : ""}">TREND</button><button type="button" data-md="rev" class="${S.mode === "rev" ? "on" : ""}">DÖNÜŞ</button></div><span class="sg-als"><label title="sesli uyarı"><input type="checkbox" id="al-snd" ${S.al.snd ? "checked" : ""}>🔊</label><label title="titreşim"><input type="checkbox" id="al-vib" ${S.al.vib ? "checked" : ""}>📳</label><button type="button" id="al-ntf" class="mini" title="tarayıcı bildirimi">${S.al.ntf ? "🔔" : "🔕"}</button></span><span id="sc-st" class="dim sg-st"></span></div></div>
+  <div class="sg-mode"><div class="seg sg-seg sg-sel" role="radiogroup" aria-label="sinyal modu">${["scalp", "trend", "rev"].map(v => `<button type="button" role="radio" data-sel="${v}" class="${S.sel === v ? "on" : ""}" aria-checked="${S.sel === v}" title="${v === "scalp" ? "anlık gir-çık (seçili kısa aralık + emir akışı)" : v === "trend" ? "12 aralık genel yön + A+ trend kurulumları" : "12 aralık genel yön + A+ dönüş kurulumları"}">${v === "scalp" ? "SCALP" : v === "trend" ? "TREND" : "DÖNÜŞ"}</button>`).join("")}</div><span class="sg-als"><label title="sesli uyarı"><input type="checkbox" id="al-snd" ${S.al.snd ? "checked" : ""}>🔊</label><label title="titreşim"><input type="checkbox" id="al-vib" ${S.al.vib ? "checked" : ""}>📳</label><button type="button" id="al-ntf" class="mini" title="tarayıcı bildirimi">${S.al.ntf ? "🔔" : "🔕"}</button></span><span id="sc-st" class="dim sg-st"></span></div></div>
   <div id="sg-gen" class="sg-gen"><div id="sg-now" class="sg-now"><div class="empty">karar hesaplanıyor…</div></div><div class="sg-hero"><div id="sg-masc" class="masc st-wait">${MASC}<div class="masc-name">VOLTİ</div></div><div id="sg-gcard" class="sg-gcard"><div class="empty">GENEL YÖN hesaplanıyor…</div></div></div>
    <div id="sg-bubble" class="sg-bubble">Merhaba! Ben VOLTİ. Tüm aralıkları okuyorum…</div>
    </div>
@@ -209,7 +216,7 @@ function paintGen(){ const gc = $("#sg-gcard"), bub = $("#sg-bubble"), nw = $("#
     return `<button type="button" data-stf="${t}" class="gd ${!x ? "na" : x.st === "SIKIŞMA" ? "m" : d > 0 ? "up" : d < 0 ? "dn" : "n"}${t === S.tf ? " on" : ""}" title="${TF_LBL[t]} ${x ? x.st + " · eğilim " + (x.d || 0).toFixed(2) : "veri yok"}"><i>${ic}</i><small>${TF_LBL[t]}</small></button>`; }).join("");
   const dec = S.dec || { word: "BEKLE", line: "BEKLE", text: "BEKLE.", yon: "↔ YÖN: YATAY", dirW: "YATAY" }, wc = dec.word === "GİR LONG" ? "up" : dec.word === "GİR SHORT" ? "dn" : "y";
   const rv = dec.rev, sc = S.sm === "scalp";
-  gc.innerHTML = `<div class="sg-sm" role="group" aria-label="analiz modu"><button type="button" data-sm="scalp" class="${sc ? "on" : ""}" aria-pressed="${sc}">SCALP (anlık)</button><button type="button" data-sm="trend" class="${sc ? "" : "on"}" aria-pressed="${!sc}">TREND</button></div>
+  gc.innerHTML = `
     <div class="sg-glab">${sc ? "ANLIK YÖN" : "GENEL YÖN"} <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${sc ? TF_LBL[S.tf] + " + emir akışı" + (dec.hold ? " · tutma " + esc(dec.hold) : "") : have + "/12 aralık"} · yön, işlem değil</small></div>
     <div class="sg-gdir sg-yon ${cls}">${esc(dec.yon)}</div>${rv ? `<div class="sg-rev ${rv.d > 0 ? "up" : "dn"}"><b>⚠ DÖNÜŞ UYARISI</b> ${esc(rv.why)}</div>` : ""}
     <div class="sg-bar" title="−100 AŞAĞI … +100 YUKARI"><span class="sg-bar0"></span><span class="sg-barf ${cls}" style="${C.G >= 0 ? "left:50%" : "right:50%"};width:${w}%"></span></div>
@@ -348,7 +355,7 @@ function paintMain(){ const card = $("#sg-card"), al = $("#sg-alerts"); if (!car
   const line = P && fin(P.stop) ? `<div class="sg-line"><span>Giriş <b>${fp(P.entry)}</b></span><span>Stop <b class="dn">${fp(P.stop)}</b></span><span>Hedef <b class="up">${fp(P.tp)}</b></span></div>`
     : P && fin(P.longAbove) ? `<div class="sg-line"><span>↑ <b class="up">${fp(P.longAbove)}</b> üstü kapanış</span><span>↓ <b class="dn">${fp(P.shortBelow)}</b> altı kapanış</span></div>` : "";
   const V = S.mv, go = V && V.word !== "BEKLE", wcls = !V ? cls : V.word === "GİR LONG" ? "up" : V.word === "GİR SHORT" ? "dn" : "y"; void line;
-  card.innerHTML = `<div class="sg-sym"><b>${esc(S.sym.replace("USDT", ""))}</b> <span class="sc-px">${fp(D.px)}</span> <small class="dim">${TF_LBL[S.tf]} · ${S.mode === "rev" ? "DÖNÜŞ" : "TREND"} · seçili aralık</small></div>
+  card.innerHTML = `<div class="sg-sym"><b>${esc(S.sym.replace("USDT", ""))}</b> <span class="sc-px">${fp(D.px)}</span> <small class="dim">${TF_LBL[S.tf]} · ${SEL_LBL[S.sel]} · seçili aralık</small></div>
     <div class="sg-state ${wcls}">${V ? V.word : "…"}</div><div class="sg-sub">${V ? esc(V.sub) : ""}</div>${V && V.note ? `<div class="sg-warn">⚠ ${esc(V.note)}</div>` : ""}
     <div class="sg-sub dim">${V ? esc(V.tag) + " · " : ""}${sub}</div><div class="dim sg-cd">mum kapanışına <b id="sc-cd">${cdf(left)}</b>${go && P && fin(P.stop) ? ` · çıkış en geç ${dur(SMT.H_OUT*TF_MS[S.tf])}` : ""}</div>`;
   if (al) al.innerHTML = (D.alerts.length ? "" : '<span class="dim">şu an uyarı yok</span>') + D.alerts.slice(0, 4).map(a => `<span class="sg-al ${a.c}">${esc(a.t)}</span>`).join(""); }
@@ -407,7 +414,7 @@ function paintDetails(){ const D = S.D, W = S.W; if (!D || !W) return; const L =
     ${S.tf !== "4h" && TF_MS[S.tf] < 144e5 ? `<div class="sub-h">saat etkisi (UTC, öğrenilmiş skor yönü doğru mu)</div><div class="sg-hours">${Array.from({ length: 24 }, (_, h) => { const x = hb[h], r = x && x.n >= 5 ? x.ok/x.n : null; return `<span class="${r === null ? "dim" : r >= 0.55 ? "up" : r < 0.47 ? "dn" : ""}" title="${h}:00">${h}<br><small>${r === null ? "·" : Math.round(r*100)}</small></span>`; }).join("")}</div><div class="dim sc-note">Kırmızı saatlerde (≥15 örnek, <%47) A+ sinyal verilmez. Berlin = UTC+1.</div>` : ""}`;
   paintBt(); }
 function paintBt(){ const el = $("#sc-bt"); if (!el || !S.W || !S.R) return; const r = SMT.replay(S.W, S.R.P.b), f = B => B.n ? `${pc(SMT.hitB(B))} <small>(${B.tp}/${B.tp + B.sl})</small> · ort. <b class="${B.pnl/B.n > 0 ? "up" : "dn"}">${(B.pnl/B.n >= 0 ? "+" : "") + (B.pnl/B.n).toFixed(3)}%</b>` : "sinyal yok";
-  el.innerHTML = `<div class="can-kv">${row("A+ sinyaller (" + r.aplus.n + ")", f(r.aplus))}${row("PUMP/DUMP kırılımları (" + r.brk.n + ")", f(r.brk))}</div><div class="dim sc-note">${S.sym} · ${TF_LBL[S.tf]} · ${S.mode === "rev" ? "DÖNÜŞ" : "TREND"} · yüklü ${S.R.P.n} mum (${dur(S.R.P.n*TF_MS[S.tf])}). Her mumda yalnızca o ana kadar bilinenle karar verildi (ileriye bakmadan); öğrenme de aynı yürüyüşte. Ortalamalar ücret (%0.10) düşülmüş, TP=1R ya da kutu yüksekliği, ${SMT.H_OUT} mum içinde. Türev/defter verisi geçmişte olmadığından testte yok.</div>`; }
+  el.innerHTML = `<div class="can-kv">${row("A+ sinyaller (" + r.aplus.n + ")", f(r.aplus))}${row("PUMP/DUMP kırılımları (" + r.brk.n + ")", f(r.brk))}</div><div class="dim sc-note">${S.sym} · ${TF_LBL[S.tf]} · ${SEL_LBL[S.sel]}${S.sel === "scalp" ? " (A+ kurulumları: TREND)" : ""} · yüklü ${S.R.P.n} mum (${dur(S.R.P.n*TF_MS[S.tf])}). Her mumda yalnızca o ana kadar bilinenle karar verildi (ileriye bakmadan); öğrenme de aynı yürüyüşte. Ortalamalar ücret (%0.10) düşülmüş, TP=1R ya da kutu yüksekliği, ${SMT.H_OUT} mum içinde. Türev/defter verisi geçmişte olmadığından testte yok.</div>`; }
 function paintHist(){ const el = $("#sc-hist"); if (!el) return; const k = key(), L = (H.load()[k] || []), st = SCM.stats(L), tms = TF_MS[S.tf], P2 = x => x === null || !fin(x) ? "—" : "%" + x.toFixed(0);
   const oc = r => !r ? '<span class="dim">…</span>' : `<span class="${r.r === "TP" || r.r === "+" ? "up" : "dn"}">${r.r === "TP" ? "TP" : r.r === "SL" ? "SL" : r.r + Math.abs(r.pnl).toFixed(2)}</span>`;
   const when = t => tms >= 864e5 ? new Date(t).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" }) : tms >= 36e5 ? new Date(t).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
@@ -430,7 +437,6 @@ function bind(){ const q = $("#sc-q"); q.oninput = () => paintList(q.value); q.o
   $("#sc-go").onclick = () => { const v = q.value.trim().toUpperCase(), r = search(v); pick(r.some(x => x.s === v) ? v : r[0] ? r[0].s : v); };
   document.querySelector(".sc-quick").onclick = e => { const b = e.target.closest("[data-sq]"); if (b) pick(b.dataset.sq); };
   const box = $("#scalp-box"); box.addEventListener("click", e => { const b = e.target.closest("[data-stf]"); if (b && b.dataset.stf !== S.tf) start(S.sym, b.dataset.stf);
-    const md = e.target.closest("[data-md]"); if (md && md.dataset.md !== S.mode){ S.mode = md.dataset.md; localStorage.setItem("neon.sinyal.mode", S.mode); try { weConfig(); } catch(e){} document.querySelectorAll("[data-md]").forEach(x => x.classList.toggle("on", x === md)); S.ovCalcAt = 0; compute(true); ovCalc(true); }
     const z = e.target.closest("[data-z]"); if (z){ const k = +z.dataset.z; if (k === 0) S.view = { n: 50, off: 0 }; else S.view.n = Math.max(20, Math.min(160, Math.round(S.view.n*(k > 0 ? 0.75 : 1.33)))); paintChart(); } });
   const alSave = () => { try { localStorage.setItem("neon.sinyal.al", JSON.stringify(S.al)); } catch(e){} };
   $("#al-snd").onchange = e => { S.al.snd = e.target.checked; alSave(); if (S.al.snd) alarm("LONG"); };
@@ -457,8 +463,14 @@ function init(){ const box = $("#scalp-box"); if (!box) return; box.innerHTML = 
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "scalp") ensure(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 /* v7.24 analysis mode: SCALP (anlık, default) or TREND — shared by ANALİZ + SİNYAL (+ badges / watchlist read S.sm) */
-function setMode(m){ m = m === "trend" ? "trend" : "scalp"; if (m === S.sm) return; S.sm = m; try { localStorage.setItem(SMK, m); } catch(e){} S.sR = null; S.bookAt = 0; try { weConfig(); } catch(e){}
-  if (m === "scalp" && TF_MS[S.tf] > 9e5 && typeof analyze === "function"){ analyze(S.sym, "5m"); return; } summarize(); bump(); window.dispatchEvent(new CustomEvent("sinyal:mode", { detail: m })); }
-document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sm]"); if (!b) return; e.preventDefault(); setMode(b.dataset.sm); window.dispatchEvent(new CustomEvent("sinyal:mode", { detail: S.sm })); });
-return { setMode, ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
+function setSel(v){ if (!SEL[v] || v === S.sel) return; const prevMode = S.mode; S.sel = v; S.sm = SEL[v].sm; S.mode = SEL[v].mode;
+  try { localStorage.setItem(SELK, v); localStorage.setItem(SMK, S.sm); localStorage.setItem("neon.sinyal.mode", S.mode); } catch(e){}
+  S.sR = null; S.bookAt = 0; try { weConfig(); } catch(e){}
+  document.querySelectorAll("[data-sel]").forEach(x => { const on = x.dataset.sel === v; x.classList.toggle("on", on); x.setAttribute("aria-checked", on); });
+  window.dispatchEvent(new CustomEvent("sinyal:mode", { detail: S.sm }));
+  if (v === "scalp" && TF_MS[S.tf] > 3e5 && typeof analyze === "function"){ analyze(S.sym, "5m"); return; } /* SCALP = anlık gir-çık on ≤ 5dk */
+  if (prevMode !== S.mode){ S.ovCalcAt = 0; compute(true); ovCalc(true); } else { summarize(); bump(); } }
+const setMode = m => setSel(m === "trend" ? "trend" : "scalp"); /* compatibility */
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sel]"); if (!b) return; e.preventDefault(); setSel(b.dataset.sel); });
+return { setSel, setMode, ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
 })();
