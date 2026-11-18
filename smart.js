@@ -39,7 +39,12 @@ function patternsAt(b, i){ const out = []; if (i < 2) return out; const x = b[i]
 /* ---------------- prep: all series once ---------------- */
 function rollMid(b, p){ const o = Array(b.length).fill(null); for (let i = p - 1; i < b.length; i++){ let hi = -Infinity, lo = Infinity; for (let j = i - p + 1; j <= i; j++){ if (b[j].h > hi) hi = b[j].h; if (b[j].l < lo) lo = b[j].l; } o[i] = (hi + lo)/2; } return o; }
 function prepHigher(hb){ if (!hb || hb.length < 40) return null; const c = hb.map(x => x.c), e9 = SCM.ema(c, 9), e21 = SCM.ema(c, 21), st = SCM.supertrend(hb).dir, h = SCM.macd(c).hist, A = SCM.atr(hb);
-  const v = hb.map((x, i) => { if (i < 30 || !fin(e21[i])) return null; const a = A[i] || x.c*0.001; return (sgn(e9[i] - e21[i], 0.05*a) + st[i] + sgn(h[i], 0.02*a) + sgn(x.c - e21[i], 0.2*a))/4; }); return { T: hb.map(x => x.T), v }; }
+  const v = hb.map((x, i) => { if (i < 30 || !fin(e21[i])) return null; const a = A[i] || x.c*0.001; return (sgn(e9[i] - e21[i], 0.05*a) + st[i] + sgn(h[i], 0.02*a) + sgn(x.c - e21[i], 0.2*a))/4; }); return { T: hb.map(x => x.T), v, bos: bosOf(hb) }; }
+/* v7.24 market structure: sticky last break of a confirmed swing (pivot 3 left / 3 right, so known 3 bars later — no lookahead).
+   close below the last swing low → −1 (bearish structure break), above the last swing high → +1; stays until the opposite break. */
+function bosOf(b, k = 3){ const n = b.length, out = Array(n).fill(0); let sh = null, sl = null, st = 0;
+  for (let i = 0; i < n; i++){ const p = i - k; if (p >= k){ let isH = true, isL = true; for (let j = p - k; j <= p + k; j++){ if (j === p) continue; /* equal highs/lows: the first one is the pivot */ if (j < p ? b[j].h >= b[p].h : b[j].h > b[p].h) isH = false; if (j < p ? b[j].l <= b[p].l : b[j].l < b[p].l) isL = false; } if (isH) sh = b[p].h; if (isL) sl = b[p].l; }
+    if (sl !== null && b[i].c < sl && st !== -1){ st = -1; } else if (sh !== null && b[i].c > sh && st !== 1){ st = 1; } out[i] = st; } return out; }
 function prep(b, o = {}){ const n = b.length, c = b.map(x => x.c), v = b.map(x => x.v), tms = o.tms || 6e4;
   const P = { b, n, c, tms, e9: SCM.ema(c, 9), e21: SCM.ema(c, 21), e50: SCM.ema(c, 50), rsi: SCM.rsi(c), sr: SCM.stochRsi(c), M: SCM.macd(c), B: SCM.boll(c), A: SCM.atr(b), A50: SCM.atr(b, 50), ST: SCM.supertrend(b), X: SCM.adx(b),
     t9: rollMid(b, 9), k26: rollMid(b, 26), s52: rollMid(b, 52), PS: SCM.psar(b), CC: SCM.cci(b), WR: SCM.willr(b), MF: SCM.mfi(b), OB: SCM.obv(b), vw: SCM.vwap(b, tms < 36e5 ? 864e5 : tms <= 144e5 ? 6048e5 : 2592e6),
@@ -195,17 +200,33 @@ function tfRel(H, c, k = 3, upTo = Infinity){ let n = 0, w = 0; if (!H) return {
   for (let j = 0; j + k < H.v.length; j++){ if (H.T[j + k] > upTo) break; const v = H.v[j]; if (!fin(v) || Math.abs(v) < 0.5) continue; const m = c[j + k] - c[j]; if (!m) continue; n++; if ((m > 0) === (v > 0)) w++; }
   return { n, acc: n ? w/n : null }; }
 const relAcc = r => r && r.n ? (r.acc*r.n + 0.5*30)/(r.n + 30) : 0.5, relMul = r => clip(1 + (relAcc(r) - 0.5)*6, 0.4, 1.6);
-function consensus(I){ const grp = L => { let s = 0, w = 0; const on = []; for (const t of L){ const x = I[t]; if (!x || !fin(x.d)) continue; const ww = GW[t]*relMul(x.rel); s += ww*x.d; w += ww; on.push(t); } return { v: w ? s/w : 0, w, on }; };
+/* v7.24 DÖNÜŞ UYARISI: a confirmed turn of 5dk–1s against the big picture (1s–1G).
+   Needs: weighted 5dk/15dk/30dk/1s score (direction vote 60 % + structure break 40 %) beyond REV.th against the big side, at least REV.need of 15dk/30dk/1s
+   pointing the other way and at least one of them with a fresh structure break that way. Structure breaks are sticky → built-in hysteresis. */
+/* tuned by walk-forward replay (v7.24, see r724): down-weighting the big picture made direction accuracy worse, so a turn CAPS the old side
+   (never YUKARI/LONG in a confirmed bearish turn → YATAY with DÖNÜŞ UYARISI) instead of re-weighting; fast intervals weigh most. */
+const REV = { th: 0.45, need: 1, bw: 0.4, kb0: 0.6, kbk: 0, km: 0.25, ks: 0.15, force: 0, cap: 1, W: { "5m": 1.2, "15m": 1, "30m": 0.4, "1h": 0.2 } };
+function revOf(I, big){ const bd = sgn(big, 0.2); if (!bd) return null; let s = 0, w = 0, opp = [], brk = [];
+  for (const t in REV.W){ const x = I[t]; if (!x || !fin(x.d)) continue; const v = (1 - REV.bw)*x.d + REV.bw*(x.bos || 0); s += REV.W[t]*v; w += REV.W[t];
+    if (t !== "5m" && sgn(x.d, 0.25) === -bd){ opp.push(t); if (x.bos === -bd) brk.push(t); } }
+  if (!w) return null; const rv = s/w; if (rv*bd > -REV.th || opp.length < REV.need || !brk.length) return null;
+  return { d: -bd, k: clip((Math.abs(rv) - REV.th)/(1 - REV.th), 0, 1), rv, opp, brk }; }
+function consensus(I, o = {}){ const grp = L => { let s = 0, w = 0; const on = []; for (const t of L){ const x = I[t]; if (!x || !fin(x.d)) continue; const ww = GW[t]*relMul(x.rel); s += ww*x.d; w += ww; on.push(t); } return { v: w ? s/w : 0, w, on }; };
   const big = grp(G_BIG), mid = grp(G_MID), sh = grp(G_SHORT); let s = 0, w = 0;
-  for (const [g, k] of [[big, 0.6], [mid, 0.25], [sh, 0.15]]) if (g.on.length){ s += k*g.v; w += k; }
-  const G = w ? s/w : 0, agree = sgn(big.v, 0.2) !== 0 && sgn(big.v, 0.2) === sgn(mid.v, 0.2), dir = sgn(G, 0.2), strong = dir !== 0 && Math.abs(G) >= 0.5 && agree;
+  /* adaptive weights: when a confirmed turn is active the big picture is down-weighted (0.6 → 0.33…0.15) by the turn's strength */
+  const rev = o.rev === false ? null : revOf(I, big.v), kb = rev ? REV.kb0 - REV.kbk*rev.k : 0.6, km = rev ? REV.km : 0.25, ks = rev ? REV.ks : 0.15;
+  for (const [g, k] of [[big, kb], [mid, km], [sh, ks]]) if (g.on.length){ s += k*g.v; w += k; }
+  let G = w ? s/w : 0; if (rev && REV.force) G = rev.k >= REV.force ? rev.rv : G; if (rev && REV.cap && sgn(G, 0.2) === -rev.d) G = clip(G, -0.19, 0.19); /* cap: never the old side during a confirmed turn */ const agree = sgn(big.v, 0.2) !== 0 && sgn(big.v, 0.2) === sgn(mid.v, 0.2), dir = sgn(G, 0.2), strong = !rev && dir !== 0 && Math.abs(G) >= 0.5 && agree;
   const label = !dir ? "NÖTR" : (strong ? "GÜÇLÜ " : "") + (dir > 0 ? "LONG" : "SHORT"), n = big.on.length + mid.on.length + sh.on.length;
   const rel = G_ALL.filter(t => I[t] && I[t].rel && I[t].rel.n).map(t => relAcc(I[t].rel)), relAvg = rel.length ? rel.reduce((a, x) => a + x, 0)/rel.length : null;
-  return { G, big: big.v, mid: mid.v, short: sh.v, dir, strong, agree, label, strength: Math.round(Math.abs(G)*100), n, relAvg }; }
+  return { G, big: big.v, mid: mid.v, short: sh.v, dir, strong, agree, label, strength: Math.round(Math.abs(G)*100), n, relAvg, rev }; }
+/* one-line reason of an active DÖNÜŞ UYARISI. L = interval labels */
+function revWhy(rv, L = {}){ if (!rv) return ""; const w = rv.d < 0 ? "aşağı" : "yukarı", lb = a => a.map(t => L[t] || t).join("+");
+  return `${lb(rv.opp)} ${w} döndü${rv.brk.length ? `, ${lb(rv.brk)} ${rv.d < 0 ? "son dibin altında kapattı" : "son tepenin üstünde kapattı"} (yapı kırıldı)` : ""} — büyük resim henüz ${rv.d < 0 ? "yukarı" : "aşağı"}.`; }
 /* ŞİMDİ NE YAPMALI — one actionable line. x: { main: {state,d,plan,pUp}, px, atr, ema21 } */
 function action(C, x){ const m = x.main || {}, R = fin(x.atr) && x.atr > 0 ? x.atr : x.px*0.003, px = x.px;
   const mk = (d, kind, entry) => { const stop = entry - d*1.5*R, r = Math.abs(entry - stop); return { d, kind, entry, stop, tp: entry + d*1.5*r }; };
-  if (["LONG", "SHORT", "PUMP", "DUMP"].includes(m.state) && m.plan && fin(m.plan.stop) && !(C.dir === -m.d && Math.abs(C.big) >= 0.4))
+  if (["LONG", "SHORT", "PUMP", "DUMP"].includes(m.state) && m.plan && fin(m.plan.stop) && !(C.dir === -m.d && Math.abs(C.big) >= 0.4) && !(C.rev && C.rev.d === -m.d))
     return { act: m.d > 0 ? "GİR LONG" : "GİR SHORT", d: m.d, kind: m.state === "PUMP" || m.state === "DUMP" ? "kırılım" : "A+ kurulum", entry: m.plan.entry, stop: m.plan.stop, tp: m.plan.tp };
   if (m.state === "SIKIŞMA" && m.plan && fin(m.plan.longAbove)) return { act: "BEKLE", d: 0, wait: "kırılımı bekle", kind: "sıkışma", longAbove: m.plan.longAbove, shortBelow: m.plan.shortBelow, prefer: C.dir || (m.pUp >= 0.5 ? 1 : -1) };
   if (C.strong && sgn(C.short, 0.25) === C.dir) return Object.assign({ act: C.dir > 0 ? "GİR LONG" : "GİR SHORT", kind: "trend + kısa vade aynı yön" }, mk(C.dir, "trend", px));
@@ -236,8 +257,9 @@ function gReplay(K, main, o = {}){ const maxB = o.maxB || 10, fee = o.fee ?? FEE
     const k = Math.min(b.length - 1, i + maxB); return { r: "T", pnl: d*(b[k].c - en)/en*100 - fee, t: b[i].t, open: k - i < maxB }; };
   let prev = "", prevL = "";
   for (let i = 30; i < b.length - 1; i++){ if (b[i].T < from) continue; const Tc = b[i].T, I = {};
-    for (const t in P){ const p = P[t], j = lastLE(p.Ts, Tc); if (j < 30 || !fin(p.H.v[j])) continue; const n = lastLE(p.ST, Tc) + 1; I[t] = { d: p.H.v[j], rel: { n, acc: n ? p.cum[n]/n : null } }; }
-    if (!Object.keys(I).length) continue; const C = consensus(I), px = b[i].c, a = action(C, { main: {}, px, atr: A[i], ema21: E[i] });
+    for (const t in P){ const p = P[t], j = lastLE(p.Ts, Tc); if (j < 30 || !fin(p.H.v[j])) continue; const n = lastLE(p.ST, Tc) + 1; I[t] = { d: p.H.v[j], bos: p.H.bos[j], rel: { n, acc: n ? p.cum[n]/n : null } }; }
+    if (!Object.keys(I).length) continue; const C = consensus(I, { rev: o.rev }), px = b[i].c, a = action(C, { main: {}, px, atr: A[i], ema21: E[i] });
+    if (o.seq) (out.seq = out.seq || []).push({ i, T: Tc, dir: C.dir, rev: C.rev ? C.rev.d : 0 }); if (C.rev) out.revN = (out.revN || 0) + 1;
     out.lab[C.label] = (out.lab[C.label] || 0) + 1; if (prevL && C.label !== prevL) out.flips++; prevL = C.label;
     if (i + 3 < b.length && C.dir){ const ok = sgn(b[i + 3].c - px) === C.dir; out.dir.n++; out.dir.ok += ok; if (C.strong){ out.str.n++; out.str.ok += ok; } }
     const key = a.act + (a.wait || ""); if (a.act !== "BEKLE" && key !== prev) out.tr.push(sim(i, a.d, px, a.stop, a.tp));
@@ -252,16 +274,19 @@ const gGate = g => !!(g && g.T && g.T.n >= 20 && g.T.win >= 0.55 && g.T.avg > 0)
    x: { px, atr, ema21, hi, lo (recent high/low of the selected interval incl. the live candle), f: price formatter } */
 const DIRW = { "GÜÇLÜ LONG": "GÜÇLÜ YUKARI", LONG: "YUKARI", "NÖTR": "YATAY", SHORT: "AŞAĞI", "GÜÇLÜ SHORT": "GÜÇLÜ AŞAĞI" }, DIRA = { "GÜÇLÜ LONG": "⇈", LONG: "↑", "NÖTR": "↔", SHORT: "↓", "GÜÇLÜ SHORT": "⇊" };
 function decision(C, A, x){ const f = x.f || (v => (+v).toFixed(4)), px = x.px, R = fin(x.atr) && x.atr > 0 ? x.atr : px*0.003, p = C.dir, dirW = DIRW[C.label] || "YATAY", arrow = DIRA[C.label] || "↔";
-  const base = { dir: p, dirW, arrow, yon: `${arrow} YÖN: ${dirW}`, note: A.note || null };
+  const rv = C.rev || null; let dW = dirW; if (rv && p === -rv.d) dW = (p > 0 ? "YUKARI" : "AŞAĞI") + " ama DÖNÜŞ RİSKİ";
+  const base = { dir: p, dirW: dW, arrow, yon: `${arrow} YÖN: ${dW}`, note: A.note || null, rev: rv ? { d: rv.d, why: x.revWhy || "" } : null };
   if (A.act === "GİR LONG" || A.act === "GİR SHORT"){ const t = `${A.act} · giriş ${f(A.entry)} · stop ${f(A.stop)} · hedef ${f(A.tp)}`;
     return { ...base, word: A.act, d: A.d, trig: [], line: t, text: `${A.act} (${A.kind}) — giriş ${f(A.entry)}, stop ${f(A.stop)}, hedef ${f(A.tp)}.` }; }
   const sq = A.wait === "kırılımı bekle", up = sq ? A.longAbove : x.hi, dn = sq ? A.shortBelow : x.lo, bx = sq ? "kutu " : "", T = [];
-  if (p >= 0 && fin(up)) T.push({ d: 1, k: "kırılım", lv: up, t: `${bx}${f(up)} üstü kapanışta LONG` });
-  if (p <= 0 && fin(dn)) T.push({ d: -1, k: "kırılım", lv: dn, t: `${bx}${f(dn)} altı kapanışta SHORT` });
-  if (p !== 0){ let z = A.wait === "geri çekilmeyi bekle" && fin(A.entry) ? A.entry : fin(x.ema21) && (px - x.ema21)*p > 0.1*R && Math.abs(px - x.ema21) < 3*R ? x.ema21 : px - p*0.6*R;
+  /* during a confirmed turn only the turn's side gets triggers (no LONG trigger in a confirmed bearish turn, and vice versa) */
+  const okL = !(rv && rv.d < 0), okS = !(rv && rv.d > 0), pT = rv ? rv.d : p;
+  if ((p >= 0 || pT > 0) && okL && fin(up)) T.push({ d: 1, k: "kırılım", lv: up, t: `${bx}${f(up)} üstü kapanışta LONG` });
+  if ((p <= 0 || pT < 0) && okS && fin(dn)) T.push({ d: -1, k: "kırılım", lv: dn, t: `${bx}${f(dn)} altı kapanışta SHORT` });
+  if (p !== 0 && !(rv && p === -rv.d)){ let z = A.wait === "geri çekilmeyi bekle" && fin(A.entry) ? A.entry : fin(x.ema21) && (px - x.ema21)*p > 0.1*R && Math.abs(px - x.ema21) < 3*R ? x.ema21 : px - p*0.6*R;
     let a = z - 0.25*R, b = z + 0.25*R; if (p > 0) b = Math.min(b, px - 0.05*R); else a = Math.max(a, px + 0.05*R); if (b < a){ const m = (a + b)/2; a = b = m; }
     T.push({ d: p, k: "geri çekilme", a, b, t: `geri çekilmede ${f(a)}–${f(b)} ${p > 0 ? "LONG" : "SHORT"} bölgesi` }); }
-  const yl = dirW.toLocaleLowerCase("tr");
+  const yl = dW.toLocaleLowerCase("tr");
   return { ...base, word: "BEKLE", d: 0, trig: T, line: "BEKLE → " + (T.length ? T.map(t => t.t).join(" · ") : "net tetik yok"),
     text: `BEKLE — yön ${yl}${T.length ? ", tetik: " + T[0].t : ""}.` }; }
 /* lower (selected interval) card: same word as the top, never a silent conflict. D = { state, d } of the selected interval, mi = its trend item */
@@ -270,5 +295,5 @@ function mainView(dec, D, mi, tfL){ D = D || {}; const stD = D.state === "LONG" 
   const conflict = !!(dec.dir && own && own === -dec.dir) || !!(dec.d && stD && stD === -dec.d);
   const sub = dec.word === "BEKLE" ? `BEKLE · yön ${dec.dirW.toLocaleLowerCase("tr")}${dec.trig.length ? ", tetik: " + dec.trig[0].t : ""}` : dec.line;
   return { word: dec.word, sub, tag, conflict, note: conflict ? `bu aralık ters (${tfL || ""} ${own > 0 ? "yukarı" : "aşağı"}, genel yön ${dec.dirW.toLocaleLowerCase("tr")}): dikkat` : null }; }
-return { decision, mainView, DIRW, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
+return { decision, mainView, DIRW, REV, revOf, revWhy, bosOf, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
 });

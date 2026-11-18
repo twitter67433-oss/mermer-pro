@@ -8,8 +8,10 @@ const QUICK = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"
 const fin = x => typeof x === "number" && isFinite(x), clip = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x)), sgn = x => x > 0 ? 1 : x < 0 ? -1 : 0;
 const tf0 = localStorage.getItem("neon.scalp.tf");
 function alLoad(){ let o = {}; try { o = JSON.parse(localStorage.getItem("neon.sinyal.al") || "{}"); } catch(e){} return { snd: o.snd !== false, vib: o.vib !== false, ntf: o.ntf === undefined ? !!window.NEON_NATIVE : !!o.ntf }; }
-const S = { sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : "trend", b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
+const SMK = "mermer.smode", sm0 = localStorage.getItem(SMK);
+const S = { sm: sm0 === "trend" ? "trend" : "scalp", sR: null, sRAt: 0, Gt: null, sym: localStorage.getItem("neon.scalp.sym") || "BTCUSDT", tf: TF_SEL.includes(tf0) ? tf0 : "15m", mode: localStorage.getItem("neon.sinyal.mode") === "rev" ? "rev" : "trend", b: {}, btc: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null,
   W: null, D: null, ws: [], wsOk: false, lastTick: 0, started: false, gen: 0, off: 0, err: null, snd: true, al: alLoad(), ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, sum: [], curKey: "", pendKey: "", alAt: {}, lastFinal: 0, list: [], poll: null, ov: {}, ovAt: 0, ovBusy: false, view: { n: 50, off: 0 } };
+if (!sm0 && TF_MS[S.tf] >= 9e5) S.tf = "5m"; /* first run: SCALP default on a short interval */
 const tfs = () => [S.tf].concat(higher(S.tf)), key = () => S.sym + "@" + S.tf, base = () => S.b[S.tf] || [];
 let DP = 2; const fp = x => !fin(x) ? "—" : (+x).toFixed(DP), now = () => Date.now() + S.off, big = x => !fin(x) ? "—" : x >= 1e9 ? (x/1e9).toFixed(2) + "B" : x >= 1e6 ? (x/1e6).toFixed(1) + "M" : x >= 1e3 ? (x/1e3).toFixed(0) + "k" : x.toFixed(0);
 const bars = a => a.map(k => ({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5], T: +k[6], tb: +k[9], x: true }));
@@ -80,7 +82,7 @@ async function loadDer(sym, my){ const o = p => fj(p).catch(() => null), per = d
   S.oiH = (oi || []).map(x => { const r = tkm.get(+x.timestamp); return { t: +x.timestamp, oi: +x.sumOpenInterest, px: +x.sumOpenInterestValue/+x.sumOpenInterest, ls: fin(r) ? r/(1 + r) : 0.5 }; });
   const o7 = S.oiH.slice(-7), oc = o7.length > 1 && o7[0].oi ? (o7[o7.length - 1].oi/o7[0].oi - 1)*100 : NaN, tl = tk && tk.length ? +tk[tk.length - 1].buySellRatio : NaN;
   S.der = { fund: pr ? +pr.lastFundingRate : NaN, oiCh: oc, per: TF_LBL[per], ls: ls && ls[0] ? +ls[0].longShortRatio : NaN, tk: tl, at: Date.now() }; }
-async function loadBook(sym, my){ try { const d = await fj(`/fapi/v1/depth?symbol=${sym}&limit=500`); if (my !== S.gen) return; S.book = d; S.bookAt = Date.now(); const w = SMT.walls(d, S.bookMem, Date.now()); S.bookMem = w.mem; S.wl = w;
+async function loadBook(sym, my){ try { const d = await fj(`/fapi/v1/depth?symbol=${sym}&limit=${S.sm === "scalp" ? 100 : 500}`); if (my !== S.gen) return; S.book = d; S.bookAt = Date.now(); const w = SMT.walls(d, S.bookMem, Date.now()); S.bookMem = w.mem; S.wl = w;
     const mid = w.mid, band = mid*0.0025; let b = 0, a = 0; for (const [p, q] of d.bids) if (mid - +p <= band) b += +q*+p; for (const [p, q] of d.asks) if (+p - mid <= band) a += +q*+p; S.imb = b + a ? (b - a)/(b + a) : 0; } catch(e){} }
 function onKline(k, tf){ const x0 = { t: +k.t, o: +k.o, h: +k.h, l: +k.l, c: +k.c, v: +k.v, T: +k.T, tb: +k.V, x: !!k.x }; let fin1 = false, upd = false;
   for (const [a, cap] of [[S.b[tf], 1200], [S.ovB[tf] !== S.b[tf] ? S.ovB[tf] : null, 520]]){ if (!a || !a.length) continue; const x = { ...x0 }, l = a[a.length - 1];
@@ -98,7 +100,7 @@ function startPoll(){ if (S.poll) return; S.poll = setInterval(async () => { con
     for (const r of k){ const T = +r[6]; onKline({ t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], v: r[5], T, V: r[9], x: T < now() }, tf); } S.pollErr = 0; } catch(e){ S.pollErr = (S.pollErr || 0) + 1; paintSt(e.message); } }, 3000); }
 function stopPoll(){ if (S.poll){ clearInterval(S.poll); S.poll = null; } }
 async function start(sym, tf){ sym = String(sym || S.sym).toUpperCase().replace(/[^A-Z0-9]/g, ""); if (!sym) return; if (tf && TF_SEL.includes(tf)) S.tf = tf; const my = ++S.gen;
-  Object.assign(S, { sym, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, dec: null, mv: null, decAt: 0, I: {}, sum: [], curKey: "", pendKey: "", view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
+  Object.assign(S, { sym, sR: null, sRAt: 0, V: null, Gt: null, W: null, D: null, err: null, book: null, bookMem: null, wl: null, der: {}, oiH: [], liq: null, btc: null, lastFinal: 0, ovB: {}, ovR: {}, ovCalcAt: 0, gR: null, gRAt: 0, G: null, A: null, dec: null, mv: null, decAt: 0, I: {}, sum: [], curKey: "", pendKey: "", view: { n: S.view.n, off: 0 } }); stopPoll(); closeWs();
   localStorage.setItem("neon.scalp.sym", sym); localStorage.setItem("neon.scalp.tf", S.tf);
   const q = $("#sc-q"); if (q) q.value = sym; document.querySelectorAll("[data-stf]").forEach(x => x.classList.toggle("on", x.dataset.stf === S.tf)); paintHead(); paintAll();
   try { await loadList(); const info = S.list.find(x => x.s === sym); if (S.list.length && !info) throw new Error(sym + " Binance USDⓈ-M vadelide USDT perp olarak yok");
@@ -157,11 +159,11 @@ async function ovCalc(force){ if (S.ovBusy || (!force && Date.now() - S.ovCalcAt
           { const px1 = P.c[P.n - 1], z = L.sq || L.sqRecent; S.ovP = { atr: P.A[P.n - 1], d: z ? z.d : L.d, plan: L.sq ? { entry: px1, stop: L.sq.stop, tp: L.sq.tp } : L.sqRecent ? { entry: z.entry, stop: z.stop, tp: z.tp } : L.aplus && L.plan ? { entry: L.plan.entry, stop: L.plan.stop, tp: L.plan.tp } : null }; }
           if (st === "SIKIŞMA" && L.squeeze.box){ const bx = L.squeeze.box, i = P.n - 1, px = P.c[i]; pUp = SMT.squeezeDir({ pos: clip(((px - bx.lo)/(bx.hi - bx.lo || 1) - 0.5)*2), cvd: clip((P.cvd[i] - P.cvd[bx.from])/((P.vs20[i] || 1)*bx.len)*4), mtf: L.a.T.mtf }).pUp; } }
         let plan = null, sd = 0, atr = null; if (K.length >= 150 && S.ovP){ const X = S.ovP; plan = X.plan; sd = X.d; atr = X.atr; } S.ovP = null;
-        S.ovR[t] = { st, v, d: dOf(st, v), rel, pUp, plan, sd, atr, px: K[K.length - 1].c }; } catch(e){ S.ovR[t] = null; } }
+        S.ovR[t] = { st, v, d: dOf(st, v), rel, pUp, plan, sd, atr, px: K[K.length - 1].c, bos: H ? H.bos[H.bos.length - 1] : 0 }; } catch(e){ S.ovR[t] = null; } }
     if (my === S.gen && (Date.now() - S.gRAt > 120000 || !S.gR)){ S.gRAt = Date.now(); const K = { ...S.ovB }; K[S.tf] = base(); try { S.gR = SMT.gReplay(K, S.tf); } catch(e){ S.gR = null; } }
     if (my === S.gen) summarize(); } finally { S.ovBusy = false; } }
 /* ---------------- GENEL YÖN: one direction + summary + action ---------------- */
-function mainItem(){ const b = base(); if (b.length < 60 || !S.D) return null; const H = SMT.prepHigher(b), v = H.v[H.v.length - 1]; return { st: S.D.state, v, d: dOf(S.D.state, v), rel: SMT.tfRel(H, b.map(x => x.c), 3), pUp: S.D.pUp, main: true }; }
+function mainItem(){ const b = base(); if (b.length < 60 || !S.D) return null; const H = SMT.prepHigher(b), v = H.v[H.v.length - 1]; return { st: S.D.state, v, d: dOf(S.D.state, v), bos: H.bos[H.bos.length - 1], rel: SMT.tfRel(H, b.map(x => x.c), 3), pUp: S.D.pUp, main: true }; }
 function extraItem(I){ const D = S.D, L1 = TF_LBL[S.tf], px = D ? D.px : null; if (!D) return null;
   if (D.state === "PUMP" || D.state === "DUMP") return `${L1}'da yatay kutu ${D.state === "PUMP" ? "yukarı" : "aşağı"} kırıldı (${D.state}).`;
   if (D.state === "SIKIŞMA") return `${L1}'da sıkışma var, ${D.pUp >= 0.5 ? "yukarı" : "aşağı"} kırılım olasılığı %${Math.round(Math.max(D.pUp, 1 - D.pUp)*100)}.`;
@@ -177,9 +179,16 @@ function summarize(){ if (!S.D || !S.R) return; const I = {}; for (const t of TF
   const C = SMT.consensus(I), P = S.R.P, n = P.n - 1; let A = SMT.action(C, { main: S.D, px: S.D.px, atr: P.A[n], ema21: P.e21[n] });
   if (A.kind === "trend" && !SMT.gGate(S.gR)){ const T = S.gR && S.gR.T; A = { act: "BEKLE", d: 0, prefer: C.dir, kind: "kapı", wait: "A+ onayını bekle",
     note: T && T.n ? `${C.label} ama bu kural ${S.sym.replace("USDT", "")} ${TF_LBL[S.tf]}'da geçmişte %${Math.round(T.win*100)} kazandırdı (${T.n} giriş, ücret sonrası ${T.net >= 0 ? "+" : ""}${T.net.toFixed(1)}%)` : `${C.label} ama bu kural için yeterli geçmiş yok` }; }
-  const bb = base().slice(-10), f = v => fp(v); S.dec = SMT.decision(C, A, { px: S.D.px, atr: P.A[n], ema21: P.e21[n], hi: Math.max(...bb.map(k => k.h)), lo: Math.min(...bb.map(k => k.l)), f });
+  const bb = base().slice(-10), f = v => fp(v), hi = Math.max(...bb.map(k => k.h)), lo = Math.min(...bb.map(k => k.l)); S.Gt = C;
+  if (S.sm === "scalp"){ /* v7.24 SCALP (anlık): the selected interval + microstructure decide; higher intervals only as a context note */
+    const b = base(), l = b[b.length - 1]; if (!S.sR || Date.now() - S.sRAt > 120000){ S.sRAt = Date.now(); try { S.sR = SCX.sReplay(b, { btc: S.btc }); } catch(e){ S.sR = null; } }
+    const V = SCX.view(b, { btc: S.btc, micro: { imb: S.imb, dlt: l && l.v ? (2*(l.tb ?? l.v/2) - l.v)/l.v : null }, gate: S.sR });
+    if (V){ const r = SCX.toDecision(SMT, V, { f, hi, lo, tfMs: TF_MS[S.tf], ctx: SCX.ctxNote(C, V.d) }); S.dec = r.dec; S.dec.rev = C.rev ? { d: C.rev.d, why: SMT.revWhy(C.rev, TF_LBL) } : null; S.V = V;
+      S.mv = SMT.mainView(S.dec, S.D, mi, TF_LBL[S.tf]); S.G = r.C; S.A = r.A; S.I = I; S.sum = [V.why].concat(V.parts.slice(0, 2).map(p => `${p.n} ${p.v > 0 ? "yukarı" : "aşağı"}`)).concat(r.dec.scalp.ctx ? [r.dec.scalp.ctx] : []).slice(0, 3);
+      S.decAt = Date.now(); bump(); if (visible()) paintGen(); checkAlert(); jFromDecision(r.C, r.A, V.atr); return; } }
+  S.dec = SMT.decision(C, A, { px: S.D.px, atr: P.A[n], ema21: P.e21[n], hi, lo, f, revWhy: C.rev ? SMT.revWhy(C.rev, TF_LBL) : "" }); S.V = null;
   S.mv = SMT.mainView(S.dec, S.D, mi, TF_LBL[S.tf]);
-  S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); S.decAt = Date.now(); bump(); if (visible()) paintGen(); checkAlert(); jFromDecision(C, A, P.A[n]); }
+  S.G = C; S.A = A; S.I = I; S.sum = SMT.summary(I, C, TF_LBL, extraItem(I)); if (C.rev) S.sum = ["⚠ DÖNÜŞ UYARISI: " + SMT.revWhy(C.rev, TF_LBL)].concat(S.sum).slice(0, 3); S.decAt = Date.now(); bump(); if (visible()) paintGen(); checkAlert(); jFromDecision(C, A, P.A[n]); }
 function actKey(){ const A = S.A, C = S.G; if (!A || !C) return ""; if (A.act !== "BEKLE") return A.act; if (C.strong) return "YÖN " + SMT.DIRW[C.label]; return ""; }
 function checkAlert(){ const k = actKey(); if (k === S.curKey){ S.pendKey = ""; return; } if (!k){ S.curKey = ""; S.pendKey = ""; return; }
   if (S.pendKey !== k){ S.pendKey = k; return; } /* must hold on two consecutive updates (≈2+ s) so a flicker does not ring */
@@ -199,15 +208,17 @@ function paintGen(){ const gc = $("#sg-gcard"), bub = $("#sg-bubble"), nw = $("#
   const dots = TF_SEL.map(t => { const x = S.I[t], d = x ? sgn(Math.abs(x.d) >= 0.25 ? x.d : 0) : null, ic = !x ? "·" : x.st === "PUMP" ? "🚀" : x.st === "DUMP" ? "💥" : x.st === "SIKIŞMA" ? "◇" : d > 0 ? (x.st === "LONG" ? "▲" : "↑") : d < 0 ? (x.st === "SHORT" ? "▼" : "↓") : "•";
     return `<button type="button" data-stf="${t}" class="gd ${!x ? "na" : x.st === "SIKIŞMA" ? "m" : d > 0 ? "up" : d < 0 ? "dn" : "n"}${t === S.tf ? " on" : ""}" title="${TF_LBL[t]} ${x ? x.st + " · eğilim " + (x.d || 0).toFixed(2) : "veri yok"}"><i>${ic}</i><small>${TF_LBL[t]}</small></button>`; }).join("");
   const dec = S.dec || { word: "BEKLE", line: "BEKLE", text: "BEKLE.", yon: "↔ YÖN: YATAY", dirW: "YATAY" }, wc = dec.word === "GİR LONG" ? "up" : dec.word === "GİR SHORT" ? "dn" : "y";
-  gc.innerHTML = `<div class="sg-glab">GENEL YÖN <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${have}/12 aralık · yön, işlem değil</small></div>
-    <div class="sg-gdir sg-yon ${cls}">${esc(dec.yon)}</div>
+  const rv = dec.rev, sc = S.sm === "scalp";
+  gc.innerHTML = `<div class="sg-sm" role="group" aria-label="analiz modu"><button type="button" data-sm="scalp" class="${sc ? "on" : ""}" aria-pressed="${sc}">SCALP (anlık)</button><button type="button" data-sm="trend" class="${sc ? "" : "on"}" aria-pressed="${!sc}">TREND</button></div>
+    <div class="sg-glab">${sc ? "ANLIK YÖN" : "GENEL YÖN"} <small class="dim">${esc(S.sym.replace("USDT", ""))} · ${sc ? TF_LBL[S.tf] + " + emir akışı" + (dec.hold ? " · tutma " + esc(dec.hold) : "") : have + "/12 aralık"} · yön, işlem değil</small></div>
+    <div class="sg-gdir sg-yon ${cls}">${esc(dec.yon)}</div>${rv ? `<div class="sg-rev ${rv.d > 0 ? "up" : "dn"}"><b>⚠ DÖNÜŞ UYARISI</b> ${esc(rv.why)}</div>` : ""}
     <div class="sg-bar" title="−100 AŞAĞI … +100 YUKARI"><span class="sg-bar0"></span><span class="sg-barf ${cls}" style="${C.G >= 0 ? "left:50%" : "right:50%"};width:${w}%"></span></div>
     <div class="dim sg-gsub">güç <b class="${cls}">%${C.strength}</b> · büyük ${C.big >= 0 ? "+" : ""}${Math.round(C.big*100)} · kısa ${C.short >= 0 ? "+" : ""}${Math.round(C.short*100)}${fin(C.relAvg) ? ` · aralık isabeti ~%${Math.round(C.relAvg*100)}` : ""}</div>
     <div class="sg-dots">${dots}</div>`;
   bub.innerHTML = [dec.text].concat(S.sum).slice(0, 4).map((x, k) => k ? esc(x) : `<b>${esc(x)}</b>`).join("<br>"); bub.className = "sg-bubble " + wc;
   const lv = dec.word === "BEKLE" ? `<div class="sg-dline">→ ${dec.trig.length ? dec.trig.map(t => `<span class="${t.d > 0 ? "up" : "dn"}">${esc(t.t)}</span>`).join(" · ") : "net tetik yok"}</div>`
     : `<div class="sg-dline"><span>giriş <b>${fp(A.entry)}</b></span> · <span>stop <b class="dn">${fp(A.stop)}</b></span> · <span>hedef <b class="up">${fp(A.tp)}</b></span> <small class="dim">${esc(A.kind)}</small></div>`;
-  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI? <small class="dim">· ${esc(dec.yon)}</small></div><div class="sg-dword ${wc}">${dec.word}</div>${lv}${dec.note ? `<div class="dim sg-dnote">${esc(dec.note)}</div>` : ""}`;
+  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI? <small class="dim">· ${esc(dec.yon)}${dec.rev ? " · ⚠ DÖNÜŞ UYARISI" : ""}</small></div><div class="sg-dword ${wc}">${dec.word}</div>${lv}${dec.hold && dec.word !== "BEKLE" ? `<div class="dim sg-dnote">tahmini tutma ${esc(dec.hold)} · ücret %0.10 dahil hesap</div>` : ""}${dec.note ? `<div class="dim sg-dnote">${esc(dec.note)}</div>` : ""}`;
   nw.className = "sg-now sg-dec " + wc;
   const D = S.D; m.className = "masc " + (dec.word === "GİR LONG" ? (D && D.state === "PUMP" ? "st-pump" : "st-long") : dec.word === "GİR SHORT" ? (D && D.state === "DUMP" ? "st-dump" : "st-short") : A.wait === "kırılımı bekle" ? "st-sqz" : "st-wait");
   const sd = $("#sd-gen"); if (sd && sd.closest("details").open) paintGenDet(); }
@@ -228,8 +239,8 @@ S.wo = (() => { let o = {}; try { o = JSON.parse(localStorage.getItem(WK) || "{}
   return { list: L, tfs: Array.isArray(o.tfs) && o.tfs.length ? o.tfs.filter(t => TF_SEL.includes(t)) : WAT.DEF_TF.slice(), all: !!o.all }; })();
 S.wpx = {}; S.wws = null; S.wwsKey = "";
 const woSave = () => { try { localStorage.setItem(WK, JSON.stringify(S.wo)); } catch(e){} };
-const WE = WAT.create({ SMT, SCM, JRN, fj, now: () => now(), cb: { add: o => jAdd(o), eval: () => { if (Date.now() - (WE.pAt || 0) > 3000){ WE.pAt = Date.now(); paintWatchSt(); } } } });
-function weConfig(){ WE.config({ list: S.wo.list, tfs: S.wo.all ? TF_SEL : S.wo.tfs, trig: S.jo.trig, auto: S.jo.auto, mode: S.mode, skip: (s, t) => S.started && s === S.sym && t === S.tf });
+const WE = WAT.create({ SMT, SCM, SCX: window.SCX, JRN, fj, now: () => now(), cb: { add: o => jAdd(o), eval: () => { if (Date.now() - (WE.pAt || 0) > 3000){ WE.pAt = Date.now(); paintWatchSt(); } } } });
+function weConfig(){ WE.config({ sm: S.sm, list: S.wo.list, tfs: S.wo.all ? TF_SEL : S.wo.tfs, trig: S.jo.trig, auto: S.jo.auto, mode: S.mode, skip: (s, t) => S.started && s === S.sym && t === S.tf });
   if (S.wo.list.length) WE.start(); else WE.stop(); wConnect(); }
 function wConnect(){ const k = S.wo.list.join(","); if (k === S.wwsKey && S.wws) return; S.wwsKey = k; if (S.wws){ try { S.wws.onclose = null; S.wws.close(); } catch(e){} S.wws = null; } if (!S.wo.list.length) return;
   let ws; try { ws = new WebSocket(WSF + "/market/stream?streams=" + S.wo.list.map(x => x.toLowerCase() + "@miniTicker").join("/")); } catch(e){ return; } S.wws = ws;
@@ -241,14 +252,14 @@ function jAdd(o){ const tr = JRN.make(o); if (!tr) return false; tr.wide = JRN.w
   try { NOTIFY && NOTIFY.toast && NOTIFY.toast(`📒 sanal ${tr.d > 0 ? "LONG" : "SHORT"} kaydedildi · ${tr.sym.replace("USDT", "")} ${TF_LBL[tr.tf]}`, "good"); } catch(e){} return true; }
 /* record GİR decisions of the viewed interval (and, if enabled, of the other intervals of this coin) + remember BEKLE triggers for this candle */
 function jFromDecision(C, A, atr){ if (!S.jo.auto || !S.D) return; const px = S.D.px, now1 = Date.now();
-  if (A.act === "GİR LONG" || A.act === "GİR SHORT") jAdd({ sym: S.sym, tf: S.tf, d: A.d, entry: px, stop: A.stop, tp: A.tp, type: jType(A, S.D.state), why: A.kind, src: "karar", t: now1 });
+  if (A.act === "GİR LONG" || A.act === "GİR SHORT") jAdd({ sym: S.sym, tf: S.tf, d: A.d, entry: px, stop: A.stop, tp: A.tp, type: jType(A, S.D.state), why: A.kind, src: "karar", sm: S.sm, t: now1 });
   const b = base(), l = b[b.length - 1]; S.jTrig = S.dec && S.dec.word === "BEKLE" && S.jo.trig && l && !l.x ? { sym: S.sym, tf: S.tf, candle: l.t, trig: S.dec.trig.slice(), atr } : S.jTrig && S.jTrig.candle === (l && l.t) ? S.jTrig : null;
-  if (S.jo.all) for (const t of TF_SEL){ if (t === S.tf) continue; const x = S.ovR[t]; if (!x || !x.plan || !["LONG", "SHORT", "PUMP", "DUMP"].includes(x.st)) continue;
+  if (S.jo.all && S.sm !== "scalp") for (const t of TF_SEL){ if (t === S.tf) continue; const x = S.ovR[t]; if (!x || !x.plan || !["LONG", "SHORT", "PUMP", "DUMP"].includes(x.st)) continue;
     const a = SMT.action(C, { main: { state: x.st, d: x.sd, plan: x.plan }, px: x.px, atr: x.atr });
     if (a.act === "GİR LONG" || a.act === "GİR SHORT") jAdd({ sym: S.sym, tf: t, d: a.d, entry: x.px, stop: a.stop, tp: a.tp, type: jType(a, x.st), why: a.kind + " (arka plan)", src: "arka plan", t: now1 }); } }
 function jTrigCheck(bar){ const g = S.jTrig; if (!g || g.sym !== S.sym || g.tf !== S.tf || g.candle !== bar.t || !S.jo.auto || !S.jo.trig) return; S.jTrig = null; const R = fin(g.atr) && g.atr > 0 ? g.atr : bar.c*0.003;
   for (const tg of g.trig){ const f = JRN.trigFired(tg, bar); if (!f) continue; const e = f.entry, st = e - tg.d*1.5*R;
-    jAdd({ sym: S.sym, tf: S.tf, d: tg.d, entry: e, stop: st, tp: e + tg.d*1.5*Math.abs(e - st), type: "tetik", why: tg.k + " tetiği", src: "tetik", t: bar.T + 1 }); break; } }
+    jAdd({ sym: S.sym, tf: S.tf, d: tg.d, entry: e, stop: st, tp: e + tg.d*1.5*Math.abs(e - st), type: "tetik", why: tg.k + " tetiği", src: "tetik", sm: S.sm, t: bar.T + 1 }); break; } }
 function jClosed(tr){ const txt = `SANAL ${tr.sym.replace("USDT", "")} ${TF_LBL[tr.tf]} ${tr.d > 0 ? "LONG" : "SHORT"}: ${tr.ok ? "DOĞRU" : "YANLIŞ"} (${tr.how}) ${tr.net >= 0 ? "+" : ""}${tr.net.toFixed(2)}%`;
   try { NOTIFY && NOTIFY.toast && NOTIFY.toast("📒 " + txt, tr.ok ? "good" : "bad"); } catch(e){}
   if (S.jo.ntf){ alarm(tr.ok ? "LONG" : "SHORT"); if (window.Notification && Notification.permission === "granted") try { new Notification("MERMER · sanal takip", { body: txt + " — gerçek emir yok", tag: "neon-jr-" + tr.id }); } catch(e){} } }
@@ -276,7 +287,7 @@ function paintJournal(light){ const sm = $("#jr-sum"), box = $("#jr-box"); if (!
     ${grp(st.byCoin, "coin", k => k.replace("USDT", ""))}${grp(st.byTf, "aralık")}${grp(st.byType, "tür")}
     ${S.jo.merge ? `<div class="dim" style="font-size:10px">aralık ve tür tabloları her kaydı ayrı sayar.</div>` : ""}
     <div class="sc-hl"><table class="can-t jr-t"><tr><th>coin · zaman</th><th>yön</th><th>giriş<br><small>stop / hedef</small></th><th>sonuç</th><th>net</th></tr>${st.list.length ? st.list.slice(0, 200).map(x => { const dp = Math.max(0, Math.min(8, 5 - Math.floor(Math.log10(x.entry || 1)))), f2 = v => fin(v) ? (+v).toFixed(dp) : "—";
-      return `<tr><td>${esc(x.sym.replace("USDT", ""))} <small>${TF_LBL[x.tf]} · ${esc(x.type)}${x.src === "izleme" ? " · ★" : ""}</small><br><small>${when(x.t)}</small></td><td class="${x.d > 0 ? "up" : "dn"}">${x.d > 0 ? "LONG" : "SHORT"}</td><td>${f2(x.entry)}<br><small><span class="dn">${f2(x.stop)}</span> / <span class="up">${f2(x.tp)}</span></small>${x.wide ? `<br><span class="jr-wide" title="stop %${JRN.stopPct(x).toFixed(1)} uzakta">geniş stop %${JRN.stopPct(x).toFixed(1)}</span>` : ""}</td>
+      return `<tr><td>${esc(x.sym.replace("USDT", ""))} <small>${TF_LBL[x.tf]} · ${x.sm === "scalp" ? "SCALP" : "TREND"} · ${esc(x.type)}${x.src === "izleme" ? " · ★" : ""}</small><br><small>${when(x.t)}</small></td><td class="${x.d > 0 ? "up" : "dn"}">${x.d > 0 ? "LONG" : "SHORT"}</td><td>${f2(x.entry)}<br><small><span class="dn">${f2(x.stop)}</span> / <span class="up">${f2(x.tp)}</span></small>${x.wide ? `<br><span class="jr-wide" title="stop %${JRN.stopPct(x).toFixed(1)} uzakta">geniş stop %${JRN.stopPct(x).toFixed(1)}</span>` : ""}</td>
         <td>${x.st === "open" ? '<span class="y">AÇIK</span>' : x.ok ? `<span class="up">DOĞRU</span><br><small>${x.how}</small>` : `<span class="dn">YANLIŞ</span><br><small>${x.how}</small>`}</td><td ${x.st === "open" ? `data-jl="${x.id}"` : ""} class="${x.st === "open" ? "dim" : x.net >= 0 ? "up" : "dn"}">${x.st === "open" ? (fin(x.last) ? sg(JRN.netPct(x.d, x.entry, x.last)) : "…") : sg(x.net)}</td></tr>`; }).join("") : `<tr><td colspan="5" class="dim">henüz kayıt yok — izleme listesine coin ekle; karar GİR LONG / GİR SHORT olunca ya da BEKLE tetiği mum kapanışında gerçekleşince buraya yazılır.</td></tr>`}</table></div>`;
   $("#jr-fs").onchange = e => { S.jf.sym = e.target.value; paintJournal(); }; $("#jr-ft").onchange = e => { S.jf.tf = e.target.value; paintJournal(); };
   paintWatch(); }
@@ -410,7 +421,7 @@ const engineOn = () => (document.body.dataset.pg === "scalp" || document.body.da
 function tick(){ if (!S.started) return; if (!engineOn()) return; const b = base(), l = b[b.length - 1], cd = $("#sc-cd"); if (cd && l) cd.textContent = cdf(l.T + 1 - now());
   if (l && !S.err && !S.poll && ((!S.wsOk && now() > l.T + 5000) || (S.wsOk && Date.now() - Math.max(S.lastTick, S.wsAt || 0) > 10000))) startPoll();
   if (Date.now() - (S.der.at || 0) > 60000 && S.D){ S.der.at = Date.now(); loadDer(S.sym, S.gen); }
-  if (Date.now() - (S.bookAt || 0) > 20000 && S.D){ S.bookAt = Date.now(); loadBook(S.sym, S.gen); }
+  if (Date.now() - (S.bookAt || 0) > (S.sm === "scalp" ? 5000 : 20000) && S.D){ S.bookAt = Date.now(); loadBook(S.sym, S.gen); }
   if (S.sym !== "BTCUSDT" && Date.now() - (S.btcAt || 0) > 300000 && S.D){ S.btcAt = Date.now(); loadBtc(S.gen); }
   compute(); paintSt(); if (S.D && Object.keys(S.ovB).length) ovCalc(); }
 function bind(){ const q = $("#sc-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); loadList().then(() => paintList("")); };
@@ -445,5 +456,9 @@ function init(){ const box = $("#scalp-box"); if (!box) return; box.innerHTML = 
   /* journal + watchlist run on every tab (paper only) */ setInterval(jLive, 2000); setInterval(() => jRemote(), 60000); setTimeout(() => jRemote(), 4000); weConfig(); paintJournal();
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "scalp") ensure(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
+/* v7.24 analysis mode: SCALP (anlık, default) or TREND — shared by ANALİZ + SİNYAL (+ badges / watchlist read S.sm) */
+function setMode(m){ m = m === "trend" ? "trend" : "scalp"; if (m === S.sm) return; S.sm = m; try { localStorage.setItem(SMK, m); } catch(e){} S.sR = null; S.bookAt = 0; try { weConfig(); } catch(e){}
+  if (m === "scalp" && TF_MS[S.tf] > 9e5 && typeof analyze === "function"){ analyze(S.sym, "5m"); return; } summarize(); bump(); window.dispatchEvent(new CustomEvent("sinyal:mode", { detail: m })); }
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sm]"); if (!b) return; e.preventDefault(); setMode(b.dataset.sm); window.dispatchEvent(new CustomEvent("sinyal:mode", { detail: S.sm })); });
+return { setMode, ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
 })();

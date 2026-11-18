@@ -28,19 +28,22 @@ function item(K, t, o){ const { SMT, SCM } = o, a = K[t]; if (!a || a.length < 6
     st = z ? (z.d > 0 ? "PUMP" : "DUMP") : L.squeeze ? "SIKIŞMA" : L.aplus ? (L.d > 0 ? "LONG" : "SHORT") : "BEKLE"; atr = P.A[i]; ema21 = P.e21 ? P.e21[i] : null; sd = z ? z.d : L.d;
     plan = L.sq ? { entry: px, stop: L.sq.stop, tp: L.sq.tp } : L.sqRecent ? { entry: z.entry, stop: z.stop, tp: z.tp } : L.aplus && L.plan ? { entry: L.plan.entry, stop: L.plan.stop, tp: L.plan.tp } : null;
     if (st === "SIKIŞMA" && L.squeeze.box){ const bx = L.squeeze.box; pUp = SMT.squeezeDir({ pos: clip(((px - bx.lo)/(bx.hi - bx.lo || 1) - 0.5)*2), cvd: clip((P.cvd[i] - P.cvd[bx.from])/((P.vs20[i] || 1)*bx.len)*4), mtf: L.a.T.mtf }).pUp; plan = { longAbove: bx.hi, shortBelow: bx.lo }; } }
-  return { st, v, d: dOf(st, v), rel, pUp, plan, sd, atr, ema21, px, bt: a[a.length - 1].t }; }
+  return { st, v, d: dOf(st, v), bos: H ? H.bos[H.bos.length - 1] : 0, rel, pUp, plan, sd, atr, ema21, px, bt: a[a.length - 1].t }; }
 /* full decision for coin K on interval t. items = { tf: item } (all intervals available), gR = gReplay result for the gate */
-function evalCoin(K, t, items, gR, o){ const { SMT } = o, it = items[t], a = K[t]; if (!it || !a || a.length < 150) return null; const I = {}; for (const k of Object.keys(items)) if (items[k]) I[k] = items[k];
+function evalCoin(K, t, items, gR, o){ const { SMT } = o, it = items[t], a = K[t];
+  if (o.sm === "scalp" && o.SCX){ /* v7.24 SCALP (anlık): this interval + flow only; gate = SCALP replay of this coin + interval */ if (!a || a.length < 80) return null; const V = o.SCX.view(a, { gate: o.sR }); if (!V) return null;
+    const bb = a.slice(-10), r = o.SCX.toDecision(SMT, V, { hi: Math.max(...bb.map(k => k.h)), lo: Math.min(...bb.map(k => k.l)), tfMs: o.tfMs });
+    return { C: r.C, A: r.A, dec: r.dec, px: V.px, atr: V.atr, st: "BEKLE", live: a[a.length - 1] }; } if (!it || !a || a.length < 150) return null; const I = {}; for (const k of Object.keys(items)) if (items[k]) I[k] = items[k];
   const C = SMT.consensus(I), px = it.px, atr = it.atr; let A = SMT.action(C, { main: { state: it.st, d: it.sd, plan: it.plan, pUp: it.pUp }, px, atr, ema21: it.ema21 });
   if (A.kind === "trend" && !SMT.gGate(gR)) A = { act: "BEKLE", d: 0, prefer: C.dir, kind: "kapı", wait: "A+ onayını bekle" };
   const bb = a.slice(-10), dec = SMT.decision(C, A, { px, atr, ema21: it.ema21, hi: Math.max(...bb.map(k => k.h)), lo: Math.min(...bb.map(k => k.l)) });
   return { C, A, dec, px, atr, st: it.st, live: a[a.length - 1] }; }
 const jType = (A, st) => A.kind === "A+ kurulum" ? "A+" : A.kind === "kırılım" ? (st === "PUMP" || st === "DUMP" ? st : "kırılım") : A.kind === "trend" ? "trend" : A.kind || "sinyal";
 /* ---------- scheduler (browser) ---------- */
-function create(o){ const { SMT, SCM, fj, cb } = o, now = o.now || (() => Date.now()), TF = SCM.TF_SEL; const W = { coins: new Map(), list: [], tfs: DEF_TF.slice(), trig: true, auto: true, mode: "trend",
+function create(o){ const { SMT, SCM, fj, cb } = o, now = o.now || (() => Date.now()), TF = SCM.TF_SEL; const W = { coins: new Map(), list: [], tfs: DEF_TF.slice(), trig: true, auto: true, mode: "trend", sm: "trend",
     busy: false, pauseTo: 0, rr: 0, calls: 0, callsAt: 0, err: null, skip: null, timer: null, last: {} };
-  const coin = s => { if (!W.coins.has(s)) W.coins.set(s, { K: {}, items: {}, gR: {}, gRAt: {}, trig: {}, retry: {}, dirty: false, evAt: 0, err: 0 }); return W.coins.get(s); };
-  function config(c){ if (c.list) W.list = c.list.slice(0, MAXC); if (c.tfs) W.tfs = c.tfs.filter(t => TF.includes(t)); for (const k of ["trig", "auto", "mode"]) if (c[k] !== undefined) W[k] = c[k]; if (c.skip !== undefined) W.skip = c.skip;
+  const coin = s => { if (!W.coins.has(s)) W.coins.set(s, { K: {}, items: {}, gR: {}, gRAt: {}, sR: {}, sRAt: {}, trig: {}, retry: {}, dirty: false, evAt: 0, err: 0 }); return W.coins.get(s); };
+  function config(c){ if (c.list) W.list = c.list.slice(0, MAXC); if (c.tfs) W.tfs = c.tfs.filter(t => TF.includes(t)); for (const k of ["trig", "auto", "mode", "sm"]) if (c[k] !== undefined) W[k] = c[k]; if (c.skip !== undefined) W.skip = c.skip;
     for (const s of [...W.coins.keys()]) if (!W.list.includes(s)) W.coins.delete(s); W.list.forEach(coin); }
   /* next REST task: round-robin over coins; per coin the most urgent interval (never loaded first, then shortest due) */
   function nextTask(){ const n = W.list.length, tn = now(); for (let k = 0; k < n; k++){ const s = W.list[(W.rr + k) % n], c = coin(s); if (tn < (c.backTo || 0)) continue;
@@ -57,13 +60,14 @@ function create(o){ const { SMT, SCM, fj, cb } = o, now = o.now || (() => Date.n
     catch(e){ c.err++; W.err = String(e.message || e); if (/429|418/.test(W.err)) W.pauseTo = now() + 60000; else c.backTo = now() + Math.min(300000, 5000*2**c.err); }
     finally { W.busy = false; } evalDirty(); }
   function fireTrig(s, t, g, bar){ const R = fin(g.atr) && g.atr > 0 ? g.atr : bar.c*0.003; for (const tg of g.trig){ const f = o.JRN.trigFired(tg, bar); if (!f) continue; const e = f.entry, st = e - tg.d*1.5*R;
-      cb.add({ sym: s, tf: t, d: tg.d, entry: e, stop: st, tp: e + tg.d*1.5*Math.abs(e - st), type: "tetik", why: tg.k + " tetiği (izleme)", src: "izleme", t: bar.T + 1 }); break; } }
+      cb.add({ sym: s, tf: t, d: tg.d, entry: e, stop: st, tp: e + tg.d*1.5*Math.abs(e - st), type: "tetik", why: tg.k + " tetiği (izleme)", src: "izleme", sm: W.sm, t: bar.T + 1 }); break; } }
   /* evaluate one dirty coin per call (all its intervals must be loaded) */
   function evalDirty(){ const tn = now(); for (const s of W.list){ const c = coin(s); if (!c.dirty || TF.some(t => !c.K[t])) continue; c.dirty = false; c.evAt = tn;
       for (const t of W.tfs){ if (W.skip && W.skip(s, t)) continue; try {
           c.items[t] = item(c.K, t, { SMT, SCM, mode: W.mode }); if (!c.gRAt[t] || tn - c.gRAt[t] > GR_MS){ c.gRAt[t] = tn; try { c.gR[t] = SMT.gReplay(c.K, t); } catch(e){ c.gR[t] = null; } }
-          const r = evalCoin(c.K, t, c.items, c.gR[t], { SMT }); if (!r) continue; W.last[s + "@" + t] = { act: r.A.act, word: r.dec.word, dir: r.C.label, d: r.C.dir, conf: r.C.strength, trig: r.dec.trig.length ? r.dec.trig[0].t : "", at: tn, px: r.px };
-          if (W.auto && (r.A.act === "GİR LONG" || r.A.act === "GİR SHORT")) cb.add({ sym: s, tf: t, d: r.A.d, entry: r.px, stop: r.A.stop, tp: r.A.tp, type: jType(r.A, r.st), why: r.A.kind + " (izleme)", src: "izleme", t: tn });
+          if (W.sm === "scalp" && o.SCX && (!c.sRAt[t] || tn - c.sRAt[t] > GR_MS)){ c.sRAt[t] = tn; try { c.sR[t] = o.SCX.sReplay(c.K[t]); } catch(e){ c.sR[t] = null; } }
+          const r = evalCoin(c.K, t, c.items, c.gR[t], { SMT, SCX: o.SCX, sm: W.sm, sR: c.sR[t], tfMs: SCM.TF_MS[t] }); if (!r) continue; W.last[s + "@" + t] = { act: r.A.act, word: r.dec.word, dir: r.C.label, d: r.C.dir, conf: r.C.strength, trig: r.dec.trig.length ? r.dec.trig[0].t : "", at: tn, px: r.px };
+          if (W.auto && (r.A.act === "GİR LONG" || r.A.act === "GİR SHORT")) cb.add({ sym: s, tf: t, d: r.A.d, entry: r.px, stop: r.A.stop, tp: r.A.tp, type: jType(r.A, r.st), why: r.A.kind + " (izleme)", src: "izleme", sm: W.sm, t: tn });
           if (r.dec.word === "BEKLE" && r.dec.trig.length && !r.live.x) c.trig[t] = { candle: r.live.t, trig: r.dec.trig.slice(), atr: r.atr }; else if (c.trig[t] && c.trig[t].candle !== r.live.t) delete c.trig[t];
         } catch(e){} }
       if (cb.eval) cb.eval(s); return; } }

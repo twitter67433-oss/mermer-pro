@@ -11,7 +11,9 @@ const DEX_TF = ["5m", "15m", "1h"], GT_TF = { "5m": ["minute", 5], "15m": ["minu
 /* GeckoTerminal ohlcv_list ([sec, o, h, l, c, v], newest first) → our candles (taker-buy volume unknown → neutral half) */
 function dexBars(list, tf, now = Date.now()){ const ms = TFMS[tf]; return (list || []).slice().reverse().filter(r => r && fin(+r[4])).map(r => { const t = +r[0]*1000; return { t, o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] || 0, tb: (+r[5] || 0)/2, T: t + ms - 1, x: t + ms - 1 < now }; }); }
 /* DEX decision from the intervals that exist; never better than the data */
-function dexEval(K, tf, o){ const { SMT, SCM, WAT } = o, items = {}; for (const t of Object.keys(K)) if (K[t] && K[t].length >= 60){ try { const it = WAT.item(K, t, { SMT, SCM }); if (it) items[t] = it; } catch(e){} }
+function dexEval(K, tf, o){ const { SMT, SCM, WAT } = o, items = {};
+  if (o.sm === "scalp" && o.SCX){ const a = K[tf]; if (!a || a.length < 80) return { word: "veri yok", none: true, src: "dex" }; const V = o.SCX.view(a, {}); if (!V) return { word: "veri yok", none: true, src: "dex" };
+    return { word: "BEKLE", d: V.d, conf: Math.round(V.strength/2), trig: "", src: "dex", sm: "scalp" }; } /* DEX: no replay gate → never GİR */ for (const t of Object.keys(K)) if (K[t] && K[t].length >= 60){ try { const it = WAT.item(K, t, { SMT, SCM }); if (it) items[t] = it; } catch(e){} }
   if (!Object.keys(items).length) return { word: "veri yok", none: true, src: "dex" }; const C = SMT.consensus(items); let r = null; try { r = WAT.evalCoin(K, tf, items, null, { SMT }); } catch(e){}
   return { word: r ? r.dec.word : "BEKLE", d: C.dir, conf: fin(C.strength) ? Math.round(C.strength/2) : 0, trig: r && r.dec.trig.length ? r.dec.trig[0].t : "", src: "dex", n: Object.keys(items).length }; }
 /* from the open SİNYAL screen (same coin + interval, fully computed) */
@@ -31,7 +33,7 @@ const GT = "https://api.geckoterminal.com/api/v2", FUT = "https://fapi.binance.c
 let gtAt = 0, gtPause = 0, lastP = 0, busyK = null, perps = null, dexBusy = false;
 const tfNow = () => (window.SCALP && SCALP.S && SCALP.S.tf) || "15m", TFL = () => (window.SCM && SCM.TF_LBL) || {};
 async function fj(p){ const r = await fetch(FUT + p, { cache: "no-store" }); if (!r.ok) throw new Error("Binance vadeli HTTP " + r.status); return r.json(); }
-const BE = WAT.create({ SMT, SCM, JRN: window.JRN, fj, cb: { add: () => {}, eval: () => repaint() } }); BE.config({ list: [], tfs: [tfNow()], auto: false, trig: false }); /* auto:false → never records, never trades */
+const BE = WAT.create({ SMT, SCM, SCX: window.SCX, JRN: window.JRN, fj, cb: { add: () => {}, eval: () => repaint() } }); BE.config({ list: [], tfs: [tfNow()], auto: false, trig: false }); /* auto:false → never records, never trades */
 function perpSet(){ if (!perps && window.SCALP) SCALP.list().then(L => { perps = new Set(L.map(x => x.s)); }).catch(() => {}); return perps; }
 /* markup used by the tabs */
 function tag(o){ const k = o.perp ? "p:" + o.perp : o.mint ? "m:" + o.mint : null; if (!k) return ""; const tf = o.perp ? tfNow() : DEXTF(), r = get(k, tf), L = X.label(r);
@@ -52,7 +54,7 @@ function scan(){ if (document.hidden) return; const tf = tfNow(), vis = [...docu
       if (!covered){ const i = recent.indexOf(s); if (i >= 0) recent.splice(i, 1); recent.unshift(s); } }
     else { const tfd = DEXTF(), c = cache.get(k + "@" + tfd); if ((!c || Date.now() - c.at > 120000) && !dexQ.includes(k) && k !== busyK) dexQ.push(k); } }
   recent.length = Math.min(recent.length, 6); const L = recent.slice(); if ([...want].some(k => k.startsWith("p:"))) lastP = Date.now();
-  if (L.join() !== BE.W.list.join() || BE.W.tfs[0] !== tf) BE.config({ list: L, tfs: [tf] }); /* runs only while a perp badge was on screen in the last 2 min */
+  const smN = (window.SCALP && SCALP.S && SCALP.S.sm) || "trend"; if (L.join() !== BE.W.list.join() || BE.W.tfs[0] !== tf || BE.W.sm !== smN){ if (BE.W.sm !== smN) for (const k of Object.keys(BE.W.last)) delete BE.W.last[k]; BE.config({ list: L, tfs: [tf], sm: smN }); } /* runs only while a perp badge was on screen in the last 2 min */
   if (L.length && Date.now() - lastP < 120000) BE.start(); else BE.stop();
   dexStep(); repaint(); }
 async function gt(p){ const w = gtAt + 3000 - Date.now(); if (w > 0) await new Promise(r => setTimeout(r, w)); gtAt = Date.now(); const r = await fetch(GT + p, { headers: { accept: "application/json" } });
@@ -61,7 +63,7 @@ async function dexStep(){ if (dexBusy || !dexQ.length || Date.now() < gtPause) r
   try { let pool = pools.get(mint); if (pool === undefined){ const j = await gt(`/networks/solana/tokens/${mint}/pools?page=1`); pool = j && j.data && j.data[0] ? j.data[0].attributes.address : null; pools.set(mint, pool); }
     if (!pool){ cache.set(k + "@" + tf, { none: true, word: "veri yok", src: "dex", at: Date.now() }); return; } const K = {};
     for (const t of X.DEX_TF){ const [u, a] = X.GT_TF[t], j = await gt(`/networks/solana/pools/${pool}/ohlcv/${u}?aggregate=${a}&limit=300&currency=usd`); K[t] = X.dexBars(j && j.data && j.data.attributes && j.data.attributes.ohlcv_list, t); }
-    cache.set(k + "@" + tf, { ...X.dexEval(K, tf, { SMT, SCM, WAT }), at: Date.now() }); _ok(k); }
+    cache.set(k + "@" + tf, { ...X.dexEval(K, tf, { SMT, SCM, WAT, SCX: window.SCX, sm: (window.SCALP && SCALP.S && SCALP.S.sm) || "trend" }), at: Date.now() }); _ok(k); }
   catch(e){ /* GeckoTerminal answers its rate limit without CORS headers → "Failed to fetch": pause, retry later, show ⋯ (only 3 misses → "hata") */
     const n = (fails.get(k) || 0) + 1; fails.set(k, n); if (/fetch|limit|429/i.test(String(e.message || e))) gtPause = Date.now() + 45000;
     if (n >= 3) cache.set(k + "@" + tf, { err: String(e.message || e), at: Date.now() - 60000 }); else if (!dexQ.includes(k)) dexQ.push(k); }

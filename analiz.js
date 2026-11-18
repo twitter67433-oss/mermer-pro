@@ -7,13 +7,13 @@
 const fin = x => typeof x === "number" && isFinite(x), sgn = (x, e = 0) => x > e ? 1 : x < -e ? -1 : 0;
 /* pure: SİNYAL state → what the ANALİZ card shows */
 function view(x){ const dec = x.dec, C = x.C, A = x.A || {}; if (!dec || !C) return null; const word = dec.word, go = word === "GİR LONG" || word === "GİR SHORT";
-  const lean = C.dir > 0 ? "eğilim LONG" : C.dir < 0 ? "eğilim SHORT" : "yatay", leanCls = C.dir > 0 ? "up" : C.dir < 0 ? "dn" : "y";
+  const an = dec.scalp ? "anlık " : "", lean = C.dir > 0 ? an + "eğilim LONG" : C.dir < 0 ? an + "eğilim SHORT" : "yatay", leanCls = C.dir > 0 ? "up" : C.dir < 0 ? "dn" : "y";
   const dirs = (x.TF || []).map(t => { const it = x.I && x.I[t]; const d = it ? sgn(Math.abs(it.d) >= 0.25 ? it.d : 0) : null; return { t, d, st: it ? it.st : null }; });
   return { word, go, cls: word === "GİR LONG" ? "up" : word === "GİR SHORT" ? "dn" : "y", lean, leanCls, strong: !!C.strong, label: C.label, yon: dec.yon,
     conf: fin(C.strength) ? Math.max(0, Math.min(100, Math.round(C.strength))) : 0,
     plan: go ? { entry: A.entry, stop: A.stop, tp: A.tp, kind: A.kind } : null,
     trig: go ? [] : (dec.trig || []).map(t => ({ d: t.d, t: t.t })), note: dec.note || null,
-    reasons: (x.sum || []).slice(0, 3), dirs }; }
+    reasons: (x.sum || []).slice(0, 3), dirs, rev: dec.rev || null, scalp: dec.scalp || null, hold: dec.hold || "" }; }
 return { view };
 });
 /* ---------------- UI ---------------- */
@@ -22,6 +22,7 @@ const $ = s => document.querySelector(s), esc = s => String(s ?? "").replace(/[&
 const { TF_SEL, TF_LBL } = SCM, fin = x => typeof x === "number" && isFinite(x); let t0 = 0, inited = false, list = [], bt = 0, pend = false;
 const Sx = () => window.SCALP && SCALP.S;
 function html(){ const S = Sx() || {}; return `<div class="az-q"><input id="az-q" placeholder="coin ara: BTC, SOL, PEPE…" autocomplete="off" spellcheck="false" value="${esc(S.sym || "BTCUSDT")}"><div id="az-l" class="az-l hidden"></div></div>
+  <div class="az-sm" role="group" aria-label="analiz modu">${["scalp", "trend"].map(m => `<button type="button" data-sm="${m}" class="${(S.sm || "scalp") === m ? "on" : ""}" aria-pressed="${(S.sm || "scalp") === m}">${m === "scalp" ? "SCALP (anlık)" : "TREND"}</button>`).join("")}</div>
   <div class="az-tf" role="group" aria-label="mum aralığı">${TF_SEL.map(t => `<button type="button" data-azt="${t}" class="${t === S.tf ? "on" : ""}">${TF_LBL[t]}</button>`).join("")}</div>
   <button type="button" id="az-go" class="az-go">ANALİZ ET</button>
   <div id="az-r" class="az-r"><div class="az-empty">Coin ve mum aralığı seç, <b>ANALİZ ET</b>'e dokun.</div></div>
@@ -49,14 +50,15 @@ function chart(cv, S, v){ const b = (S.b[S.tf] || []).slice(-60); if (!cv || b.l
   const px = b[b.length - 1].c; g.strokeStyle = "rgba(184,151,90,.9)"; g.beginPath(); g.moveTo(0, Y(px)); g.lineTo(w, Y(px)); g.stroke(); }
 function paint(){ const el = $("#az-r"), S = Sx(); if (!el || !S) return; if (!t0) return; const fp = SCALP.fp, have = TF_SEL.filter(t => S.I && S.I[t]).length, coin = esc(S.sym.replace("USDT", "")), tfL = TF_LBL[S.tf];
   if (S.err){ el.innerHTML = `<div class="az-card"><div class="az-err">✖ ${esc(S.err)}</div><button type="button" id="az-re" class="az-mini">↻ tekrar dene</button></div>`; return; }
-  const ready = S.dec && S.G && (have >= 11 || (have >= 6 && Date.now() - t0 > 25000));
+  const sc = S.sm === "scalp", ready = S.dec && S.G && (sc ? !!S.V && S.dec.scalp : (have >= 11 || (have >= 6 && Date.now() - t0 > 25000)));
   if (!ready){ el.innerHTML = `<div class="az-card az-load"><div class="az-coin">${coin} <small>${tfL}</small></div><div class="az-wait">analiz ediliyor… <b>${have}</b>/12 aralık okundu</div><div class="az-cbar"><span style="width:${Math.round(have/12*100)}%"></span></div></div>`; setTimeout(paint, 700); return; }
   const v = ANZ.view({ dec: S.dec, C: S.G, A: S.A, I: S.I, sum: S.sum, TF: TF_SEL }); if (!v) return; const when = new Date(S.decAt || Date.now()).toLocaleTimeString("tr-TR", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const dots = v.dirs.map(d => `<span class="az-d ${d.d > 0 ? "up" : d.d < 0 ? "dn" : d.st === "SIKIŞMA" ? "m" : d.d === null ? "na" : "n"}${d.t === S.tf ? " on" : ""}"><i>${d.d === null ? "·" : d.st === "SIKIŞMA" ? "◇" : d.d > 0 ? "↑" : d.d < 0 ? "↓" : "•"}</i><small>${TF_LBL[d.t]}</small></span>`).join("");
   el.innerHTML = `<div class="az-card ${v.cls}"><div class="az-coin">${coin} <small>${tfL} · ${fp(S.D ? S.D.px : null)}</small></div>
-    <div class="az-word ${v.cls}">${esc(v.word)}</div>
-    ${v.go ? `<div class="az-plan"><div><small>giriş</small><b>${fp(v.plan.entry)}</b></div><div><small>stop</small><b class="dn">${fp(v.plan.stop)}</b></div><div><small>hedef</small><b class="up">${fp(v.plan.tp)}</b></div></div><div class="az-kind">${esc(v.plan.kind || "")} · kanıtlı kurulum</div>`
-      : `<div class="az-lean ${v.leanCls}">${v.lean === "yatay" ? "yön: yatay" : esc(v.lean)}${v.strong && v.lean !== "yatay" ? " · güçlü" : ""}</div><div class="az-why">eğilim = yön, giriş değil — GİR için kanıtlı kurulum (A+) bekleniyor</div>
+    <div class="az-mode">${sc ? "SCALP · " + esc(tfL) + " + emir akışı" : "TREND · 12 aralık"}</div>
+    <div class="az-word ${v.cls}">${esc(v.word)}</div>${v.rev ? `<div class="az-rev ${v.rev.d > 0 ? "up" : "dn"}" role="note"><b>⚠ DÖNÜŞ UYARISI</b> ${esc(v.rev.why)}</div>` : ""}
+    ${v.go ? `<div class="az-plan"><div><small>giriş</small><b>${fp(v.plan.entry)}</b></div><div><small>stop</small><b class="dn">${fp(v.plan.stop)}</b></div><div><small>hedef</small><b class="up">${fp(v.plan.tp)}</b></div></div><div class="az-kind">${esc(v.plan.kind || "")} · kanıtlı kurulum${v.hold ? " · tutma " + esc(v.hold) : ""}</div>`
+      : `<div class="az-lean ${v.leanCls}">${v.lean === "yatay" ? "yön: yatay" : esc(v.lean)}${v.scalp && v.scalp.flowW && v.lean !== "yatay" ? ` <small>· tepki (akış: ${esc(v.scalp.flowW)})</small>` : ""}${v.strong && v.lean !== "yatay" ? " · güçlü" : ""}</div><div class="az-why">${v.scalp ? "anlık eğilim — " + esc(v.scalp.why) : "eğilim = yön, giriş değil — GİR için kanıtlı kurulum (A+) bekleniyor"}</div>
         ${v.trig.length ? `<div class="az-trig">${v.trig.map(t => `<div class="${t.d > 0 ? "up" : "dn"}">→ ${esc(t.t)}</div>`).join("")}</div>` : `<div class="az-trig dim">net tetik yok</div>`}`}
     <div class="az-conf"><small>güven (yön gücü)</small><div class="az-cbar ${v.leanCls}"><span style="width:${v.conf}%"></span></div><b>%${v.conf}</b></div>
     <ul class="az-rs">${v.reasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul>
@@ -67,7 +69,9 @@ function paint(){ const el = $("#az-r"), S = Sx(); if (!el || !S) return; if (!t
   chart($("#az-cv"), S, v); }
 function init(){ const box = $("#analiz-box"); if (!box || inited) return; inited = true; box.innerHTML = html(); bind();
   window.addEventListener("sinyal:update", () => { if (document.body.dataset.pg !== "analiz" || pend) return; pend = true; setTimeout(() => { pend = false; paint(); }, 400); });
-  window.addEventListener("themechange", () => paint()); window.addEventListener("resize", () => { if (document.body.dataset.pg === "analiz") paint(); }); }
+  window.addEventListener("themechange", () => paint());
+  window.addEventListener("sinyal:mode", () => { const S = Sx(); document.querySelectorAll(".az-sm [data-sm]").forEach(b => { const on = b.dataset.sm === S.sm; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+    document.querySelectorAll("[data-azt]").forEach(b => b.classList.toggle("on", b.dataset.azt === S.tf)); if (t0) t0 = Date.now(); paint(); }); window.addEventListener("resize", () => { if (document.body.dataset.pg === "analiz") paint(); }); }
 function show(){ init(); const S = Sx(); if (!S || !inited) return; document.querySelectorAll("[data-azt]").forEach(b => b.classList.toggle("on", b.dataset.azt === S.tf)); const q = $("#az-q"); if (q && document.activeElement !== q) q.value = S.sym;
   if (!t0) run(S.sym, S.tf); else paint(); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();

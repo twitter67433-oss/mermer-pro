@@ -631,6 +631,15 @@ html.night .sgb.dn:not(.bl){background:#eb7084;border-color:#eb7084;color:#22222
 html.night .sgb.bl.up{color:#51cd9a;border-color:rgba(81,205,154,0.5)}
 html.night .sgb.bl.dn{color:#eb7084;border-color:rgba(235,112,132,0.5)}
 html.night .sheet-box .sheet-chk input{accent-color:#51cd9a}
+html.night .az-sm button,
+html.night .sg-sm button{border:1px solid rgba(214,178,113,0.55);background:rgba(34,34,34,0.5);color:var(--ink,#dcdad8)}
+html.night .az-sm button.on,
+html.night .sg-sm button.on{background:#9cb8de;border-color:#9cb8de;color:#222222}
+html.night .az-mode{color:var(--gold,#d6b271)}
+html.night .az-rev,
+html.night .sg-rev{border:1px solid rgba(235,112,132,0.45);background:rgba(235,112,132,0.07);color:#eb7086}
+html.night .az-rev.up,
+html.night .sg-rev.up{border-color:rgba(81,205,154,0.45);background:rgba(81,205,154,0.07);color:#51cd9c}
 /* ---- marble.css ---- */
 html.night{--bg:#1b1a16;--panel:#22201a;--line:#555048;--g:#51cd9a;--c:#9cb8de;--m:#d6b371;--y:#d6b371;--r:#eb7084;--txt:#dcdad8;--dim:#c0bdba;--gold:#d6b271;--gold2:#d6b371;--ink:#dfdedc;--emer:#51cd9a;--bord:#eb7084;--navy:#9cb8de;--sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;--serif:'Playfair Display','Cormorant Garamond','Didot','Bodoni 72',Georgia,serif;--mono:'JetBrains Mono','DejaVu Sans Mono',monospace;--disp:var(--serif);--tech:'JetBrains Mono','DejaVu Sans Mono',monospace;--holo:linear-gradient(100deg,#d6b171,#d6b271 45%,#d6b671 55%,#d6b171);--glass:linear-gradient(150deg,#26221c,#1e1b17 60%,#181613);--edge:rgba(214,178,113,0.55);--edge2:rgba(34,34,34,0.7);--marble:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 900' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-20 120 C90 160 140 90 230 150 S380 260 470 210 S590 240 640 200' stroke='%235d5b57' stroke-opacity='.35' stroke-width='1.4'/%3E%3Cpath d='M-20 128 C100 170 150 104 240 160' stroke='%23585551' stroke-opacity='.4' stroke-width='5'/%3E%3Cpath d='M40 -10 C70 120 20 220 110 330 S150 520 90 640 S120 860 60 920' stroke='%2363615d' stroke-opacity='.28' stroke-width='1.1'/%3E%3Cpath d='M110 330 C190 360 230 330 300 390 S420 430 520 400' stroke='%235f5d58' stroke-opacity='.3' stroke-width='.9'/%3E%3Cpath d='M620 470 C520 500 470 560 390 560 S250 620 180 700 S60 760 -20 760' stroke='%23615f5a' stroke-opacity='.33' stroke-width='1.3'/%3E%3Cpath d='M620 480 C530 515 480 575 400 575' stroke='%2356534e' stroke-opacity='.45' stroke-width='6'/%3E%3Cpath d='M390 560 C410 640 470 690 450 780 S500 880 520 920' stroke='%23d6b271' stroke-opacity='.18' stroke-width='1'/%3E%3Cpath d='M300 -10 C330 60 300 110 350 170' stroke='%23d6b271' stroke-opacity='.16' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E")}
 html.night,

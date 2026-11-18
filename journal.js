@@ -12,7 +12,7 @@ const netPct = (d, entry, exit, fee = FEE) => d*(exit - entry)/entry*100 - fee;
 function make(o){ const d = o.d > 0 ? 1 : -1, e = +o.entry, st = +o.stop, tp = +o.tp; if (!fin(e) || !fin(st) || !fin(tp) || e <= 0) return null;
   if (d > 0 ? !(st < e && tp > e) : !(st > e && tp < e)) return null; const t = +o.t || Date.now(), ms = TFMS[o.tf] || 9e5;
   return { id: o.id || (t.toString(36) + Math.random().toString(36).slice(2, 6)), t, sym: String(o.sym), tf: o.tf, d, entry: e, stop: st, tp, type: o.type || "A+", why: o.why || "", src: o.src || "karar",
-    exp: t + TOUT*ms, chk: t, st: "open", hi: e, lo: e }; }
+    sm: o.sm === "scalp" ? "scalp" : "trend", exp: t + (o.sm === "scalp" ? 6 : TOUT)*ms, chk: t, st: "open", hi: e, lo: e }; }
 /* add with dedupe: same coin + interval + direction is not re-opened while one is open */
 function add(list, tr){ if (!tr) return { list, added: false, why: "geçersiz" }; if (list.some(x => x.st === "open" && x.sym === tr.sym && x.tf === tr.tf && x.d === tr.d)) return { list, added: false, why: "açık var" };
   let L = [tr].concat(list); if (L.length > MAXN){ const open = L.filter(x => x.st === "open"), closed = L.filter(x => x.st !== "open").sort((a, b) => b.t - a.t); L = open.concat(closed).slice(0, MAXN).sort((a, b) => b.t - a.t); }
@@ -55,8 +55,8 @@ const stopPct = tr => Math.abs(tr.entry - tr.stop)/tr.entry*100;
 function wideStop(list, tr, k = 3, cap = 5){ const p = stopPct(tr); if (p > cap) return true; const a = list.filter(x => x !== tr && fin(x.entry) && fin(x.stop)).slice(0, 200).map(stopPct).sort((x, y) => x - y);
   if (a.length < 5) return false; const m = a.length % 2 ? a[(a.length - 1)/2] : (a[a.length/2 - 1] + a[a.length/2])/2; return m > 0 && p > k*m; }
 function csv(list, tz = "Europe/Berlin"){ const fmt = t => { try { return new Date(t).toLocaleString("sv-SE", { timeZone: tz }); } catch(e){ return new Date(t).toISOString(); } };
-  const rows = [["zaman (Berlin)", "coin", "aralık", "yön", "tür", "neden", "geniş stop", "giriş", "stop", "hedef", "durum", "sonuç", "çıkış", "kapanış (Berlin)", "net %"]];
-  for (const x of list) rows.push([fmt(x.t), x.sym, x.tf, x.d > 0 ? "LONG" : "SHORT", x.type, x.why, x.wide ? "evet" : "", x.entry, x.stop, x.tp, x.st === "open" ? "AÇIK" : x.ok ? "DOĞRU" : "YANLIŞ", x.how || "", x.exit ?? "", x.cT ? fmt(x.cT) : "", fin(x.net) ? x.net.toFixed(3) : ""]);
+  const rows = [["zaman (Berlin)", "coin", "aralık", "mod", "yön", "tür", "neden", "geniş stop", "giriş", "stop", "hedef", "durum", "sonuç", "çıkış", "kapanış (Berlin)", "net %"]];
+  for (const x of list) rows.push([fmt(x.t), x.sym, x.tf, x.sm === "scalp" ? "SCALP" : "TREND", x.d > 0 ? "LONG" : "SHORT", x.type, x.why, x.wide ? "evet" : "", x.entry, x.stop, x.tp, x.st === "open" ? "AÇIK" : x.ok ? "DOĞRU" : "YANLIŞ", x.how || "", x.exit ?? "", x.cT ? fmt(x.cT) : "", fin(x.net) ? x.net.toFixed(3) : ""]);
   return rows.map(r => r.map(v => { const s = String(v ?? ""); return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
 return { FEE, MAXN, TOUT, TFMS, netPct, make, add, close, resolveBars, tick, gapTf, trigFired, stats, units, stopPct, wideStop, csv };
 });
