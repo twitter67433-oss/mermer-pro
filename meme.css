@@ -432,3 +432,47 @@ body.mm-flash-loss::after{content:"";position:fixed;inset:0;background:rgba(155,
 .az-rev.up,.sg-rev.up{border-color:rgba(15,107,69,.45);background:rgba(15,107,69,.07);color:#0b5236}
 .az-rev b,.sg-rev b{display:block;font-weight:800;letter-spacing:.05em;margin-bottom:2px}
 .sg-sel button{padding:7px 9px;letter-spacing:.04em;font-weight:700}
+.mm-simadd{display:flex;gap:8px;align-items:center;margin:0 0 6px;flex-wrap:wrap}.mm-simadd input#mm-addamt{width:84px;padding:8px 10px}.mm-simadd .mini{padding:8px 12px;font-weight:700}
+.mm-loose{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600}.mm-loose input{width:auto;margin:0}
+/* ---------- v7.26 SADE GÖRÜNÜM (body.simple; "detay" switch brings everything back) ---------- */
+.dt-tg{margin-left:auto;flex:0 0 auto;padding:3px 9px;border-radius:999px;border:1px solid #d9cbb3;background:#fffdf9;color:#8a6828;font:600 10.5px/1.4 var(--sans,Inter,sans-serif);letter-spacing:.04em;cursor:pointer}
+.dt-tg[aria-pressed="true"]{background:#8a6828;color:#fff;border-color:#8a6828}
+#scalp>h3,#psim>h3,#coinan>h3,#meme>h3,#pump>h3{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+body.simple :is(#scalp,#coinan,#meme,#pump,#analiz)>h3 small{display:none}
+/* SİNYAL: one verdict (big word + one line) and the chart */
+body.simple :is(.sg-nowh,.sg-dnote,.sg-hero,#sg-bubble,#sg-card,.sg-det,.sg-als){display:none!important}
+body.simple #scalp .plan-foot,body.simple #scalp>div>.plan-foot{display:none}
+body.simple .sg-dword{font-size:44px;margin:4px 0 2px}
+body.simple .sg-dline{font-size:13px}
+/* VADELİ coin analizi: one verdict (smart badge, large) + chart */
+body .can-one .sgb{font-size:15px;padding:6px 16px;border-width:1.5px}body .can-one .sgb b{font-size:17px;letter-spacing:.06em}body .can-one .sgb small{font-size:10px}
+body.simple :is(.can-lg,.can-plan,.can-f,.can-note,#can-d,#can-trade){display:none!important}
+body.simple #coinan .plan-foot{display:none}
+/* MEME: balance, positions, trades; agents / goal / long notes behind detay */
+body.simple :is(#mm-goal,#mm-ags,.mm-simnote,#pf-note,#pf-log,.pf-sub.dim,.pf-l){display:none!important}
+body.simple #meme .sub-h:has(+ #mm-ags),body.simple #pump .sub-h:has(+ #pf-log){display:none}
+body.simple :is(#meme,#pump)>div>.plan-foot{display:none}
+/* badges: just colored LONG / SHORT / BEKLE */
+body.simple .sgb{padding:1px 8px}body.simple .sgb b{font-size:10px}
+/* MEME TEST: BAKİYE EKLE row */
+#meme .mm-simadd .mini{background:#0f6b45!important;border-color:#0f6b45!important;color:#fff!important}
+/* ANALİZ: taller chart, detay fold */
+.az-panel .az-cv{height:210px}
+.az-det{margin:6px 0 2px;border-top:1px dashed #e2d6c2;padding-top:4px}.az-det>summary{cursor:pointer;font-size:12px;color:#8a6828;font-weight:600;list-style:none;padding:4px 0}.az-det>summary::before{content:"▸ "}.az-det[open]>summary::before{content:"▾ "}
+/* ---------- v7.26 VADELİ SİMÜLATÖR ---------- */
+.ps-bal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:2px 0 10px}.ps-bal div{border:1px solid #e2d6c2;border-radius:10px;padding:6px 4px;text-align:center;background:#fffdf9}
+.ps-bal small{display:block;font-size:10px;color:var(--dim)}.ps-bal b{font-family:var(--tech);font-size:13.5px}
+.ps-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}.ps-row input{flex:1;min-width:0}.ps-px{font-family:var(--tech);font-size:18px;font-weight:700;min-width:90px;text-align:right}
+.ps-side{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}.ps-side button{padding:10px;font-weight:800;letter-spacing:.06em}
+#psim .ps-side button.up.on{background:#0f6b45!important;border-color:#0f6b45!important;color:#fff!important}#psim .ps-side button.dn.on{background:#9b1c31!important;border-color:#9b1c31!important;color:#fff!important}
+.ps-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ps-grid label{display:flex;flex-direction:column;font-size:11px;color:var(--dim);gap:3px}.ps-grid input,.ps-grid select{width:100%;box-sizing:border-box}
+.ps-btns{display:flex;gap:8px;margin:10px 0 4px}#psim .ps-btns .ps-go{flex:1;background:#23201c!important;border-color:#23201c!important;color:#fffdf8!important;font-weight:800;letter-spacing:.08em}
+.ps-info{font-size:11.5px;min-height:15px;margin-bottom:6px}
+.ps-pos{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.ps-p{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;border:1px solid #e2d6c2;border-left:4px solid #8a6828;border-radius:10px;padding:8px 10px;background:#fffdf9}
+.ps-p.up{border-left-color:#0f6b45}.ps-p.dn{border-left-color:#9b1c31}.ps-p .ps-u{font-family:var(--tech);font-weight:700;text-align:right}.ps-p .ps-l{font-size:11px}.ps-p button{justify-self:end}
+.ps-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin:4px 0 8px}
+.ps-hr{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:6px;font-size:11px;padding:4px 0;border-bottom:1px dashed #e2d6c2;align-items:center}.ps-hr small{grid-column:1/-1;color:var(--dim)}
+.ps-tools{display:flex;gap:8px;align-items:center;margin:8px 0}.ps-tools input{width:90px}
+.ps-p .up,.ps-sum .up,.ps-bal .up,.ps-hr .up{color:#0f6b45}.ps-p .dn,.ps-sum .dn,.ps-bal .dn,.ps-hr .dn{color:#9b1c31}
+body.simple #psim .plan-foot,body.simple #psim>h3 small{display:none}

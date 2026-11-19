@@ -24,7 +24,9 @@ const fromLast = (x, maxAge, now = Date.now()) => x && now - x.at <= maxAge ? { 
 function label(r){ if (!r) return { txt: "⋯", cls: "na" }; if (r.none || r.err) return { txt: r.err ? "hata" : "veri yok", cls: "na" };
   if (r.word === "GİR LONG") return { txt: "GİR LONG", cls: "up" }; if (r.word === "GİR SHORT") return { txt: "GİR SHORT", cls: "dn" };
   return { txt: "BEKLE · " + (r.d > 0 ? "eğilim L" : r.d < 0 ? "eğilim S" : "yatay"), cls: r.d > 0 ? "bl up" : r.d < 0 ? "bl dn" : "y" }; }
-return { DEX_TF, GT_TF, dexBars, dexEval, fromScalp, fromLast, label };
+/* v7.26 simple view: the badge is just a colored LONG / SHORT / BEKLE (GİR only → LONG/SHORT; eğilim stays BEKLE) */
+function labelS(r){ const L = label(r); if (L.cls === "na") return L; return L.txt === "GİR LONG" ? { txt: "LONG", cls: "up" } : L.txt === "GİR SHORT" ? { txt: "SHORT", cls: "dn" } : { txt: "BEKLE", cls: "y" }; }
+return { DEX_TF, GT_TF, dexBars, dexEval, fromScalp, fromLast, label, labelS };
 });
 /* ---------------- browser ---------------- */
 if (typeof window !== "undefined" && typeof document !== "undefined") window.SGB = (() => {
@@ -36,10 +38,11 @@ async function fj(p){ const r = await fetch(FUT + p, { cache: "no-store" }); if 
 const BE = WAT.create({ SMT, SCM, SCX: window.SCX, JRN: window.JRN, fj, cb: { add: () => {}, eval: () => repaint() } }); BE.config({ list: [], tfs: [tfNow()], auto: false, trig: false }); /* auto:false → never records, never trades */
 function perpSet(){ if (!perps && window.SCALP) SCALP.list().then(L => { perps = new Set(L.map(x => x.s)); }).catch(() => {}); return perps; }
 /* markup used by the tabs */
-function tag(o){ const k = o.perp ? "p:" + o.perp : o.mint ? "m:" + o.mint : null; if (!k) return ""; const tf = o.perp ? tfNow() : DEXTF(), r = get(k, tf), L = X.label(r);
+function tag(o){ const k = o.perp ? "p:" + o.perp : o.mint ? "m:" + o.mint : null; if (!k) return ""; const tf = o.perp ? tfNow() : DEXTF(), r = get(k, tf), L = LBL(r);
   return `<button type="button" class="sgb ${L.cls}${o.mint ? " dex" : ""}" data-sgb="${esc(k)}"${o.sym ? ` data-sgs="${esc(o.sym)}"` : ""} title="sinyal rozeti · ${o.mint ? "DEX verisi (GeckoTerminal), düşük güven" : "Binance vadeli"} · yalnızca gösterim, emir yok">${inner(L, tf, !!o.mint, r)}</button>`; }
 const DEXTF = () => X.DEX_TF.includes(tfNow()) ? tfNow() : "15m";
-const inner = (L, tf, dex, r) => `<b>${esc(L.txt)}</b><small>${esc(TFL()[tf] || tf)}${dex ? " · DEX" : ""}${r && fin(r.conf) && !r.none ? " · %" + r.conf : ""}</small>`;
+const SIMPLE = () => document.body.classList.contains("simple"), LBL = r => SIMPLE() ? X.labelS(r) : X.label(r);
+const inner = (L, tf, dex, r) => SIMPLE() ? `<b>${esc(L.txt)}</b>` : `<b>${esc(L.txt)}</b><small>${esc(TFL()[tf] || tf)}${dex ? " · DEX" : ""}${r && fin(r.conf) && !r.none ? " · %" + r.conf : ""}</small>`;
 const fin = x => typeof x === "number" && isFinite(x);
 function get(k, tf){ const kk = k + "@" + tf, c = cache.get(kk); const sym = k.slice(2);
   if (k.startsWith("p:")){ const s = window.SCALP && SCALP.S, a = X.fromScalp(s, sym, tf); if (a){ cache.set(kk, { ...a, at: Date.now() }); return a; }
@@ -69,7 +72,7 @@ async function dexStep(){ if (dexBusy || !dexQ.length || Date.now() < gtPause) r
     if (n >= 3) cache.set(k + "@" + tf, { err: String(e.message || e), at: Date.now() - 60000 }); else if (!dexQ.includes(k)) dexQ.push(k); }
   finally { dexBusy = false; busyK = null; repaint(); if (dexQ.length) setTimeout(dexStep, 100); } }
 /* successful token → forget its misses */ const _ok = k => fails.delete(k);
-function repaint(){ const tf = tfNow(); document.querySelectorAll(".sgb[data-sgb]").forEach(e => { const k = e.dataset.sgb, dex = k.startsWith("m:"), t = dex ? DEXTF() : tf, r = get(k, t), L = X.label(r), h = inner(L, t, dex, r);
+function repaint(){ const tf = tfNow(); document.querySelectorAll(".sgb[data-sgb]").forEach(e => { const k = e.dataset.sgb, dex = k.startsWith("m:"), t = dex ? DEXTF() : tf, r = get(k, t), L = LBL(r), h = inner(L, t, dex, r);
     if (e.innerHTML !== h){ e.innerHTML = h; e.className = `sgb ${L.cls}${dex ? " dex" : ""}`; } }); }
 /* tap → ANALİZ (perp) or a short note (DEX: ANALİZ is Binance-futures only) */
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest(".sgb[data-sgb]"); if (!b) return; e.preventDefault(); e.stopPropagation(); const k = b.dataset.sgb;

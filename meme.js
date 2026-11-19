@@ -28,7 +28,7 @@ const ms = x => x === null || x === undefined || !isFinite(x) ? "—" : x >= 100
 const T = () => window.TRADE, W = () => window.WALLET, X = () => window.EXEC;
 const K = "neon.meme";
 const SIM_FALLBACK = 0.212; /* last known real BOT CÜZDANI balance — used when the wallet balance cannot be read */
-const DEF = { mode: "SIM", dep: SIM_FALLBACK, autoStart: false, base: 0.05, maxTrade: 0.1, budget: 0.5, dailyLoss: 0.25, maxPos: 3, tp: 250, sl: 25, trail: 20, holdMin: 15, slip: 20, prio: 0.0005,
+const DEF = { mode: "SIM", dep: SIM_FALLBACK, simLoose: true, autoStart: false, base: 0.05, maxTrade: 0.1, budget: 0.5, dailyLoss: 0.25, maxPos: 3, tp: 250, sl: 25, trail: 20, holdMin: 15, slip: 20, prio: 0.0005,
   w: { on: true, minInit: 0, minMcap: 15, maxMcap: 120, needSoc: false, maxDev: 20, maxRisk: 58, waitSec: 15, minMom: -5 },
   sc: { on: true, min: 55, minBuyers: 3, maxTop: 55, learn: true },
   x: { on: true, early: 12, earlySec: 20, momUp: 5, momFail: 8, be: 20, beLock: 1, ptp: 40, ptpPct: 50, trailHi: 12, trailSw: 100, rev: true, revSec: 6, flatMin: 4, flatBand: 10, simHc: true },
@@ -96,8 +96,10 @@ const fnKey = r => String(r).replace(/\([^)]*\)/g, "").replace(/[0-9][0-9.,]*/g,
 const fnInc = (st, r) => { const o = FN[st] = FN[st] || {}; const k = r === undefined ? "_" : fnKey(r); o[k] = (o[k] || 0) + 1; };
 const ST = { scN: 0, scPass: 0, scores: [], wb: 0, wbLive: 0, on: false, wake: null, cands: new Map(), mons: new Map(), busy: new Set(), buying: 0, curves: new Map(), cpLog: new Map(), lastCopy: null, seen: 0, passed: 0, entered: 0, wLast: "", gk: { n: 0, yes: 0, no: 0, to: 0, last: null }, real: { bal: null, at: 0 }, orb: 0 };
 const isReal = () => C.mode === "GERÇEK";
-/* v7.7: no unrestricted SIM any more — SIM obeys every GERÇEK limit. Kept as a constant so the shared sizing/risk code has one path. */
-const simFree = () => false;
+/* v7.26 TEST SERBEST (SIM only, default on, switchable): in SIM the caps (işlem başı max, bütçe, günlük zarar, max pozisyon),
+   the 2-loss pause and the SIM confirmation sheets are skipped; only the virtual cash limits a buy. isReal() → always false,
+   so GERÇEK keeps every limit, cooldown and ONAYLA exactly as before (nothing in C is changed by this switch). */
+const simFree = () => !isReal() && C.simLoose !== false;
 const SRV = !!window.NEON_SRV; /* true inside the always-on server bot (server/server.mjs) */
 const RMT = () => !SRV && !!(window.REMOTE && REMOTE.paired()); /* phone paired with the server bot: local engine stays idle, UI mirrors the server */
 const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return +d; };
@@ -361,8 +363,8 @@ function onCopy(ev){ if (ev.kind !== "trade"){ paintAgentsQ(); paintWalletsQ(); 
   paintWalletsQ(); if (!ST.on || !C.cp.on) return; const w = COPY.list.find(x => x.addr === t.wallet); if (!w || w.on === false) return;
   if (t.isBuy){ const cp = C.cp; if (t.sol < cp.minSrc) return; if (t.mcap && t.mcap > cp.maxMcap){ ST.cpSkip = `mcap ${fmt(t.mcap, 0)} > ${cp.maxMcap}`; return; }
     if (posGet(t.mint)) return;
-    const L = (ST.cpLog.get(t.wallet) || []).filter(x => Date.now() - x < 600000); if (L.length >= cp.max10){ ST.cpSkip = `${lab(t.wallet)}: 10 dk'da ${cp.max10} kopya sınırı`; return; }
-    const lastMint = ST.cpLog.get("m:" + t.mint); if (lastMint && Date.now() - lastMint < cp.cool*1000) return;
+    const L = (ST.cpLog.get(t.wallet) || []).filter(x => Date.now() - x < 600000); if (!simFree() && L.length >= cp.max10){ ST.cpSkip = `${lab(t.wallet)}: 10 dk'da ${cp.max10} kopya sınırı`; return; }
+    const lastMint = ST.cpLog.get("m:" + t.mint); if (!simFree() && lastMint && Date.now() - lastMint < cp.cool*1000) return; /* TEST SERBEST: no copy cooldown in SIM */
     ST.cpLog.set(t.wallet, L.concat(Date.now())); ST.cpLog.set("m:" + t.mint, Date.now());
     const sym = (PUMP.get(t.mint) || {}).symbol || t.mint.slice(0, 5); ST.lastCopy = { w: t.wallet, sym, at: Date.now() };
     enter({ mint: t.mint, sym, src: "copy", wallet: t.wallet, srcSol: t.sol, size: riskSize("copy", t.sol, w.size), tEv: t.at - (t.lag || 0), c0: { vSol: t.vSol, vTok: t.vTok, mcap: t.mcap, complete: false }, reason: `KOPYA: ${lab(t.wallet)} ${fmt(t.sol, 3)} SOL aldı` }); }
@@ -414,18 +416,21 @@ async function simToReal(){ if (isReal()){ NOTIFY.toast("yalnızca SIM modunda",
   if (!(await CONN.typedConfirm("SIM = GERÇEK BAKİYE", `SIM sanal bakiyesi <b>${fmt(dep, 4)} SOL</b> olur (${b ? "BOT CÜZDANI'nın şu anki SOL bakiyesi" : "cüzdan okunamadı → son gerçek bakiye 0.212 SOL"}). SIM pozisyonları, SIM eğrisi ve SIM risk durumu silinir (günlükteki SIM kayıtları kalır). Ayarlar ve limitler GERÇEK ile aynıdır.`, "SIFIRLA"))) return;
   C.dep = dep; save(); simResetNow(); }
 async function mig77Sync(){ if (localStorage.getItem("neon.meme.sim77") !== "1") return; const b = await realWalletSol(); localStorage.removeItem("neon.meme.sim77");
-  if (b && !ST.on && !SIM.n && !SIM.pos.length && Math.abs(b - C.dep) > 1e-6){ C.dep = b; save(); SIM = simNew(b); simSave(); tl("mode", `v7.7: SIM bakiyesi BOT CÜZDANI ile eşlendi · ${fmt(b, 4)} SOL`, "y"); render(); } }
+  if (b && !ST.on && !SIM.n && !SIM.pos.length && !SIM.added && Math.abs(b - C.dep) > 1e-6){ C.dep = b; save(); SIM = simNew(b); simSave(); tl("mode", `v7.7: SIM bakiyesi BOT CÜZDANI ile eşlendi · ${fmt(b, 4)} SOL`, "y"); render(); } }
 function simResetNow(){ if (ST.on && !isReal()) throw new Error("önce OTO'yu durdur");
   for (const p of SIM.pos) stopMon(p.mint); SIM = simNew(C.dep); simSave(); localStorage.removeItem(RK("SIM")); localStorage.removeItem(EK("SIM")); localStorage.removeItem(EK("SIM") + ".mk");
   if (!isReal()){ R = rLoad("SIM"); EQ = []; MK = []; } tl("mode", `SIM sıfırlandı · sanal yatırım ${fmt(C.dep, 4)} SOL · GERÇEK ayarları`, "y"); render(); }
-/* manual trade through the engine (always ONAYLA) */
+/* v7.26 BAKİYE EKLE — SIM only: adds VIRTUAL SOL to the test balance (no wallet, no transaction). Never available in GERÇEK. */
+function simAdd(v){ v = +String(v ?? "").replace(",", "."); if (isReal()) throw new Error("yalnızca SIM/TEST"); if (!(v > 0) || !isFinite(v) || v > 1e6) throw new Error("miktar 0–1.000.000 SOL");
+  SIM.cash += v; SIM.dep = (+SIM.dep || 0) + v; SIM.added = (+SIM.added || 0) + v; simSave(); tl("mode", `SIM: +${fmt(v, 4)} SOL sanal bakiye eklendi · nakit ${fmt(SIM.cash, 4)} SOL`, "up"); return SIM.cash; }
+/* manual trade through the engine (GERÇEK: always ONAYLA · SIM with TEST SERBEST: no sheet) */
 async function manual(mint, action, opt = {}){ const t = PUMP.get(mint), sym = (t && t.symbol) || opt.sym || short(mint);
   if (action === "buy"){ const size = +(opt.sol || C.base); if (!(size > 0) || (!simFree() && size > C.maxTrade)){ NOTIFY.toast(simFree() ? "Miktar 0'dan büyük olmalı" : `Miktar 0–${C.maxTrade} SOL (işlem başı max)`, "bad"); return; }
     const why = riskCheck(size, mint); if (why){ NOTIFY.toast("✖ " + why, "bad"); return; }
-    if (!(await T().confirmSheet({ title: (isReal() ? "" : "SIM · ") + "AL · MEME MOTORU", mode: isReal() ? "GERÇEK" : "SIM", rows: [["Mod", C.mode, isReal() ? "dn" : ""], ["Token", sym + " · " + short(mint)], ["Miktar", size + " SOL"], ["Kayma / öncelik", `%${C.slip} / ${C.prio} SOL`], ["Rug riski", t ? t.risk + " / 100" : "—"], ["Kaynak", opt.src === "grok" ? "AI önerisi" : "elle"]], warn: isReal() ? "BOT CÜZDANI imzalar ve hemen gönderir. Geri alınamaz." : "SIM: gerçek işlem gönderilmez; canlı fiyatla sanal dolum.", okText: "ONAYLA · AL" }))) return;
+    if (!simFree() && !(await T().confirmSheet({ title: (isReal() ? "" : "SIM · ") + "AL · MEME MOTORU", mode: isReal() ? "GERÇEK" : "SIM", rows: [["Mod", C.mode, isReal() ? "dn" : ""], ["Token", sym + " · " + short(mint)], ["Miktar", size + " SOL"], ["Kayma / öncelik", `%${C.slip} / ${C.prio} SOL`], ["Rug riski", t ? t.risk + " / 100" : "—"], ["Kaynak", opt.src === "grok" ? "AI önerisi" : "elle"]], warn: isReal() ? "BOT CÜZDANI imzalar ve hemen gönderir. Geri alınamaz." : "SIM: gerçek işlem gönderilmez; canlı fiyatla sanal dolum.", okText: "ONAYLA · AL" }))) return;
     return enter({ mint, sym, src: opt.src || "manual", manual: true, size, tEv: performance.now(), curve: t && t.curve, reason: opt.src === "grok" ? "AI önerisi (onaylandı)" : "elle" }); }
   const p = posGet(mint); if (!p){ NOTIFY.toast("Bu tokenda açık pozisyon yok", "bad"); return; }
-  if (!(await T().confirmSheet({ title: (isReal() ? "" : "SIM · ") + "SAT · MEME MOTORU", mode: isReal() ? "GERÇEK" : "SIM", rows: [["Token", p.sym], ["Miktar", "%100 · " + fmt(p.tokens, 0)], ["Maliyet", fmt(p.solIn, 4) + " SOL"], ["Tahmini değer", fmt(posVal(p), 4) + " SOL"]], okText: "ONAYLA · SAT" }))) return;
+  if (!simFree() && !(await T().confirmSheet({ title: (isReal() ? "" : "SIM · ") + "SAT · MEME MOTORU", mode: isReal() ? "GERÇEK" : "SIM", rows: [["Token", p.sym], ["Miktar", "%100 · " + fmt(p.tokens, 0)], ["Maliyet", fmt(p.solIn, 4) + " SOL"], ["Tahmini değer", fmt(posVal(p), 4) + " SOL"]], okText: "ONAYLA · SAT" }))) return;
   return exit(mint, opt.src === "grok" ? "AI önerisi (onaylandı)" : "elle satış"); }
 /* ------------------------- context for GROK ------------------------- */
 function gateInfo(o){ const t = PUMP.get(o.mint) || {}, m = t.meta || {}; const c = curveOf(o.mint) || o.c0 || {};
@@ -498,8 +503,10 @@ function html(){ const real = isReal(), ex = X().C;
   return `${goalHTML()}
     <div class="mm-bar"><div class="seg" role="group" aria-label="Mod"><button type="button" data-mode="SIM" class="${real ? "" : "on"}">SIM</button><button type="button" data-mode="GERÇEK" class="${real ? "on real" : ""}">GERÇEK</button></div>
       <button type="button" id="mm-arm" class="arm ${ST.on ? "on" : ""}">${ST.on ? "■ OTO DURDUR" : "▶ OTO BAŞLAT"}</button></div>
-    ${real ? "" : `<div class="mm-simquick"><button type="button" id="mm-simreal" class="mini wide">SIM = GERÇEK BAKİYE</button><small class="mm-simnote">SIM, GERÇEK ile aynı ayar ve limitlerle çalışır · yalnızca para sanal</small></div>`}
-    <div class="mm-hero"><canvas id="orb" aria-hidden="true"></canvas><div class="mm-bal"><div class="mm-badges"><span class="mode-badge ${real ? "real" : "sim"}">${real ? "⚠ GERÇEK" : "SIM · GERÇEK AYARLAR"}</span><span id="mm-auto" class="pill"></span><span id="mm-cmpb" class="pill mm-cmp-pill${C.cmp && C.cmp.on ? "" : " hidden"}">BİLEŞİK</span></div>
+    ${real ? "" : `<div class="mm-simquick"><button type="button" id="mm-simreal" class="mini wide">SIM = GERÇEK BAKİYE</button></div>
+      <div class="mm-simadd"><input id="mm-addamt" inputmode="decimal" placeholder="SOL" aria-label="eklenecek sanal SOL" value="1"><button type="button" id="mm-add" class="mini">+ BAKİYE EKLE</button><label class="mm-loose"><input type="checkbox" id="mm-loose" ${C.simLoose !== false ? "checked" : ""}> TEST SERBEST</label></div>
+      <small class="mm-simnote">TEST: sanal bakiye · ${C.simLoose !== false ? "limit / ara / onay yok" : "GERÇEK limitleriyle"} · GERÇEK etkilenmez</small>`}
+    <div class="mm-hero"><canvas id="orb" aria-hidden="true"></canvas><div class="mm-bal"><div class="mm-badges"><span class="mode-badge ${real ? "real" : "sim"}">${real ? "⚠ GERÇEK" : simFree() ? "SIM · TEST SERBEST" : "SIM · GERÇEK AYARLAR"}</span><span id="mm-auto" class="pill"></span><span id="mm-cmpb" class="pill mm-cmp-pill${C.cmp && C.cmp.on ? "" : " hidden"}">BİLEŞİK</span></div>
       <div class="mm-big"><span id="mm-eq">—</span><small>SOL</small></div><div class="mm-usd" id="mm-usd"></div><div class="mm-dep" id="mm-dep"></div></div></div>
     <div class="mm-kpis" id="mm-kpis"></div>
     <div class="sub-h">AÇIK POZİSYONLAR <small id="mm-posn"></small></div><div id="mm-pos" class="pos-list"></div>
@@ -562,7 +569,7 @@ function html(){ const real = isReal(), ex = X().C;
       <div class="f2">${inp("dep", "SIM sanal yatırım SOL")}<button type="button" id="mm-simreset" class="mini wide s" style="align-self:end">SIM'İ SIFIRLA</button></div>
       ${real ? "" : `<button type="button" id="mm-simreal-b" class="mini wide">SIM = GERÇEK BAKİYE</button>`}
       <label class="chk real-chk"><input type="checkbox" id="mm-autostart" ${C.autoStart ? "checked" : ""}> ⚠ otomatik başlat <small>(sayfa açılınca OTO kendiliğinden başlar; GERÇEK modda BOT CÜZDANI kilidini açtığın an)</small></label>
-      <div class="plan-foot">SIM = GERÇEK BAKİYE: sanal bakiyeyi BOT CÜZDANI'nın SOL bakiyesine eşler (adres herkese açık RPC ile okunur, kilit açılmaz; okunamazsa 0.212 SOL). SIM; filtreler, pump skoru, çıkışlar, bileşik, işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut ve 2 kayıpta ara dahil GERÇEK ile <b>aynı</b> kuralları uygular. Fark yalnızca dolumların sanal olmasıdır (+ hızlı harekette dolum kesintisi).</div></details>
+      <div class="plan-foot">SIM = GERÇEK BAKİYE: sanal bakiyeyi BOT CÜZDANI'nın SOL bakiyesine eşler (adres herkese açık RPC ile okunur, kilit açılmaz; okunamazsa 0.212 SOL). SIM; filtreler, pump skoru, çıkışlar, bileşik, işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut ve 2 kayıpta ara dahil GERÇEK ile <b>aynı</b> kuralları uygular. Fark yalnızca dolumların sanal olmasıdır (+ hızlı harekette dolum kesintisi). <b>TEST SERBEST</b> açıkken (yalnızca SIM) işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut, 2 kayıpta ara, kopya bekleme süreleri ve SIM onay ekranları uygulanmaz — yalnızca sanal nakit sınırlar; <b>+ BAKİYE EKLE</b> sanal SOL ekler. GERÇEK bu anahtardan hiç etkilenmez.</div></details>
     <div class="plan-foot">SIM: gerçek canlı piyasa verisi (PumpPortal + Solana RPC), gerçekçi dolum (bonding curve, gecikme sonrası fiyat, pump.fun %1.25 + PumpPortal %0.5 + öncelik + ağ ücreti + token hesabı kirası), hiçbir işlem gönderilmez. GERÇEK: BOT CÜZDANI. Sayfa yenilenince OTO <b>kapalı</b> başlar (otomatik başlat açık değilse). Yatırım tavsiyesi değildir.</div></details>`; }
 
 function bind(){ const box = $("#meme-box");
@@ -577,6 +584,8 @@ function bind(){ const box = $("#meme-box");
     C.autoStart = e.target.checked; save(); };
   $("#mm-simreset").onclick = () => simReset();
   for (const id of ["#mm-simreal", "#mm-simreal-b"]){ const b = $(id); if (b) b.onclick = () => simToReal(); }
+  { const a = $("#mm-add"); if (a) a.onclick = () => { try { simAdd($("#mm-addamt").value); NOTIFY.toast("✔ sanal bakiye eklendi", "good"); render(); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } };
+    const l = $("#mm-loose"); if (l) l.onchange = () => { if (isReal()) return; C.simLoose = l.checked; save(); render(); } }
   $("#cp-add").onclick = () => { try { COPY.add($("#cp-addr").value, $("#cp-lab").value); $("#cp-addr").value = ""; $("#cp-lab").value = ""; NOTIFY.toast("Takibe alındı", "good"); paintWallets(); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } };
   $("#cp-disc").onclick = async () => { const b = $("#cp-disc"), el = $("#cp-disc-res"); b.disabled = true; el.innerHTML = `<div class="empty">pump.fun'daki tüm işlemler 12 sn dinleniyor…</div>`;
     try { const r = await COPY.discover(12); el.innerHTML = `<div class="plan-foot">${r.trades} işlem · ${r.wallets} cüzdan. İşlem sayısına göre ilk 10 (çoğu bot olabilir — takip etmeden önce Solscan'de bak):</div>` + r.top.map(u => `<div class="disc"><a href="https://solscan.io/account/${esc(u.addr)}" target="_blank" rel="noopener">${short(u.addr)} ↗</a><span>${u.n} işlem · ${u.buys}A/${u.sells}S · ${u.mints} token · hacim ${fmt(u.vol, 2)} · net <b class="${u.net >= 0 ? "up" : "dn"}">${sg(u.net, 2)}</b></span><button type="button" class="mini" data-trk="${esc(u.addr)}">TAKİP</button></div>`).join("");
@@ -603,7 +612,7 @@ function paint(full){ if (document.hidden) return; if (!$("#mm-eq")) return; con
   paintGoal();
   const arm = $("#mm-arm"); arm.textContent = ST.on ? "■ OTO DURDUR" : "▶ OTO BAŞLAT"; arm.classList.toggle("on", ST.on);
   const J = JOURNAL.list().filter(x => x.venue === "pump.fun" && x.wallet === walletTag() && typeof x.pnl === "number"), w = J.filter(x => x.pnl > 0).length, tp = todayPnl();
-  $("#mm-kpis").innerHTML = `<div><small>BUGÜN</small><b class="${tp >= 0 ? "up" : "dn"}">${sg(tp, 4)}</b></div><div><small>İŞLEM</small><b>${J.length}</b></div><div><small>KAZANMA</small><b>${J.length ? Math.round(w/J.length*100) + "%" : "—"}</b></div><div><small>AÇIK</small><b>${posList().length}/${C.maxPos}</b></div>`;
+  $("#mm-kpis").innerHTML = `<div><small>BUGÜN</small><b class="${tp >= 0 ? "up" : "dn"}">${sg(tp, 4)}</b></div><div><small>İŞLEM</small><b>${J.length}</b></div><div><small>KAZANMA</small><b>${J.length ? Math.round(w/J.length*100) + "%" : "—"}</b></div><div><small>AÇIK</small><b>${posList().length}/${simFree() ? "∞" : C.maxPos}</b></div>`;
   paintPos(); paintAgents(); if (window.AGENTS && (full || Date.now() - (ST.agAt || 0) > 1800)){ ST.agAt = Date.now(); try { AGENTS.paint(); } catch(e){ console.error(e); } } paintLadder(); paintLat(); drawEq(); if (full || Date.now() - lastFull > 5000){ lastFull = Date.now(); paintTL(); paintTape(); paintWallets(); paintScore(); } }
 function scStats(){ const b = [0, 0, 0, 0, 0]; for (const x of ST.scores) b[Math.min(4, Math.floor(x/20))]++; const D = WB.filter(r => r.done && !r.skip && isFinite(r.p5)), avg = k => D.length ? D.reduce((a, r) => a + r[k], 0)/D.length : null;
   return { n: ST.scN, pass: ST.scPass, buckets: b, wb: WB.length, wbDone: D.length, avgHi: avg("pHi"), avg5: avg("p5"), hit40: D.filter(r => r.pHi >= 40).length, flow: FLOW.stat }; }
@@ -741,6 +750,6 @@ if (isReal()){ realBal(true); X().keepWarm(true); }
 if (MIG77 || localStorage.getItem("neon.meme.sim77") === "1") setTimeout(() => mig77Sync().catch(() => {}), 1200);
 if (C.autoStart){ if (!isReal()) setTimeout(() => arm(true).then(ok => ok && NOTIFY.toast("otomatik başlat: OTO açıldı (SIM)", "good")), 1500);
   else { const iv = setInterval(() => { if (ST.on || !C.autoStart || C.mode !== "GERÇEK"){ clearInterval(iv); return; } if (W().unlocked()){ clearInterval(iv); arm(true).then(ok => ok && NOTIFY.ping("bad", "otomatik başlat: GERÇEK OTO açıldı")); } }, 2000); } }
-return { funnel: () => JSON.parse(JSON.stringify(FN)), realWalletSol, simToReal, sizeWhy, sizeExplain, FLOW, scStats, get WB(){ return WB; }, check, exit, xcfg, snap, ctl, get remote(){ return RMT(); }, get on(){ return ST.on; }, get mode(){ return C.mode; }, arm, stop, endPause, kill, manual, context, applySuggestion, gateInfo, render, paint, fab, get C(){ return C; }, setP, _ST: ST, get SIM(){ return SIM; }, get R(){ return R; }, equity, posList, sizeCalc, riskSize, riskCheck, riskOnClose, simFree, fxWin, fxBuy, fxLoss, goalRestart };
+return { funnel: () => JSON.parse(JSON.stringify(FN)), realWalletSol, simToReal, sizeWhy, sizeExplain, FLOW, scStats, get WB(){ return WB; }, check, exit, xcfg, snap, ctl, get remote(){ return RMT(); }, get on(){ return ST.on; }, get mode(){ return C.mode; }, arm, stop, endPause, kill, manual, context, applySuggestion, gateInfo, render, paint, fab, get C(){ return C; }, setP, _ST: ST, get SIM(){ return SIM; }, get R(){ return R; }, equity, posList, sizeCalc, riskSize, riskCheck, riskOnClose, simFree, simAdd, fxWin, fxBuy, fxLoss, goalRestart };
 })();
 window.MEME = MEME;

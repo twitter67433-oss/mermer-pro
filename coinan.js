@@ -120,13 +120,15 @@ const row = (k, v, c) => `<div><span>${k}</span><b class="${c || ""}">${v}</b></
 function paintV(loading){ const el = $("#can-v"); if (!el) return; const A = S.A, bt = $("#can-trade");
   if (S.err){ el.innerHTML = `<div class="err-line">✖ ${esc(S.err)}</div>`; if (bt) bt.disabled = true; return; }
   if (!A){ el.innerHTML = `<div class="empty">${loading ? "analiz ediliyor… (15dk/1s/4s/1G + türev + balina)" : "coin seç → ANALİZ"}</div>`; return; }
-  const V = A.v, P = V.plan, h = A.tf["1h"], cls = V.v === "LONG" ? "up" : V.v === "SHORT" ? "dn" : "y";
-  el.innerHTML = `<div class="can-head"><div><b class="can-sym">${esc(A.sym)}</b> ${window.SGB ? SGB.tag({ perp: A.sym }) : ""} <span>${fp(h ? h.px : NaN)}</span> <small class="${A.chg24 >= 0 ? "up" : "dn"}">${pc(A.chg24)} 24s</small></div>
-    <div class="can-verd ${cls}">${V.v}<small>güven %${V.conf}</small></div></div>
+  const V = A.v, P = V.plan, h = A.tf["1h"];
+  /* v7.26: ONE verdict — the smart-engine badge (same as SİNYAL/ANALİZ). The old "BEKLE güven %84" CAN verdict duplicated it and is gone;
+     its score/factors/plan stay under "detay" as background analysis. */
+  el.innerHTML = `<div class="can-head"><div><b class="can-sym">${esc(A.sym)}</b> <span>${fp(h ? h.px : NaN)}</span> <small class="${A.chg24 >= 0 ? "up" : "dn"}">${pc(A.chg24)} 24s</small></div>
+    <div class="can-one">${window.SGB ? SGB.tag({ perp: A.sym }) : ""}</div></div>
     ${P && P.side ? `<div class="can-plan">${row("giriş bölgesi", fp(P.zone[0]) + " – " + fp(P.zone[1]))}${row("stop", fp(P.stop) + ` <small>(risk %${P.riskPct.toFixed(2)})</small>`, "dn")}${row("TP1", fp(P.tp1) + ` <small>R:R ${P.rr1.toFixed(1)}</small>`, "up")}${row("TP2", fp(P.tp2) + ` <small>R:R ${P.rr2.toFixed(1)}</small>`, "up")}</div>`
       : P ? `<div class="can-plan">${row("LONG için", "1s kapanış > " + fp(P.longAbove))}${row("SHORT için", "1s kapanış < " + fp(P.shortBelow))}${row("destek / direnç", fp(P.sup) + " / " + fp(P.res))}</div>` : ""}
     <div class="can-f">${V.factors.map(f => `<span class="${f.v > 0.15 ? "up" : f.v < -0.15 ? "dn" : "dim"}">${f.v > 0.15 ? "▲" : f.v < -0.15 ? "▼" : "•"} ${esc(f.why)}</span>`).join("")}</div>
-    <div class="dim can-note">skor ${V.score >= 0 ? "+" : ""}${V.score} (−1…+1) · ${loading ? "yenileniyor…" : "güncel"} · analiz, garanti değil</div>`;
+    <div class="dim can-note">arka plan analizi: ${V.v} · güven %${V.conf} · skor ${V.score >= 0 ? "+" : ""}${V.score} (−1…+1) · ${loading ? "yenileniyor…" : "güncel"} · analiz, garanti değil</div>`;
   if (bt) bt.disabled = !(P && P.side); paintD(); const at = $("#can-at"); if (at) at.textContent = new Date(A.at).toLocaleTimeString("tr-TR"); }
 function paintD(){ const el = $("#can-d"), A = S.A; if (!el || !A) return; const D = A.der, W = A.wh;
   const tfr = TFS.map(t => { const x = A.tf[t]; if (!x) return `<tr><td>${LBL[t]}</td><td colspan="5" class="dim">veri az</td></tr>`;
@@ -152,7 +154,13 @@ function draw(){ const el = $("#can-chart"); if (!el || !window.LightweightChart
   S.cs.setData(b.map(x => ({ time: T(x), open: x.o, high: x.h, low: x.l, close: x.c }))); S.e20.setData(sl(e20)); S.e50.setData(sl(e50)); S.vw.setData(S.tf === "1d" ? [] : sl(vw));
   for (const l of S.lines) try { S.cs.removePriceLine(l); } catch(e){} S.lines = [];
   const L = (p, col, t, st, w) => { if (isFinite(p)) S.lines.push(S.cs.createPriceLine({ price: p, color: col, lineWidth: w || 2, lineStyle: st || 0, axisLabelVisible: true, title: t })); };
-  const P = S.A && S.A.sym && S.A.v.plan; if (P){ if (P.side){ L(P.zone[0], "#1e3a5f", "giriş", 2, 1); L(P.zone[1], "#1e3a5f", "giriş", 2, 1); L(P.stop, "#9b1c31", "STOP"); L(P.tp1, "#0f6b45", "TP1"); L(P.tp2, "#0f6b45", "TP2", 0, 1); }
+  /* v7.26: default view = smart-engine plan (only on GİR) + pivot support/resistance + formations; the old CAN plan lines only under "detay" */
+  const det = !window.DETAY || DETAY.on(), Z = window.SCALP && SCALP.S;
+  if (Z && S.A && Z.sym === S.A.sym && Z.dec && /^GİR /.test(Z.dec.word) && Z.A){ L(Z.A.entry, "#1e3a5f", "giriş", 0, 1); L(Z.A.stop, "#9b1c31", "stop"); L(Z.A.tp, "#0f6b45", "hedef"); }
+  if (window.PAT){ const px = b[b.length - 1].c; if (!det) for (const l of PAT.levels(b, px)) L(l.p, l.k === "R" ? "#9a7432" : "#5d6f86", l.k === "R" ? "direnç" : "destek", 3, 1);
+    const seen = new Set(), mk = PAT.candles(b, 40).concat(PAT.chart(b)).filter(m => b[m.i] && !seen.has(m.i) && seen.add(m.i)).map(m => ({ time: T(b[m.i]), position: m.d < 0 ? "aboveBar" : "belowBar", color: m.d > 0 ? "#0f6b45" : m.d < 0 ? "#9b1c31" : "#8a6828", shape: m.d > 0 ? "arrowUp" : m.d < 0 ? "arrowDown" : "circle", text: m.t }));
+    try { S.cs.setMarkers(mk.sort((x, y) => x.time - y.time)); } catch(e){} }
+  const P = det && S.A && S.A.sym && S.A.v.plan; if (P){ if (P.side){ L(P.zone[0], "#1e3a5f", "giriş", 2, 1); L(P.zone[1], "#1e3a5f", "giriş", 2, 1); L(P.stop, "#9b1c31", "STOP"); L(P.tp1, "#0f6b45", "TP1"); L(P.tp2, "#0f6b45", "TP2", 0, 1); }
     else { L(P.longAbove, "#0f6b45", "LONG >", 2, 1); L(P.shortBelow, "#9b1c31", "SHORT <", 2, 1); } L(P.sup, "#364760", "destek", 3, 1); L(P.res, "#364760", "direnç", 3, 1); }
   S.chart.timeScale().fitContent(); }
 /* hand-off to the existing İŞLEM flow: loads the symbol in VADELİ, then fills side/stop/target. The order itself still needs EMRİ HAZIRLA → ONAYLA. */
@@ -164,7 +172,7 @@ async function toTrade(){ const A = S.A, P = A && A.v.plan; if (!P || !P.side){ 
       const set = (id, v) => { const e = $(id); if (e){ e.value = (+v).toFixed(S.dec); e.dispatchEvent(new Event("input", { bubbles: true })); } }; set("#bfx-stop", P.stop); set("#bfx-tgt", P.tp1);
       $("#trade").scrollIntoView({ block: "start" }); window.NOTIFY && NOTIFY.toast(`COIN ANALİZ planı İŞLEM'e aktarıldı (${P.side} · stop ${fp(P.stop)} · TP1 ${fp(P.tp1)}). Emir için EMRİ HAZIRLA → ONAYLA.`, "good"); return true; } }
   window.NOTIFY && NOTIFY.toast("İŞLEM formu yüklenemedi", "bad"); return false; }
-function bind(){ const q = $("#can-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); paintList(""); };
+function bind(){ window.addEventListener("detay:change", () => { try { draw(); } catch(e){} }); const q = $("#can-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); paintList(""); };
   q.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const r = search(q.value)[0]; if (r) pick(r.s); } };
   $("#can-list").onclick = e => { const b = e.target.closest("[data-cs]"); if (b) pick(b.dataset.cs); };
   $("#can-go").onclick = () => { const r = search(q.value)[0]; pick(r ? r.s : q.value.trim().toUpperCase()); };
