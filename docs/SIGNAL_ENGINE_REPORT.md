@@ -45,7 +45,7 @@
 - **Sonuç: iyileşme kanıtlanmadı.** Yanlış sinyal oranı azalmadı, arttı. Ölçülen tek olumlu sonuç sınıf sıralaması (GÜÇLÜ > ORTA > ZAYIF).
 
 ## Sonraki adımlar (öneri)
-- Daha yüksek aralıklar (1h/4h) ve maliyet/risk oranı daha düşük kurulumlar test edilmeli. 15dk'da ortalama maliyet stopun yaklaşık %10'u.
+- ~~1h/4h testi~~ **Yapıldı (v7.51, BACKTEST_REPORT §FAZ 3b):** 1s'te (150 coin, 1 yıl) tüm sınıflar negatif. 4s'te (247 coin, 2.5 yıl) GÜÇLÜ +0.03R, ama rastgele zamanlı aynı yönlü kontrol de aynı kadar kazandı; artı, piyasa yönünden geliyor. Kanıtlanmadı, ana görünüme eklenmedi.
 - Türev verisi (funding / OI) için tarihçe toplanıp bu katman ölçülmeli. Şu an test edilmedi.
 - Daha uzun ve farklı piyasa dönemleri ile delist edilmiş coinler eklenmeli.
 - Herhangi bir iyileşme ancak bu rapordaki aynı karşılaştırma tekrarlanıp ölçülürse iddia edilecek.

@@ -61,4 +61,9 @@ const agg = (b, k) => { const o = []; for (let i = 0; i + k <= b.length; i += k)
   assert.ok(a > 0 && z > a); assert.ok(!/TRADE|AUTO\.|EXEC|JOURNAL|alarm\(|checkAlert|jFrom|H\.save/.test(blk), "SİNYAL 8 panel never orders, journals or alerts");
   assert.ok(/KANITLANMADI/.test(blk) && /kazanma olasılığı DEĞİLDİR/.test(blk), "honest labels");
   const html = fs.readFileSync(path.join(D, "index.html"), "utf8"); assert.ok(html.indexOf("scalp.js") < html.indexOf("sig8.js"), "SCM loaded before SIG8"); }
+/* v7.51: per-interval backtest labels (1h / 4h tested, nothing proven) — label only, panel stays KANITLANMADI */
+{ const S8 = require(path.join(D, "sig8.js")); assert.deepStrictEqual(S8.BT.tested, ["15m", "1h", "4h"]);
+  for (const k of ["1h", "4h"]){ const B = S8.BT.byTf[k]; assert.ok(B && B.span && B.note && B.grades.strong.n > 1000, k + " label present"); }
+  assert.ok(/zamanlama avantajı yok/.test(S8.BT.byTf["4h"].note), "4h small plus is explained as drift, not edge");
+  const sy = fs.readFileSync(path.join(D, "sinyal.js"), "utf8"); assert.ok(/BT0\.byTf\[S\.tf\]/.test(sy) && /BT0\.tested/.test(sy), "panel picks the label of the selected interval"); }
 console.log("sig8.test OK");

@@ -54,6 +54,9 @@ Yöntem: tüm JS için `node --check` (0 sözdizimi hatası), mevcut 23 testin t
 - Teslimden önce eski ve yeni motor aynı geçmiş veride karşılaştırılmalı: sinyal sayısı, kazanma oranı, net beklenti, yanlış sinyal azalması, max DD. **Ölçmeden iyileşme iddia edilmeyecek.**
 - H (kayma), G'nin bu kıyas çerçevesine taşınması ve F (kısmi dolum / derinlik simülasyonu) bu fazda ele alınacak.
 
+### FAZ 3b'de bulunan (v7.51, düzeltilmedi, davranış değişikliği kapsam dışı)
+- **ORTA: `sert.js` `simExit` / `simLong`, iz süren stopta iyimser dolum.** İz stop mum kapanışında güncelleniyor. Fiyat zaten stopun ötesindeyse sonraki mum stopun ötesinde açılır, ama çıkış yine stop fiyatından sayılıyor; gerçekte açılıştan dolar. Bu, canlı SERT defterinin kazanma / ortalama rakamlarını biraz iyi gösterir. 1s geçmiş testte bu hata bir listeyi −0.016R'den +0.091R'ye çıkarıyordu (BACKTEST_REPORT §FAZ 3b). Öneri: dolum için `side < 0 ? max(s, k.o) : min(s, k.o)`.
+
 ### Diğer
 - PUMP OTO ve Phantom yolunda (bot.js) BELİRSİZ defteri.
 - Native Android Keystore köprüsü.

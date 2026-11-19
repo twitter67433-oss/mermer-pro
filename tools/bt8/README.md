@@ -11,3 +11,6 @@ Betikler kutuda `/workspace/r750` altında çalıştırıldı. Yollar mutlak old
 5. `node newscan2.js`: SİNYAL 8'in tüm adayları ve her hedef (1 / 1.5 / 2 / 3R) için sonucu.
 6. `node wf.js`: walk-forward. 4 × 30 gün; her katta parametreler yalnızca önceki katlarda, kapanmış işlemlerle seçilir.
 7. `node table.js`: eski / yeni karşılaştırma tablosu (örneklem dışı 90 gün).
+
+## FAZ 3b (v7.51): 1s / 4s
+Betikler `tools/bt8/tf/` altında. Adımlar için `docs/BACKTEST_REPORT.md` → "Yeniden üretme" bölümüne bakın. `fetch3.js` dışındaki tüm betikler, verinin bulunduğu dizini `/workspace/r750/d1h` ya da `/workspace/r750/d4h` olarak bekler. `TF` ortam değişkenine göre bunlardan birini kullanır.

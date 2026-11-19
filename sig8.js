@@ -142,5 +142,12 @@ function freqOf(st, sym, tf, now, ms = 864e5){ const a = (st && st[sym + "|" + t
 /* measured, not live: docs/BACKTEST_REPORT.md — 40 Binance USDT perps, 15m, out-of-sample 2026-08-21 → 2026-11-19 (90 days), costs above, one open trade per coin+strategy */
 const BT = { span: "15dk · 40 coin · 90 gün örneklem dışı", note: "Geçmiş testte (40 coin, 15dk, 90 gün, ücret+spread+kayma dahil) hiçbir sınıf kârlı çıkmadı; walk-forward ayarında eğitim dönemlerinde kârlı ayar bulunamadı. Eski motordan ölçülebilir şekilde iyi değil.",
   grades: { strong: { n: 13170, win: 0.376, expR: -0.122 }, medium: { n: 8492, win: 0.362, expR: -0.197 }, weak: { n: 7710, win: 0.370, expR: -0.213 } } };
+/* v7.51 (label only): 1h / 4h results from docs/BACKTEST_REPORT.md §FAZ 3b — default thresholds, out-of-sample, real funding, delisted coins included */
+BT.byTf = {
+  "1h": { kind: "varsayılan eşikler, delist dahil", span: "1s · 150 coin (40'ı delist) · 304 gün örneklem dışı", note: "1 saatlik testte (150 coin, 1 yıl, ücret+spread+kayma+gerçek funding) hiçbir sınıf kârlı çıkmadı; walk-forward ayarı da örneklem dışında zararda. Eski motordan ölçülebilir şekilde iyi değil.",
+    grades: { strong: { n: 35677, win: 0.387, expR: -0.030 }, medium: { n: 23341, win: 0.378, expR: -0.068 }, weak: { n: 20753, win: 0.368, expR: -0.100 } } },
+  "4h": { kind: "varsayılan eşikler, delist dahil", span: "4s · 247 coin (53'ü delist) · 730 gün örneklem dışı", note: "4 saatlikte GÜÇLÜ/ORTA küçük artıda (+0.03R) ama 4 dönemin 2'si eksi ve kazanç SHORT tarafından geliyor: aynı coinde rastgele zamanda açılan aynı SHORT da aynı kadar kazandı (alt coin düşüş trendi). Yani zamanlama avantajı yok; ek %0.2 maliyette sıfırlanıyor.",
+    grades: { strong: { n: 36132, win: 0.416, expR: 0.031 }, medium: { n: 25326, win: 0.395, expR: 0.014 }, weak: { n: 23160, win: 0.371, expR: -0.036 } } } };
+BT.tested = ["15m", "1h", "4h"];
 return { BT, COST, costPct, DEF, W0, STRAT, GRADE, dq, prep, regime, triggers, evidence, judge, evalAt, resolve, stats, freqAdd, freqOf, atT };
 });

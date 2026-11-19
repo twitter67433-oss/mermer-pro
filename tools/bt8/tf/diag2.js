@@ -1,0 +1,16 @@
+/* robustness checks for any old/new list that is positive OOS: t-stat, bootstrap CI, coin concentration, delisted vs live, extra-cost sensitivity, by direction of BTC */
+const { S8, OOS0, OOS1, TF, META, fs, load } = require("./lib2.js"); const key = process.argv[2] || "SERT-dvl", file = process.argv[3] || `old_sert_${TF}.json`;
+const D = JSON.parse(fs.readFileSync(file)), del = new Set(META.syms.filter(x => x.st === "SETTLING").map(x => x.s)); let T = [];
+for (const s in D){ let busy = -1; for (const x of D[s].filter(x => x.s === key).sort((a, z) => a.t - z.t)){ if (x.i <= busy) continue; busy = x.j; if (x.t >= OOS0 && x.t < OOS1) T.push(Object.assign({ sym: s }, x)); } }
+const st = S8.stats(T), m = st.expR, sd = Math.sqrt(T.reduce((a, x) => a + (x.R - m)**2, 0)/(T.length - 1)); console.log(key, TF, "n", T.length, "expR", m.toFixed(3), "exp%", st.expP.toFixed(3), "PF", st.pf.toFixed(2), "t", (m/sd*Math.sqrt(T.length)).toFixed(2));
+/* day-clustered bootstrap (signals on the same day are correlated) */
+const byDay = {}; for (const x of T){ const d = Math.floor(x.t/864e5); (byDay[d] = byDay[d] || []).push(x.R); } const days = Object.values(byDay); let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647)/2147483647; const bs = [];
+for (let k = 0; k < 2000; k++){ let s = 0, n = 0; for (let q = 0; q < days.length; q++){ const a = days[Math.floor(rnd()*days.length)]; for (const r of a){ s += r; n++; } } bs.push(s/n); } bs.sort((a, z) => a - z); console.log("day-bootstrap 95% CI expR", bs[50].toFixed(3), bs[1949].toFixed(3), "P(exp≤0)", (bs.filter(x => x <= 0).length/2000).toFixed(3));
+const bySym = {}; for (const x of T) (bySym[x.sym] = bySym[x.sym] || []).push(x); const cs = Object.entries(bySym).map(([s, a]) => [s, a.reduce((q, x) => q + x.R, 0), a.length]).sort((a, z) => z[1] - a[1]);
+console.log("coins", cs.length, "positive coins", cs.filter(x => x[1] > 0).length, "top5", cs.slice(0, 5).map(x => x[0] + ":" + x[1].toFixed(1) + "/" + x[2]).join(" "));
+const top5 = new Set(cs.slice(0, 5).map(x => x[0])), top10 = new Set(cs.slice(0, 10).map(x => x[0])); const f = a => { const s = S8.stats(a); return s.n ? `n=${s.n} expR=${s.expR.toFixed(3)} exp%=${s.expP.toFixed(3)} PF=${s.pf.toFixed(2)} win=${(s.win*100).toFixed(1)}%` : "n=0"; };
+console.log("without top5 coins", f(T.filter(x => !top5.has(x.sym)))); console.log("without top10 coins", f(T.filter(x => !top10.has(x.sym))));
+console.log("delisted coins", f(T.filter(x => del.has(x.sym)))); console.log("live coins", f(T.filter(x => !del.has(x.sym))));
+for (const extra of [0.05, 0.1, 0.2]){ const a = T.map(x => { const rp = x.net/x.R; return Object.assign({}, x, { net: x.net - extra, R: (x.net - extra)/rp }); }); console.log(`extra cost +${extra}% / trade`, f(a)); }
+const btc = load("BTCUSDT", "1d"), bi = new Map(btc.map((x, i) => [x.t, i])); const up = [], dn = []; for (const x of T){ const d0 = Math.floor(x.t/864e5)*864e5, i = bi.get(d0); if (i === undefined || i < 7) continue; (btc[i - 1].c > btc[i - 8].c ? up : dn).push(x); }
+console.log("BTC 7d up before", f(up)); console.log("BTC 7d down before", f(dn)); console.log("exits", JSON.stringify({ SL: T.filter(x => x.r === "SL").length, Tp: T.filter(x => x.r === "T+").length, Tm: T.filter(x => x.r === "T−").length }));
