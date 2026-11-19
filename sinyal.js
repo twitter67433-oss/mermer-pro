@@ -225,7 +225,9 @@ function paintGen(){ const gc = $("#sg-gcard"), bub = $("#sg-bubble"), nw = $("#
   bub.innerHTML = [dec.text].concat(S.sum).slice(0, 4).map((x, k) => k ? esc(x) : `<b>${esc(x)}</b>`).join("<br>"); bub.className = "sg-bubble " + wc;
   const lv = dec.word === "BEKLE" ? `<div class="sg-dline">→ ${dec.trig.length ? dec.trig.map(t => `<span class="${t.d > 0 ? "up" : "dn"}">${esc(t.t)}</span>`).join(" · ") : "net tetik yok"}</div>`
     : `<div class="sg-dline"><span>giriş <b>${fp(A.entry)}</b></span> · <span>stop <b class="dn">${fp(A.stop)}</b></span> · <span>hedef <b class="up">${fp(A.tp)}</b></span> <small class="dim">${esc(A.kind)}</small></div>`;
-  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI? <small class="dim">· ${esc(dec.yon)}${dec.rev ? " · ⚠ DÖNÜŞ UYARISI" : ""}</small></div><div class="sg-dword ${wc}">${dec.word}</div>${lv}${dec.hold && dec.word !== "BEKLE" ? `<div class="dim sg-dnote">tahmini tutma ${esc(dec.hold)} · ücret %0.10 dahil hesap</div>` : ""}${dec.note ? `<div class="dim sg-dnote">${esc(dec.note)}</div>` : ""}`;
+  /* v7.27 squeeze warning: display only — a GİR SHORT is shown as "SHORT GİRME", the decision itself is unchanged */
+  const sq = window.SQZ ? SQZ.get(S.sym) : null, blockS = !!(sq && sq.on && dec.word === "GİR SHORT"), sqH = window.SQZ ? SQZ.html(S.sym) : "";
+  nw.innerHTML = `<div class="sg-nowh">ŞİMDİ NE YAPMALI? <small class="dim">· ${esc(dec.yon)}${dec.rev ? " · ⚠ DÖNÜŞ UYARISI" : ""}</small></div><div class="sg-dword ${blockS ? "y" : wc}">${blockS ? "SHORT GİRME" : dec.word}</div>${blockS ? "" : lv}${sqH}${dec.hold && dec.word !== "BEKLE" ? `<div class="dim sg-dnote">tahmini tutma ${esc(dec.hold)} · ücret %0.10 dahil hesap</div>` : ""}${dec.note ? `<div class="dim sg-dnote">${esc(dec.note)}</div>` : ""}`;
   nw.className = "sg-now sg-dec " + wc;
   const D = S.D; m.className = "masc " + (dec.word === "GİR LONG" ? (D && D.state === "PUMP" ? "st-pump" : "st-long") : dec.word === "GİR SHORT" ? (D && D.state === "DUMP" ? "st-dump" : "st-short") : A.wait === "kırılımı bekle" ? "st-sqz" : "st-wait");
   const sd = $("#sd-gen"); if (sd && sd.closest("details").open) paintGenDet(); }
@@ -472,5 +474,6 @@ function setSel(v){ if (!SEL[v] || v === S.sel) return; const prevMode = S.mode;
   if (prevMode !== S.mode){ S.ovCalcAt = 0; compute(true); ovCalc(true); } else { summarize(); bump(); } }
 const setMode = m => setSel(m === "trend" ? "trend" : "scalp"); /* compatibility */
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sel]"); if (!b) return; e.preventDefault(); setSel(b.dataset.sel); });
+window.addEventListener("sqz:update", e => { if (e.detail && e.detail.sym === S.sym && S.dec) try { paintGen(); } catch(x){} });
 return { setSel, setMode, ensure, start, analyze, list: () => loadList().then(() => S.list), search, fp: x => fp(x), _j: { add: o => jAdd(o), remote: () => jRemote(), trig: b => jTrigCheck(b), WE, weConfig },  checkAlert, testAlert: () => fireAlert(S.A && S.A.act !== "BEKLE" ? S.A.act : "YÖN GÜÇLÜ YUKARI", true), get S(){ return S; } };
 })();

@@ -16,11 +16,12 @@ function open(st, o){ const side = o.side > 0 ? 1 : -1, margin = +o.margin, lev 
   if (tp !== null && (tp - px)*side <= 0) throw new Error(side > 0 ? "LONG hedef fiyatın üstünde olmalı" : "SHORT hedef fiyatın altında olmalı");
   const notional = margin*lev, fee = notional*FEE; if (margin + fee > free(st) + 1e-9) throw new Error(`serbest bakiye yetmiyor (${free(st).toFixed(2)} USDT)`);
   const liq = liqPx(side, px, lev); if (stop !== null && (stop - liq)*side <= 0) throw new Error("stop likidasyon fiyatının ötesinde — kaldıracı düşür");
-  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin, lev, entry: px, qty: notional/px, stop, tp, liq, feeIn: fee, t: o.t || Date.now(), sig: o.sig || null }; st.pos.push(p); return p; }
+  const trail = +o.trail > 0 ? +o.trail : 0, tmax = +o.tmax > 0 ? +o.tmax : 0;
+  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin, lev, entry: px, qty: notional/px, stop, tp, liq, feeIn: fee, t: fin(o.t) ? o.t : Date.now(), sig: o.sig || null, rule: o.rule || null, trail, tmax, best: px }; st.pos.push(p); return p; }
 function close(st, id, px, why, t){ const i = st.pos.findIndex(p => p.id === id); if (i < 0) return null; const p = st.pos[i]; st.pos.splice(i, 1);
   let gross, feeOut; if (why === "likidasyon"){ gross = -p.margin; feeOut = 0; } else { gross = upnl(p, px); feeOut = p.qty*px*FEE; }
   st.bal += gross - feeOut; const net = gross - feeOut - p.feeIn;
-  const r = { id: p.id, sym: p.sym, side: p.side, lev: p.lev, margin: p.margin, entry: p.entry, exit: px, why, net, roe: net/p.margin, fee: feeOut + p.feeIn, t0: p.t, t1: t || Date.now(), sig: p.sig }; st.hist.unshift(r); if (st.hist.length > 300) st.hist.length = 300; return r; }
+  const r = { id: p.id, sym: p.sym, side: p.side, lev: p.lev, margin: p.margin, entry: p.entry, exit: px, why, net, roe: net/p.margin, fee: feeOut + p.feeIn, t0: p.t, t1: t || Date.now(), sig: p.sig, rule: p.rule || null }; st.hist.unshift(r); if (st.hist.length > 300) st.hist.length = 300; return r; }
 /* hi/lo = extremes seen since the last check (default px). Adverse level first (stop or liquidation, whichever is nearer), then target —
    if both are touched inside one check the stop is assumed (conservative). */
 function mark(st, sym, px, t, hi, lo){ hi = fin(hi) ? Math.max(hi, px) : px; lo = fin(lo) ? Math.min(lo, px) : px; const out = [];
@@ -28,16 +29,30 @@ function mark(st, sym, px, t, hi, lo){ hi = fin(hi) ? Math.max(hi, px) : px; lo 
     const stopFirst = p.stop !== null && (p.stop - p.liq)*s > 0;
     if (stopFirst && (adv - p.stop)*s <= 0){ out.push(close(st, p.id, p.stop, "stop", t)); continue; }
     if ((adv - p.liq)*s <= 0){ out.push(close(st, p.id, p.liq, "likidasyon", t)); continue; }
-    if (p.tp !== null && (fav - p.tp)*s >= 0){ out.push(close(st, p.id, p.tp, "hedef", t)); continue; } }
+    if (p.tp !== null && (fav - p.tp)*s >= 0){ out.push(close(st, p.id, p.tp, "hedef", t)); continue; }
+    /* trailing stop (abs distance) follows the best price seen — checked from the next update on, like the backtest */
+    if (p.trail > 0){ p.best = s > 0 ? Math.max(p.best ?? p.entry, fav) : Math.min(p.best ?? p.entry, fav); const ns = p.best - s*p.trail; if (p.stop === null || (ns - p.stop)*s > 0) p.stop = ns; } }
   return out; }
+/* time stop: close positions older than their tmax at the current price */
+function expire(st, prices, t){ const out = []; for (const p of st.pos.slice()){ const px = prices[p.sym]; if (p.tmax > 0 && fin(px) && t - p.t >= p.tmax) out.push(close(st, p.id, px, "süre", t)); } return out; }
 function addBal(st, v){ v = +v; if (!(v > 0) || !fin(v) || v > 1e9) throw new Error("miktar > 0 olmalı"); st.bal += v; st.start += v; return st.bal; }
 function reset(st, v = 1000){ const n = create(v); Object.keys(st).forEach(k => delete st[k]); Object.assign(st, n); return st; }
 /* sinyal doğruluğu: for trades opened while a signal had a direction (GİR or eğilim), did price move that way by the exit? */
-function stats(st){ const H = st.hist, n = H.length, w = H.filter(r => r.net > 0).length, tot = H.reduce((s, r) => s + r.net, 0);
+function stats(st, rule){ const H = rule === undefined ? st.hist : st.hist.filter(r => (r.rule || null) === rule), n = H.length, w = H.filter(r => r.net > 0).length, tot = H.reduce((s, r) => s + r.net, 0);
   const S = H.filter(r => r.sig && r.sig.d), sh = S.filter(r => (r.exit - r.entry)*r.sig.d > 0).length, G = H.filter(r => r.sig && /^GİR/.test(r.sig.word || "")), gw = G.filter(r => r.net > 0).length;
   return { n, wins: w, winRate: n ? w/n : null, total: tot, sigN: S.length, sigAcc: S.length ? sh/S.length : null, girN: G.length, girWin: G.length ? gw/G.length : null }; }
+/* v7.27 SERT SHORT (kanıtlanmadı) — backtest (109 alts, 45 d, fee 0.10 %): ≈ +0.08 %/trade, not significant. Paper only.
+   b: closed 15m bars oldest→newest {o,h,l,c,qv,tb}; last = signal bar. oi1: OI change over the last hour (fraction); fr: last funding rate. */
+const SERT = { vr: 3, sell: 0.55, oi1: 0.01, fr: 0.0005, maxRisk: 0.03, tmax: 60*60000, buf: 0.0005 };
+function atr14(b){ let a = null; for (let i = 0; i < b.length; i++){ const x = b[i], pc = i ? b[i - 1].c : x.c, tr = Math.max(x.h - x.l, Math.abs(x.h - pc), Math.abs(x.l - pc)); a = i < 14 ? (i === 0 ? tr : (a*i + tr)/(i + 1)) : (a*13 + tr)/14; } return a; }
+function sertShort(b, oi1, fr){ const n = b.length; if (n < 101) return { sig: false, why: "veri az" }; const x = b[n - 1];
+  let s = 0; for (let i = n - 97; i < n - 1; i++) s += b[i].qv; const avg = s/96, vr = avg > 0 ? x.qv/avg : 0, sell = x.qv > 0 ? 1 - x.tb/x.qv : 0;
+  const lo4 = Math.min(b[n - 5].l, b[n - 4].l, b[n - 3].l, b[n - 2].l), red = x.c < x.o, brk = x.c < lo4, fuel = (fin(oi1) && oi1 >= SERT.oi1) || (fin(fr) && fr >= SERT.fr);
+  const sig = red && brk && vr >= SERT.vr && sell >= SERT.sell && fuel;
+  return { sig, stop: x.h*(1 + SERT.buf), atr: atr14(b), vr, sell, oi1, fr, lo4, t: x.t,
+    why: `${red && brk ? "kırmızı 15dk < 1s dip" : "kırılım yok"} · hacim ${vr.toFixed(1)}× · satış %${Math.round(sell*100)} · OI 1s ${fin(oi1) ? (oi1*100).toFixed(1) + "%" : "—"} · funding ${fin(fr) ? (fr*100).toFixed(3) + "%" : "—"}` }; }
 function equity(st, prices){ return st.bal + st.pos.reduce((s, p) => s + (fin(prices[p.sym]) ? upnl(p, prices[p.sym]) - p.qty*prices[p.sym]*FEE : 0), 0); }
-return { FEE, MMR, create, open, close, mark, addBal, reset, stats, equity, free, used, liqPx, upnl };
+return { FEE, MMR, SERT, sertShort, atr14, expire, create, open, close, mark, addBal, reset, stats, equity, free, used, liqPx, upnl };
 });
 
 /* ------------------------------ UI (browser only) ------------------------------ */
@@ -52,13 +67,14 @@ const curSym = () => { const v = String(($("#ps-sym") || {}).value || sel || "")
 function sigFor(sym){ const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.dec) return { word: S.dec.word, d: S.G ? Math.sign(S.G.dir || 0) : 0, tf: S.tf, plan: /^GİR/.test(S.dec.word) && S.A ? { stop: S.A.stop, tp: S.A.tp } : null };
   try { const c = window.SGB && SGB._c; if (c) for (const [k, r] of c) if (k.startsWith("p:" + sym + "@") && r && r.word && !r.none) return { word: r.word, d: Math.sign(r.d || 0), tf: k.split("@")[1], plan: null }; } catch(e){} return null; }
 /* live prices: public aggTrade stream for the open + selected symbols; REST fallback every 3 s */
-function syms(){ const s = new Set(st.pos.map(p => p.sym)); const c = curSym(); if (c && document.body.dataset.pg === "fut" && !document.hidden) s.add(c); return [...s].slice(0, 8); }
+function syms(){ const s = new Set(st.pos.map(p => p.sym)); for (const k of SR.sig.keys()) s.add(k); const c = curSym(); if (c && document.body.dataset.pg === "fut" && !document.hidden) s.add(c); return [...s].slice(0, 8); }
 function stream(){ const L = syms(), key = L.join(","); if (key === wsKey && ws && ws.readyState <= 1) return; wsKey = key; try { ws && ws.close(); } catch(e){} ws = null; if (!L.length) return;
   try { const w = new WebSocket("wss://fstream.binance.com/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade").join("/")); ws = w;
     w.onmessage = ev => { try { const d = JSON.parse(ev.data).data; if (!d) return; const s = d.s, p = +d.p; px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); if (p > e.hi) e.hi = p; if (p < e.lo) e.lo = p; } catch(e){} };
     w.onclose = () => { if (ws === w){ ws = null; wsKey = ""; } }; } catch(e){} }
 async function poll(){ for (const s of syms()){ if (ws && ws.readyState === 1 && px[s]) continue; try { const r = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + s); if (r.ok){ const j = await r.json(); const p = +j.price; if (p > 0){ px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); e.hi = Math.max(e.hi, p); e.lo = Math.min(e.lo, p); } } } catch(e){} } }
-function tick(){ let changed = false; for (const s of Object.keys(ext)){ const e = ext[s], p = px[s]; delete ext[s]; if (!(p > 0)) continue; const r = P.mark(st, s, p, Date.now(), e.hi, e.lo);
+function tick(){ let changed = false;
+  for (const x of P.expire(st, px, Date.now())){ changed = true; try { NOTIFY.toast(`SİM: ${x.sym.replace("USDT", "")} süre doldu (60 dk) ${us(x.net)} USDT`, x.net >= 0 ? "good" : "bad"); } catch(e){} } for (const s of Object.keys(ext)){ const e = ext[s], p = px[s]; delete ext[s]; if (!(p > 0)) continue; const r = P.mark(st, s, p, Date.now(), e.hi, e.lo);
     for (const x of r){ changed = true; try { NOTIFY.toast(`SİM: ${x.sym.replace("USDT", "")} ${x.side > 0 ? "LONG" : "SHORT"} kapandı (${x.why}) ${us(x.net)} USDT`, x.net >= 0 ? "good" : "bad"); } catch(e){} } }
   if (changed){ save(); stream(); } if (changed || Date.now() - lastPaint > 900) paint(); }
 function html(){ return `<div class="ps-bal" id="ps-bal"></div>
@@ -68,12 +84,13 @@ function html(){ return `<div class="ps-bal" id="ps-bal"></div>
     <label>stop<input id="ps-stop" inputmode="decimal" placeholder="isteğe bağlı"></label><label>hedef<input id="ps-tp" inputmode="decimal" placeholder="isteğe bağlı"></label></div>
   <div class="ps-btns"><button type="button" id="ps-fill" class="mini">SİNYALDEN DOLDUR</button><button type="button" id="ps-open" class="mini wide ps-go">SANAL AÇ</button></div>
   <div class="ps-info dim" id="ps-info"></div>
+  <div class="sub-h">SERT SHORT <small>kanıtlanmadı · yalnızca sanal</small></div><div class="ps-sert" id="ps-sert"></div>
   <div class="sub-h">AÇIK POZİSYONLAR</div><div id="ps-pos" class="ps-pos"></div>
   <div class="ps-sum" id="ps-sum"></div>
   <details class="keys ps-h"><summary>📜 Geçmiş</summary><div id="ps-hist"></div></details>
   <div class="ps-tools"><input id="ps-add" inputmode="decimal" value="1000" aria-label="eklenecek sanal USDT"><button type="button" id="ps-addb" class="mini">+ BAKİYE</button><button type="button" id="ps-reset" class="mini">SIFIRLA</button></div>
   <div class="plan-foot">Kağıt işlem: <b>gerçek emir yok</b>, API anahtarı yok — yalnızca Binance'in herkese açık canlı fiyatı okunur. Ücret işlem başı %${(P.FEE*100).toFixed(2)} (giriş + çıkış), likidasyon tahmini (bakım %${(P.MMR*100).toFixed(1)}); stop/hedef son işlem fiyatıyla kontrol edilir. Sonuçlar gerçek işlemde kayma/fonlama yüzünden farklı olur.</div>`; }
-function paint(){ const box = $("#psim-box"); if (!box || !box.firstChild) return; lastPaint = Date.now(); const sym = curSym(), p = px[sym];
+function paint(){ const box = $("#psim-box"); if (!box || !box.firstChild) return; lastPaint = Date.now(); if (st.hist.length !== paint.h){ paint.h = st.hist.length; paintSert(); } const sym = curSym(), p = px[sym];
   const eq = P.equity(st, px), upl = st.pos.reduce((s, q) => s + (px[q.sym] ? P.upnl(q, px[q.sym]) : 0), 0);
   $("#ps-bal").innerHTML = `<div><small>bakiye</small><b>${st.bal.toFixed(2)}</b></div><div><small>serbest</small><b>${P.free(st).toFixed(2)}</b></div><div><small>açık K/Z</small><b class="${upl >= 0 ? "up" : "dn"}">${us(upl)}</b></div><div><small>özsermaye</small><b>${eq.toFixed(2)}</b></div>`;
   $("#ps-px").textContent = p ? fp(p) : "—";
@@ -82,7 +99,31 @@ function paint(){ const box = $("#psim-box"); if (!box || !box.firstChild) retur
       <div class="ps-u ${u >= 0 ? "up" : "dn"}">${us(u)} <small>(%${(u/q.margin*100).toFixed(1)})</small></div><div class="ps-l dim">stop ${q.stop !== null ? fp(q.stop) : "—"} · hedef ${q.tp !== null ? fp(q.tp) : "—"} · liq ${fp(q.liq)}</div><button type="button" class="mini" data-psc="${q.id}">KAPAT</button></div>`; }).join("") : `<div class="empty">açık sanal pozisyon yok</div>`;
   const S = P.stats(st), pc = x => x === null ? "—" : "%" + Math.round(x*100);
   $("#ps-sum").innerHTML = `<span>${S.n} işlem</span><span>kazanma <b>${pc(S.winRate)}</b></span><span>toplam <b class="${S.total >= 0 ? "up" : "dn"}">${us(S.total)}</b></span><span>sinyal doğruluğu <b>${pc(S.sigAcc)}</b> <small>(${S.sigN})</small></span>`;
-  const hb = $("#ps-hist"); if (hb && hb.closest("details").open) hb.innerHTML = st.hist.length ? st.hist.slice(0, 40).map(r => `<div class="ps-hr"><span>${new Date(r.t1).toLocaleString("tr-TR", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><b>${esc(r.sym.replace("USDT", ""))} ${r.side > 0 ? "L" : "S"} ${r.lev}x</b><span>${fp(r.entry)}→${fp(r.exit)}</span><span>${esc(r.why)}</span><b class="${r.net >= 0 ? "up" : "dn"}">${us(r.net)}</b><small>${r.sig ? esc(r.sig.word) : "—"}</small></div>`).join("") : `<div class="empty">henüz işlem yok</div>`; }
+  const hb = $("#ps-hist"); if (hb && hb.closest("details").open) hb.innerHTML = st.hist.length ? st.hist.slice(0, 40).map(r => `<div class="ps-hr"><span>${new Date(r.t1).toLocaleString("tr-TR", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><b>${esc(r.sym.replace("USDT", ""))} ${r.side > 0 ? "L" : "S"} ${r.lev}x</b><span>${fp(r.entry)}→${fp(r.exit)}</span><span>${esc(r.why)}</span><b class="${r.net >= 0 ? "up" : "dn"}">${us(r.net)}</b><small>${r.rule === "sert" ? "SERT SHORT" : r.sig ? esc(r.sig.word) : "—"}</small></div>`).join("") : `<div class="empty">henüz işlem yok</div>`; }
+/* ---- SERT SHORT scanner: selected coin + SİNYAL watchlist, once per closed 15m candle ---- */
+const SR = { sig: new Map(), scanned: 0, slot: 0, busy: false, n: 0 };
+const fj = async u => { const r = await fetch("https://fapi.binance.com" + u); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); };
+function sertList(){ const s = new Set(); const c = curSym(); if (c) s.add(c); try { const W = window.SCALP && SCALP._j && SCALP._j.WE; if (W) for (const x of W.W.list) s.add(x); } catch(e){} return [...s].slice(0, 12); }
+async function sertScan(force){ const slot = Math.floor(Date.now()/900000); if (SR.busy || (!force && slot === SR.slot)) return; SR.busy = true; SR.slot = slot; const L = sertList(); SR.n = L.length;
+  for (const s of L){ try {
+      const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=120`); const b = k.filter(x => +x[6] < Date.now()).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
+      const last = b[b.length - 1], closeT = last.t + 900000;
+      const [oh, on, fr] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
+      const ago = (oh || []).filter(x => +x.timestamp <= closeT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN, oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN;
+      const r = P.sertShort(b, oi1, fr && fr[0] ? +fr[0].fundingRate : NaN); r.sym = s; r.until = closeT + 900000;
+      if (r.sig) SR.sig.set(s, r); else SR.sig.delete(s);
+    } catch(e){} await new Promise(r => setTimeout(r, 250)); }
+  SR.scanned = Date.now(); SR.busy = false; paintSert(); }
+function paintSert(){ const el = $("#ps-sert"); if (!el) return; const now = Date.now(); for (const [s, r] of SR.sig) if (now > r.until) SR.sig.delete(s);
+  const S = P.stats(st, "sert"), pc = x => x === null ? "—" : "%" + Math.round(x*100);
+  const rows = [...SR.sig.values()].map(r => { const p = px[r.sym], risk = p ? (r.stop - p)/p : NaN; const ok = p && risk > 0 && risk <= P.SERT.maxRisk;
+    return `<div class="ps-sr"><span><b class="dn">${esc(r.sym.replace("USDT", ""))}</b> stop ${fp(r.stop)}${isFinite(risk) ? ` (%${(risk*100).toFixed(1)})` : ""} · iz ${fp(r.atr)} · 60 dk</span>${ok ? `<button type="button" class="mini" data-sert="${esc(r.sym)}">SİMDE AÇ</button>` : `<small class="dim">${p ? "stop >%3 / geçti" : "fiyat bekleniyor"}</small>`}</div>`; }).join("");
+  el.innerHTML = (rows || `<div class="dim">tetik yok · ${SR.n} coin · ${SR.scanned ? new Date(SR.scanned).toLocaleTimeString("tr-TR", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }) : "taranıyor…"}</div>`)
+    + `<div class="dim">kural geçmişi: ${S.n} işlem · kazanma ${pc(S.winRate)} · net ${us(S.total)} USDT</div>`; }
+function sertOpen(sym){ const r = SR.sig.get(sym), p = px[sym]; if (!r){ NOTIFY.toast("tetik süresi doldu", "bad"); return; }
+  try { const risk = (r.stop - p)/p; if (!(p > 0) || !(risk > 0) || risk > P.SERT.maxRisk) throw new Error("stop %3'ten uzak ya da fiyat stopu geçti — atlandı");
+    const q = P.open(st, { sym, side: -1, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: "sert", sig: { word: "SERT SHORT", d: -1, tf: "15m" } });
+    ext[sym] = { hi: p, lo: p }; SR.sig.delete(sym); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 function setSide(s){ side = s; document.querySelectorAll("[data-ps]").forEach(b => b.classList.toggle("on", +b.dataset.ps === s)); paint(); }
 function fill(){ const sym = curSym(); if (!sym) return; const g = sigFor(sym); if (!g){ NOTIFY.toast("Bu coin için sinyal yok — önce ANALİZ/SİNYAL'de aç", "bad"); return; }
   if (g.d) setSide(g.d); const P2 = g.plan; $("#ps-stop").value = P2 && P2.stop ? +P2.stop : ""; $("#ps-tp").value = P2 && P2.tp ? +P2.tp : "";
@@ -99,7 +140,9 @@ function init(){ const box = $("#psim-box"); if (!box || box.dataset.on) return;
   box.querySelector(".ps-h").ontoggle = () => paint();
   $("#ps-addb").onclick = () => { try { P.addBal(st, $("#ps-add").value.replace(",", ".")); save(); paint(); NOTIFY.toast("✔ sanal bakiye eklendi", "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } };
   $("#ps-reset").onclick = async () => { const ok = window.CONN && CONN.typedConfirm ? await CONN.typedConfirm("SİMÜLATÖRÜ SIFIRLA", "Sanal bakiye <b>1000 USDT</b> olur; açık sanal pozisyonlar ve geçmiş silinir. Gerçek hesap etkilenmez.", "SIFIRLA") : confirm("Simülatör sıfırlansın mı?"); if (!ok) return; P.reset(st, 1000); save(); stream(); paint(); };
+  $("#ps-sert").onclick = e => { const b = e.target.closest("[data-sert]"); if (b) sertOpen(b.dataset.sert); };
+  setInterval(() => { if (document.body.dataset.pg === "fut" && !document.hidden) sertScan(false); paintSert(); }, 20000); setTimeout(() => sertScan(true), 3000);
   stream(); poll(); paint(); setInterval(tick, 500); setInterval(stream, 2000); pollT = setInterval(poll, 3000); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { get st(){ return st; }, px, sigFor, paint, _save: save };
+return { get st(){ return st; }, px, sigFor, paint, _save: save, SR, sertScan, sertOpen, paintSert };
 })();

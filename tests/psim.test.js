@@ -32,4 +32,23 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
 { const src = fs.readFileSync(path.join(__dirname, "..", "psim.js"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   ok("paper only: no order / account endpoints, no API key, no signing", !/fapi\/v1\/(order|batchOrders|leverage|marginType|account|positionRisk)|X-MBX-APIKEY|signature|HMAC|apiKey/i.test(src));
   ok("only public price reads (aggTrade stream + ticker/price)", /@aggTrade/.test(src) && /fapi\/v1\/ticker\/price/.test(src)); }
+{ /* v7.27 SERT SHORT rule */
+  const mk = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+  const base = mk(104, i => ({ t: i*9e5, o: 100, h: 100.5, l: 99.5, c: 100, qv: 1000, tb: 500 }));
+  const sig = base.concat([{ t: 104*9e5, o: 100, h: 100.2, l: 98, c: 98.5, qv: 3500, tb: 1400 }]);
+  let r = P.sertShort(sig, 0.012, 0.0001); ok("SERT: red 15m close below 1h low, vol 3.5×, sell 60 %, OI +1.2 % → signal", r.sig && near(r.stop, 100.2*1.0005) && r.vr > 3.4, r.why);
+  ok("SERT: same bar with funding ≥ 0.05 % and flat OI → signal", P.sertShort(sig, 0, 0.0006).sig);
+  ok("SERT: no fuel (OI +0.5 %, funding 0.01 %) → no signal", !P.sertShort(sig, 0.005, 0.0001).sig);
+  const lowVol = base.concat([{ ...sig[104], qv: 2500, tb: 1000 }]); ok("SERT: volume 2.5× → no signal", !P.sertShort(lowVol, 0.02, 0).sig);
+  const buyers = base.concat([{ ...sig[104], tb: 2000 }]); ok("SERT: taker sell < 55 % → no signal", !P.sertShort(buyers, 0.02, 0).sig);
+  const noBrk = base.concat([{ ...sig[104], l: 99.6, c: 99.6 }]); ok("SERT: close above the 1h low → no signal", !P.sertShort(noBrk, 0.02, 0).sig);
+  ok("SERT: < 101 bars → no signal", !P.sertShort(sig.slice(-50), 0.02, 0.001).sig);
+  const st = P.create(1000), p = P.open(st, { sym: "X", side: -1, margin: 100, lev: 10, px: 100, stop: 101, trail: 0.5, tmax: 3600000, rule: "sert", t: 0 });
+  P.mark(st, "X", 99, 1000, 99.2, 98.8); ok("trailing: stop follows the low (98.8 + 0.5 = 99.3)", near(p.stop, 99.3), p.stop);
+  const c = P.mark(st, "X", 99.4, 2000, 99.4, 99.0); ok("trailing stop hit → closed at 99.3 in profit", c.length === 1 && c[0].why === "stop" && c[0].exit === 99.3 && c[0].net > 0 && c[0].rule === "sert");
+  const p2 = P.open(st, { sym: "Y", side: -1, margin: 100, lev: 10, px: 50, stop: 51, trail: 0.3, tmax: 3600000, rule: "sert", t: 0 });
+  ok("time stop: nothing before 60 min", P.expire(st, { Y: 49.9 }, 3599999).length === 0);
+  const e = P.expire(st, { Y: 49.9 }, 3600000); ok("time stop: closed at 60 min at the live price", e.length === 1 && e[0].why === "süre" && e[0].exit === 49.9);
+  const q = P.open(st, { sym: "Z", side: 1, margin: 10, lev: 1, px: 10 }); P.close(st, q.id, 9, "elle");
+  const S = P.stats(st, "sert"), A = P.stats(st); ok("rule stats only count SERT trades", S.n === 2 && A.n === 3 && S.wins === 2, JSON.stringify(S)); }
 console.log(f ? `${f} FAILED` : "ALL PASS"); process.exit(f ? 1 : 0);

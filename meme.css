@@ -476,3 +476,6 @@ body.simple .sgb{padding:1px 8px}body.simple .sgb b{font-size:10px}
 .ps-tools{display:flex;gap:8px;align-items:center;margin:8px 0}.ps-tools input{width:90px}
 .ps-p .up,.ps-sum .up,.ps-bal .up,.ps-hr .up{color:#0f6b45}.ps-p .dn,.ps-sum .dn,.ps-bal .dn,.ps-hr .dn{color:#9b1c31}
 body.simple #psim .plan-foot,body.simple #psim>h3 small{display:none}
+/* v7.27 squeeze warning: one line */
+.sqz-line{margin:4px 0 6px;padding:5px 9px;border-radius:8px;border:1px solid #9b1c31;background:rgba(155,28,49,.07);color:#9b1c31;font:700 12px/1.35 var(--sans,Inter,sans-serif)}
+.ps-sert{margin:6px 0 8px;font-size:12.5px}.ps-sert .ps-sr{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #e2d6c2}.ps-sert .ps-sr span{flex:1}
