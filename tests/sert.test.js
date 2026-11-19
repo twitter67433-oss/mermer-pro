@@ -73,13 +73,13 @@ ok(X.kind({ symbol: "XAUUSDT", baseAsset: "XAU", underlyingType: "COMMODITY", un
   && X.kind({ symbol: "SOLUSDT", baseAsset: "SOL", underlyingType: "COIN", underlyingSubType: ["Layer-1", "Crypto"] }) === "", "kind: ALTIN / EMTİA / HİSSE tags, crypto untagged");
 ok(X.top([{ symbol: "XAUUSDT", quoteVolume: "9e9", closeTime: now }, { symbol: "TSLAUSDT", quoteVolume: "8e9", closeTime: now }], 50, now).length === 2, "top: gold/stock contracts are kept");
 // v7.29 full universe scan
-{ const ei = { symbols: [{ symbol: "BTCUSDT", contractType: "PERPETUAL", status: "TRADING" }, { symbol: "XAUUSDT", contractType: "PERPETUAL", status: "TRADING" }, { symbol: "TSLAUSDT", contractType: "PERPETUAL", status: "TRADING" },
+{ const ei = { symbols: [{ symbol: "BTCUSDT", contractType: "PERPETUAL", status: "TRADING" }, { symbol: "XAUUSDT", contractType: "PERPETUAL", status: "TRADING" }, { symbol: "TSLAUSDT", contractType: "TRADIFI_PERPETUAL", status: "TRADING" },
     { symbol: "BTCUSDT_261225", contractType: "CURRENT_QUARTER", status: "TRADING" }, { symbol: "OLDUSDT", contractType: "PERPETUAL", status: "SETTLING" }, { symbol: "ETHUSDC", contractType: "PERPETUAL", status: "TRADING" }] };
   const U = X.universe(ei); ok(JSON.stringify(U) === JSON.stringify(["BTCUSDT", "XAUUSDT", "TSLAUSDT", "ETHUSDC"]), "universe: every TRADING perpetual (crypto, gold, stocks), no quarterlies/settling");
   const O = X.order(U, ["TSLAUSDT", "NEWUSDT"], { BTCUSDT: 9, XAUUSDT: 20, ETHUSDC: 1 }); ok(JSON.stringify(O) === JSON.stringify(["TSLAUSDT", "NEWUSDT", "XAUUSDT", "BTCUSDT", "ETHUSDC"]), "order: priority first, then 24h volume, no duplicates"); }
 { const old = Array.from({ length: 110 }, (_, i) => ({ t: i*900000, c: i })), nb = [{ t: 109*900000, c: -1 }, { t: 110*900000, c: 110 }, { t: 111*900000, c: 111 }], M = X.merge(old, nb);
   ok(M.length === 110 && M[M.length - 1].t === 111*900000 && M[M.length - 3].c === -1 && M[0].t === 2*900000, "merge: incremental bars, newest wins, capped at 110"); }
 { const src = require("fs").readFileSync(__dirname + "/../sert.js", "utf8"), w = +(src.match(/work\(\), work\(\), work\(\), work\(\), work\(\)/) ? 5 : 0), gap = +(src.match(/await sleep\((\d+)\); \} \};/) || [])[1];
-  const perSec = w*1000/(gap + 150), pass = 570/perSec, wFirst = 570*2/(pass/60); ok(w === 5 && pass < 300 && wFirst < 1400, `rate budget: ${perSec.toFixed(1)} req/s, full pass ≈ ${Math.round(pass)} s, first pass ≈ ${Math.round(wFirst)} weight/min (limit 2400)`); }
+  const perSec = w*1000/(gap + 150), pass = 820/perSec, wFirst = 820*2/(pass/60); ok(w === 5 && pass < 300 && wFirst < 1400, `rate budget: ${perSec.toFixed(1)} req/s, full pass ≈ ${Math.round(pass)} s, first pass ≈ ${Math.round(wFirst)} weight/min (limit 2400)`); }
 { const fs = require("fs"), src = fs.readFileSync(__dirname + "/../sert.js", "utf8"); ok(!/fapi\/v1\/order|batchOrders|X-MBX-APIKEY|signature|MEME\.|sapi\//.test(src), "signal only: no order endpoints, keys or MEME calls"); }
 console.log(fails ? `${fails} FAIL` : "ALL PASS"); process.exit(fails ? 1 : 0);

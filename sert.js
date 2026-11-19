@@ -45,7 +45,7 @@ function csv(J){ const q = v => /[;"\n]/.test(String(v)) ? '"' + String(v).repla
 function kind(s){ if (!s) return ""; const b = String(s.baseAsset || s.symbol || "").replace(/USDT$/, ""), u = String(s.underlyingType || ""), sub = (s.underlyingSubType || []).join(",");
   if (/^(XAU|PAXG|XAUT)$/.test(b)) return "ALTIN"; if (u === "COMMODITY") return "EMTİA"; if (/EQUITY|PREMARKET/.test(u) || (/TradFi/.test(sub) && u !== "COIN")) return "HİSSE"; return ""; }
 /* v7.29 full universe: every USD-M PERPETUAL contract with status TRADING (crypto, gold, stocks …) */
-const universe = ei => ((ei && ei.symbols) || []).filter(s => s.contractType === "PERPETUAL" && s.status === "TRADING").map(s => s.symbol);
+const universe = ei => ((ei && ei.symbols) || []).filter(s => (s.contractType === "PERPETUAL" || s.contractType === "TRADIFI_PERPETUAL") && s.status === "TRADING").map(s => s.symbol); /* gold/stocks are TRADIFI_PERPETUAL */
 /* scan order: priority (selected/watchlist) first, then by 24h quote volume, then the rest */
 function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of pri || []) if (x && !seen.has(x)){ seen.add(x); out.push(x); }
   for (const x of (U || []).slice().sort((a, b) => ((vol && vol[b]) || 0) - ((vol && vol[a]) || 0))) if (!seen.has(x)){ seen.add(x); out.push(x); } return out; }
