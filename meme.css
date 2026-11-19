@@ -542,3 +542,8 @@ section.sec-off > div{opacity:.55}
 .agg-det{font-size:10.5px;line-height:1.35}
 body.simple .agg-det{display:none}
 .agg-live{font-size:12px;margin-top:6px;padding-top:6px;border-top:1px dashed #d9cbb3}
+/* v7.33.2 open sim positions inside SHORT / LONG */
+.hx-posb{margin-top:8px}
+.hx-note{font-size:12px;font-weight:600;margin:4px 0}
+.hx-pos{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;padding:5px 0;border-top:1px solid #e3d8c4}
+.hx-pos .mini{margin-left:auto}

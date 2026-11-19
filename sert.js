@@ -133,7 +133,7 @@ function list(){ const s = new Set(); try { const S = window.SCALP && SCALP.S; i
 function livePx(sym){ try { const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.D && S.D.px > 0) return S.D.px; } catch(e){} try { const p = window.PSIMUI && PSIMUI.px[sym]; if (p > 0) return p; } catch(e){} return NaN; }
 const sqOn = sym => { const q = window.SQZ && SQZ.peek(sym); return !!(q && q.on); };
 /* live trigger of list k: until the next 15m close, while price has not crossed the stop and DEFTER has not closed it */
-function act(k, sym){ const M = R.L[k], r = M && M.get(sym); if (!r) return null; if (Date.now() > r.until){ M.delete(sym); return null; } const p = livePx(sym); if (p > 0 && (p - r.stop)*r.side >= 0) return null;
+function act(k, sym){ const M = R.L[k], r = M && M.get(sym); if (!r) return null; if (Date.now() > r.until){ M.delete(sym); return null; } const p = livePx(sym); if (p > 0 && (p - r.stop)*r.side <= 0) return null; /* price crossed the stop (SHORT: p ≥ SL, LONG: p ≤ SL) */
   const j = J.find(x => x.k === k && x.sym === sym && x.t === r.close); if (j && j.res) return null; return r; }
 const active = sym => act("sert", sym);
 const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</b></span> · <span>önerilen SL <b class="dn">${fp(r.stop)}</b></span> · <span>çıkış 1×ATR iz / 60dk · stopsuz: TP2 / 60dk</span> <small class="sert-tag">${esc((X.LK[r.k || "sert"] || X.LK.sert).name)} · kanıtlanmadı</small></div>`;
@@ -237,15 +237,22 @@ function paintJ(tab){ const el = $(`#hx-j-${tab}`); if (!el) return; const lk = 
     ${rows ? `<div class="sert-tw"><table class="sert-t"><tr><th>zaman</th><th>coin</th><th>giriş</th><th>önerilen SL</th><th>sonuç (${MODE})</th><th>çıkış</th><th>net</th><th>MAE</th><th>TERSİ (${wr})</th></tr>${rows}</table></div>` : `<div class="dim">henüz kayıt yok</div>`}
     <div class="sert-btns"><button type="button" class="mini" data-hxcsv="${lk}"${JJ.length ? "" : " disabled"}>CSV dışa aktar</button><button type="button" class="mini" data-hxclr="${lk}"${JJ.length ? "" : " disabled"}>temizle</button></div>`; }
 function navMarks(){ for (const tab of ["short", "long"]){ const b = document.querySelector(`#nav button[data-go="${tab}"]`); if (b) b.classList.toggle("sec-off", !TABS[tab].some(l => ON[l.k] !== false)); } }
-function paint(){ paintLists(); const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); paintJ("short"); paintJ("long"); navMarks(); }
+function paint(){ paintLists(); paintPos(); const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); paintJ("short"); paintJ("long"); navMarks(); }
 const paintList = paintLists;
 async function exportCsv(k){ const txt = "\ufeff" + X.csv(JL(k)), name = `mermer-${k}-defter-${X.berlin(Date.now()).slice(0, 10)}.csv`;
   try { const f = new File([txt], name, { type: "text/csv" }); if (navigator.canShare && navigator.canShare({ files: [f] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)){ await navigator.share({ files: [f], title: name }); return; } } catch(e){ if (e && e.name === "AbortError") return; }
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   try { window.NOTIFY && NOTIFY.toast("✔ CSV: " + name, "good"); } catch(e){} }
 function clearJ(k){ const n = JL(k).length; if (!confirm(`${X.LK[k].name} DEFTERİ TEMİZLENSİN Mİ?\n${n} kayıt silinir (CSV ile önce dışa aktarabilirsin). Diğer listeler, simülatör ve gerçek hesap etkilenmez.`)) return; J = J.filter(j => (j.k || "sert") !== k); jSave(); paint(); }
-async function simOpen(k, sym){ try { const r = act(k, sym); if (!r) throw new Error("tetik süresi doldu"); if (!window.PSIMUI) throw new Error("simülatör yok");
-    if (!(PSIMUI.px[sym] > 0)){ const t = await fj(`/fapi/v1/ticker/price?symbol=${sym}`); PSIMUI.px[sym] = +t.price; } if (k === "sert") PSIMUI.sertOpen(sym); else PSIMUI.ruleOpen(r); paintLists(); } catch(e){ try { NOTIFY.toast("✖ " + e.message, "bad"); } catch(x){} } }
+/* v7.33.2: SİMDE AÇ stays on this tab (no tab switch, no scroll): inline confirmation + AÇIK SANAL POZİSYONLAR block below. Paper only. */
+const NOTE = { short: "", long: "" };
+async function simOpen(k, sym){ const tab = X.LK[k].tab, y = window.scrollY; try { const r = act(k, sym); if (!r) throw new Error("tetik süresi doldu"); if (!window.PSIMUI) throw new Error("simülatör yok");
+    if (!(PSIMUI.px[sym] > 0)){ const t = await fj(`/fapi/v1/ticker/price?symbol=${sym}`); PSIMUI.px[sym] = +t.price; } const q = k === "sert" ? PSIMUI.sertOpen(sym) : PSIMUI.ruleOpen(r);
+    NOTE[tab] = q ? `✔ SİM açıldı: ${sym.replace("USDT", "")} ${W(q.side)} ${q.lev}x @ ${fp(q.entry)} (sanal, gerçek emir yok)` : ""; } catch(e){ NOTE[tab] = "✖ " + e.message; }
+  clearTimeout(NOTE["t" + tab]); NOTE["t" + tab] = setTimeout(() => { NOTE[tab] = ""; paintPos(); }, 8000); paintLists(); paintPos(); requestAnimationFrame(() => { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); }); }
+function paintPos(){ const P = window.PSIM, U = window.PSIMUI; for (const tab of ["short", "long"]){ const el = $(`#hx-pos-${tab}`); if (!el) continue; const L = U ? U.st.pos : [];
+    el.innerHTML = (NOTE[tab] ? `<div class="hx-note ${NOTE[tab][0] === "✔" ? "up" : "dn"}">${esc(NOTE[tab])}</div>` : "") + (L.length ? `<div class="sert-h">AÇIK SANAL POZİSYONLAR <small class="dim">${L.length} · VADELİ simülatörü ile aynı · gerçek emir yok</small></div>` + L.map(q => { const c = U.px[q.sym], u = c && P ? P.upnl(q, c) : NaN, roe = isFinite(u) ? u/q.margin : NaN, nm = q.rule && X.LK[q.rule] ? X.LK[q.rule].name : q.rule === "sert" ? "SHORT" : (q.sig && q.sig.word) || "elle";
+      return `<div class="hx-pos ${q.side > 0 ? "up" : "dn"}"><b>${esc(q.sym.replace("USDT", ""))} ${W(q.side)} ${q.lev}x</b> <small class="dim">${esc(nm)}</small><span>giriş ${fp(q.entry)} → ${c ? fp(c) : "—"} · <b class="${u >= 0 ? "up" : "dn"}">${isFinite(u) ? (u >= 0 ? "+" : "−") + Math.abs(u).toFixed(2) + " USDT (" + pct(roe, 1) + ")" : "—"}</b></span><span class="dim">SL ${q.stop ? fp(q.stop) : "—"} · TP ${q.tp ? fp(q.tp) : "—"}${q.trail ? " · iz " + fp(q.trail) : ""}</span><button type="button" class="mini" data-hxpc="${q.id}">kapat</button></div>`; }).join("") : ""); } }
 function setOn(k, v){ ON[k] = v; try { localStorage.setItem(OK, JSON.stringify(ON)); } catch(e){} if (!v) R.L[k].clear();
   if (window.SEC){ const want = anyOn(); if (SEC.on("short") !== want) SEC.set("short", want); } /* scanner (and its sockets/timers) stop only when every list is PASİF */
   else if (v) scan(true); paint(); try { window.NOTIFY && NOTIFY.toast(`${X.LK[k].name} ${v ? "AKTİF" : "PASİF"}`, v ? "good" : "info"); } catch(e){} }
@@ -256,6 +263,7 @@ function onClick(e){ const t = e.target;
   const g = t.closest("[data-hxgo]"); if (g){ const [k, y] = g.dataset.hxgo.split("|"), tab = X.LK[k].tab; SEL[tab] = { k, sym: y }; paintLists(); paintDet(tab); const d = $(`#hx-det-${tab}`); d && d.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
   const jl = t.closest("[data-hxj]"); if (jl){ const [tab, k] = jl.dataset.hxj.split("|"); JSEL[tab] = k; paintJ(tab); return; }
   const m = t.closest("[data-smode]"); if (m){ MODE = m.dataset.smode; try { localStorage.setItem(MK, MODE); } catch(x){} paintJ("short"); paintJ("long"); return; }
+  const pc = t.closest("[data-hxpc]"); if (pc){ e.stopPropagation(); if (window.PSIMUI) PSIMUI.closePos(pc.dataset.hxpc); paintPos(); return; }
   const c = t.closest("[data-hxcsv]"); if (c){ exportCsv(c.dataset.hxcsv); return; } const z = t.closest("[data-hxclr]"); if (z){ clearJ(z.dataset.hxclr); return; } }
 function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el) el.addEventListener("click", onClick); }
   paint(); liqOpen(); if (window.SEC && SEC.on("short") !== anyOn()) SEC.set("short", anyOn());
@@ -263,7 +271,7 @@ function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el
   setInterval(() => { if (Math.floor(Date.now()/900000) !== R.slot && Date.now() % 900000 > 4000) scan(false); else paintLists(); }, 10000); setInterval(resolve, 60000);
   setInterval(() => { const pg = document.body.dataset.pg; if ((pg === "short" || pg === "long") && !document.hidden && SEL[pg]) paintDet(pg); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) resolve(); });
-  window.addEventListener("sqz:update", () => paintLists());
+  window.addEventListener("sqz:update", () => paintLists()); window.addEventListener("psim:change", () => paintPos()); setInterval(() => { const pg = document.body.dataset.pg; if ((pg === "short" || pg === "long") && !document.hidden && window.PSIMUI && PSIMUI.st.pos.length) paintPos(); }, 3000);
   window.addEventListener("sec:change", e => { if (e.detail && e.detail.sec === "short"){ if (e.detail.on){ liqOpen(); resolve(); scan(true); } paint(); } });
   window.addEventListener("themechange", () => { const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
