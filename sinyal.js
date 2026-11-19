@@ -123,7 +123,7 @@ function liveDerVotes(){ const D = S.der, v = {}; if (fin(D.fund)) v.fund = D.fu
 function run(closedOnly){ const T = tfs(), b = closedOnly ? base().filter(x => x.x) : base(); if (b.length < 120) return null; const P = SMT.prep(b, { tms: TF_MS[S.tf], h1: S.b[T[1]], h2: S.b[T[2]], btc: S.btc });
   const l = b[b.length - 1]; if (!l.x){ const el = clip((now() - l.t)/(l.T - l.t + 1), 0.15, 1); P.volProj = l.v/el; } return { P, W: SMT.walk(P, { mode: S.mode }) }; }
 function decide(R){ const W = R.W, L = W.live, P = R.P, b = P.b, i = L.i, px = b[i].c, dv = liveDerVotes(), dsum = Object.values(dv).reduce((s, x) => s + x, 0), out = { px, i, L, dv, alerts: [] };
-  const SQ = W.sqB, sqStat = d => { const B = d > 0 ? SQ.up : SQ.dn; return { n: B.tp + B.sl, hit: SMT.hitB(B), net: B.n ? B.pnl/B.n : null }; };
+  const SQ = W.sqB, sqStat = d => { const B = d > 0 ? SQ.up : SQ.dn; return { n: B.tp + B.sl, hit: SMT.hitB(B), win: SMT.winB(B), all: B.n, net: B.n ? B.pnl/B.n : null }; };
   if (S.liq){ const near = [...S.liq.above.slice(0, 1), ...S.liq.below.slice(0, 1)]; void near; }
   if (L.info === undefined) void 0;
   const A = L.a, info = A.info; if (info.btc) out.alerts.push({ c: info.btc.dir > 0 ? "up" : "dn", t: `BTC ${info.btc.dir > 0 ? "↑ kırdı" : "↓ kırdı"} (${info.btc.bm.toFixed(1)} ATR) — ${S.sym.replace("USDT", "")} henüz takip etmedi` });
@@ -351,7 +351,7 @@ function paintMain(){ const card = $("#sg-card"), al = $("#sg-alerts"); if (!car
   if (S.err){ card.innerHTML = ""; return; }
   const D = S.D; if (!D){ card.innerHTML = `<div class="empty">${TF_LBL[S.tf]} mumlar yükleniyor, öğreniyorum…</div>`; return; }
   const b = base(), l = b[b.length - 1], left = l ? l.T + 1 - now() : 0, cls = SC[D.state], P = D.plan;
-  const sub = D.state === "LONG" || D.state === "SHORT" ? `geçmişte <b>${pc(D.conf.hit)}</b> tuttu (${D.conf.n} örnek) · ücret sonrası ort. ${fin(D.conf.net) ? (D.conf.net >= 0 ? "+" : "") + D.conf.net.toFixed(2) + "%" : "—"}`
+  const sub = D.state === "LONG" || D.state === "SHORT" ? `geçmişte TP/SL <b>${pc(D.conf.hit)}</b> · net kazanç <b>${fin(D.conf.win) ? pc(D.conf.win) : "—"}</b> (${D.conf.n} örnek) · ücret sonrası ort. ${fin(D.conf.net) ? (D.conf.net >= 0 ? "+" : "") + D.conf.net.toFixed(2) + "%" : "—"}`
     : D.state === "PUMP" || D.state === "DUMP" ? `${D.sub} · geçmiş kırılımlar ${D.conf.n ? pc(D.conf.hit) + " (" + D.conf.n + ")" : "az örnek"}`
     : D.state === "SIKIŞMA" ? `patlama yakın · <b class="${D.pUp >= 0.5 ? "up" : "dn"}">${D.pUp >= 0.5 ? "yukarı" : "aşağı"} %${Math.round(Math.max(D.pUp, 1 - D.pUp)*100)}</b>`
     : `${esc(D.reason)}`;
@@ -399,7 +399,7 @@ function paintDetails(){ const D = S.D, W = S.W; if (!D || !W) return; const L =
   $("#sd-pat").innerHTML = `<div class="can-f">${cur.length ? cur.map(p => `<span class="${p.ctx ? vc(p.d) : "dim"}">${esc(p.n)}${p.ctx ? "" : " (bağlam yok)"}</span>`).join("") : '<span class="dim">son mumda formasyon yok</span>'}</div>
     <table class="can-t"><tr><th>formasyon (bağlamlı)</th><th>isabet</th><th>n</th></tr>${pats.length ? pats.map(([k, B]) => `<tr><td>${esc(B.name)}</td><td class="${B.ok/B.n >= 0.55 ? "up" : B.ok/B.n < 0.45 ? "dn" : ""}">%${Math.round(B.ok/B.n*100)}</td><td>${B.n}</td></tr>`).join("") : '<tr><td colspan="3" class="dim">yüklü geçmişte bağlamlı formasyon yok</td></tr>'}</table>
     <div class="dim sc-note">Formasyon yalnızca bağlamda sayılır: hareket sonrası, seviye/salınım noktasında ve hacim ≥1.2×. İsabet = ${SMT.H_LAB} mum sonra beklenen yönde mi.</div>`;
-  const q = W.sqB, sqr = (B, l) => `${l}: ${B.n ? `${pc(SMT.hitB(B))} (${B.tp}/${B.tp + B.sl}) · ort. ${(B.pnl/B.n).toFixed(2)}%` : "örnek yok"}`;
+  const q = W.sqB, sqr = (B, l) => `${l}: ${B.n ? `net kazanç ${pc(SMT.winB(B))} (${B.win || 0}/${B.n}) · TP/SL ${pc(SMT.hitB(B))} (${B.tp}/${B.tp + B.sl}) · süre doldu ${(B.top || 0) + (B.ton || 0)} · ort. ${(B.pnl/B.n).toFixed(2)}%` : "örnek yok"}`;
   $("#sd-sq").innerHTML = `<div class="can-kv">${row("durum", D.state === "SIKIŞMA" ? '<b class="m">SIKIŞMA — patlama yakın</b>' : D.state === "PUMP" || D.state === "DUMP" ? D.state : L.fake ? "SAHTE KIRILIM" : "sıkışma yok")}
     ${L.squeeze ? row("koşullar", Object.entries(L.squeeze.cond).filter(x => x[1]).map(x => ({ bwLow: "BB dar", kcIn: "Keltner içi", atrDrop: "ATR düştü", volDry: "hacim kurudu" }[x[0]])).join(" · ")) : ""}
     ${D.box ? row("kutu", `${fp(D.box.lo)} – ${fp(D.box.hi)} · ${D.box.len} mum · yükseklik %${((D.box.hi - D.box.lo)/D.px*100).toFixed(2)}`) : ""}
@@ -416,7 +416,7 @@ function paintDetails(){ const D = S.D, W = S.W; if (!D || !W) return; const L =
     ${row("BTC öncülük", S.sym === "BTCUSDT" ? "bu BTC" : bi ? `<b class="${bi.dir > 0 ? "up" : "dn"}">BTC ${bi.dir > 0 ? "yukarı" : "aşağı"} kırdı, ${S.sym.replace("USDT", "")} geride</b>` : "BTC'de sert kırılım yok")}</div>
     ${S.tf !== "4h" && TF_MS[S.tf] < 144e5 ? `<div class="sub-h">saat etkisi (UTC, öğrenilmiş skor yönü doğru mu)</div><div class="sg-hours">${Array.from({ length: 24 }, (_, h) => { const x = hb[h], r = x && x.n >= 5 ? x.ok/x.n : null; return `<span class="${r === null ? "dim" : r >= 0.55 ? "up" : r < 0.47 ? "dn" : ""}" title="${h}:00">${h}<br><small>${r === null ? "·" : Math.round(r*100)}</small></span>`; }).join("")}</div><div class="dim sc-note">Kırmızı saatlerde (≥15 örnek, <%47) A+ sinyal verilmez. Berlin = UTC+1.</div>` : ""}`;
   paintBt(); }
-function paintBt(){ const el = $("#sc-bt"); if (!el || !S.W || !S.R) return; const r = SMT.replay(S.W, S.R.P.b), f = B => B.n ? `${pc(SMT.hitB(B))} <small>(${B.tp}/${B.tp + B.sl})</small> · ort. <b class="${B.pnl/B.n > 0 ? "up" : "dn"}">${(B.pnl/B.n >= 0 ? "+" : "") + (B.pnl/B.n).toFixed(3)}%</b>` : "sinyal yok";
+function paintBt(){ const el = $("#sc-bt"); if (!el || !S.W || !S.R) return; const r = SMT.replay(S.W, S.R.P.b), f = B => B.n ? `net kazanç ${pc(SMT.winB(B))} <small>(${B.win || 0}/${B.n})</small> · TP/SL ${pc(SMT.hitB(B))} <small>(${B.tp}/${B.tp + B.sl} · süre doldu ${(B.top || 0) + (B.ton || 0)})</small> · ort. <b class="${B.pnl/B.n > 0 ? "up" : "dn"}">${(B.pnl/B.n >= 0 ? "+" : "") + (B.pnl/B.n).toFixed(3)}%</b>` : "sinyal yok";
   el.innerHTML = `<div class="can-kv">${row("A+ sinyaller (" + r.aplus.n + ")", f(r.aplus))}${row("PUMP/DUMP kırılımları (" + r.brk.n + ")", f(r.brk))}</div><div class="dim sc-note">${S.sym} · ${TF_LBL[S.tf]} · ${SEL_LBL[S.sel]}${S.sel === "scalp" ? " (A+ kurulumları: TREND)" : ""} · yüklü ${S.R.P.n} mum (${dur(S.R.P.n*TF_MS[S.tf])}). Her mumda yalnızca o ana kadar bilinenle karar verildi (ileriye bakmadan); öğrenme de aynı yürüyüşte. Ortalamalar ücret (%0.10) düşülmüş, TP=1R ya da kutu yüksekliği, ${SMT.H_OUT} mum içinde. Türev/defter verisi geçmişte olmadığından testte yok.</div>`; }
 function paintHist(){ const el = $("#sc-hist"); if (!el) return; const k = key(), L = (H.load()[k] || []), st = SCM.stats(L), tms = TF_MS[S.tf], P2 = x => x === null || !fin(x) ? "—" : "%" + x.toFixed(0);
   const oc = r => !r ? '<span class="dim">…</span>' : `<span class="${r.r === "TP" || r.r === "+" ? "up" : "dn"}">${r.r === "TP" ? "TP" : r.r === "SL" ? "SL" : r.r + Math.abs(r.pnl).toFixed(2)}</span>`;

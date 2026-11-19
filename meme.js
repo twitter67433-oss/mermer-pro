@@ -27,8 +27,10 @@ const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin", 
 const ms = x => x === null || x === undefined || !isFinite(x) ? "—" : x >= 1000 ? (x/1000).toFixed(2) + " sn" : Math.round(x) + " ms";
 const T = () => window.TRADE, W = () => window.WALLET, X = () => window.EXEC;
 const K = "neon.meme";
-const SIM_FALLBACK = 0.212; /* last known real BOT CÜZDANI balance — used when the wallet balance cannot be read */
-const DEF = { mode: "SIM", dep: SIM_FALLBACK, simLoose: true, autoStart: false, base: 0.05, maxTrade: 0.1, budget: 0.5, dailyLoss: 0.25, maxPos: 3, tp: 250, sl: 25, trail: 20, holdMin: 15, slip: 20, prio: 0.0005,
+/* v7.40: SIM capital is its own setting (C.dep, "SANAL sermaye"). It is never silently taken from an old real-wallet balance:
+   SIM = GERÇEK BAKİYE copies the wallet only when it can be read right now; otherwise nothing changes. SIM_DEFAULT is only the first-install value. */
+const SIM_DEFAULT = 0.212;
+const DEF = { mode: "SIM", dep: SIM_DEFAULT, simLoose: true, autoStart: false, base: 0.05, maxTrade: 0.1, budget: 0.5, dailyLoss: 0.25, maxPos: 3, tp: 250, sl: 25, trail: 20, holdMin: 15, slip: 20, prio: 0.0005,
   w: { on: true, minInit: 0, minMcap: 15, maxMcap: 120, needSoc: false, maxDev: 20, maxRisk: 58, waitSec: 15, minMom: -5 },
   sc: { on: true, min: 55, minBuyers: 3, maxTop: 55, learn: true },
   x: { on: true, early: 12, earlySec: 20, momUp: 5, momFail: 8, be: 20, beLock: 1, ptp: 40, ptpPct: 50, trailHi: 12, trailSw: 100, rev: true, revSec: 6, flatMin: 4, flatBand: 10, simHc: true },
@@ -49,7 +51,7 @@ if ((C.fv|0) < 3){ C.tp = DEF.tp; C.trail = DEF.trail; C.w.waitSec = DEF.w.waitS
 /* v7.7: one-time — SIM becomes a 1:1 preview of GERÇEK. Serbest mod off for good, SIM account restarts at the real wallet balance
    (0.212 SOL now; replaced by the live BOT CÜZDANI balance right after load if it can be read). Real-mode data and all limits untouched. */
 let MIG77 = false;
-if ((C.fv|0) < 4){ delete C.freeSim; C.dep = SIM_FALLBACK; C.fv = 4; MIG77 = true;
+if ((C.fv|0) < 4){ delete C.freeSim; C.dep = SIM_DEFAULT; C.fv = 4; MIG77 = true;
   try { ["neon.sim", "neon.meme.risk.sim", "neon.meme.eq.sim", "neon.meme.eq.sim.mk"].forEach(k => localStorage.removeItem(k)); localStorage.setItem("neon.meme.sim77", "1"); save(); } catch(e){} }
 delete C.freeSim;
 /* v7.9: one-time — looser selection from the measured funnel. Only these selection keys change; risk limits, exits and rug rejects are untouched. */
@@ -247,10 +249,12 @@ async function enter(o){ /* o: { mint, sym, src, wallet, srcSol, tEv, c0, curve,
     if (!isReal()){ r = await X().sim({ action: "buy", sol: size, slip: C.slip, prio: C.prio, sym: o.sym, mint: o.mint }, () => curveOf(o.mint), c0, o.tEv, { src: o.src, newAta: true, hc: o.hc || 0 });
       SIM.cash += r.sol; SIM.n++; const jid = JOURNAL.add({ venue: "pump.fun", mode: auto ? "OTO" : "MANUEL", wallet: "SIM", src: o.src, w: o.wallet || null, sym: o.sym, mint: o.mint, side: "AL→SAT", in: +(-r.sol).toFixed(9), unit: "SOL", reason: o.reason || "", note: `giriş mcap ${fmt(c0 && c0.mcap, 1)} SOL · olay→gön. ${ms(r.m.ev2sent)} · gön.→dolum ${ms(r.m.sent2conf)}` });
       posAdd({ mint: o.mint, sym: o.sym, venue: "pump.fun", solIn: -r.sol, tokens: r.tokens, t: Date.now(), auto, src: o.src, wallet: o.wallet || null, curve: key, jid, entryMcap: c0 && c0.mcap }); }
-    else { r = await X().real({ action: "buy", mint: o.mint, amount: size, denominatedInSol: "true", slip: C.slip, prio: C.prio, pool: "pump", sym: o.sym }, o.tEv, { src: o.src, preKey: "buy:" + o.mint, ref: c0 && c0.mcap });
+    else { try { r = await X().real({ action: "buy", mint: o.mint, amount: size, denominatedInSol: "true", slip: C.slip, prio: C.prio, pool: "pump", sym: o.sym }, o.tEv, { src: o.src, preKey: "buy:" + o.mint, ref: c0 && c0.mcap }); }
+      catch(e){ if (!e.uncertain) throw e; /* v7.40: confirmation BELİRSİZ → the buy may have landed: track it as a position (never buy again), the chain check decides later */
+        r = { sig: e.sig, m: {}, unc: true }; tl("err", `⚠ ${esc(o.sym)} alım onayı BELİRSİZ — pozisyon varsayıldı, tekrar ALINMAYACAK; zincir kontrol ediliyor`, "dn"); NOTIFY.ping("bad", `${o.sym}: alım BELİRSİZ`); }
       const est = c0 ? X().buyOut(c0, size) : null, spent = size*(1 + X().PP_FEE) + C.prio + X().BASE_FEE + X().RENT;
       const jid = JOURNAL.add({ venue: "pump.fun", mode: auto ? "OTO" : "MANUEL", wallet: "BOT", src: o.src, w: o.wallet || null, sym: o.sym, mint: o.mint, side: "AL→SAT", in: +spent.toFixed(9), unit: "SOL", sigIn: r.sig, reason: o.reason || "", note: `giriş mcap ${fmt(c0 && c0.mcap, 1)} SOL · olay→gön. ${ms(r.m.ev2sent)} · gön.→onay ${ms(r.m.sent2conf)}` });
-      posAdd({ mint: o.mint, sym: o.sym, venue: "pump.fun", solIn: spent, tokens: est, estTok: true, t: Date.now(), auto, src: o.src, wallet: o.wallet || null, curve: key, jid, entryMcap: c0 && c0.mcap, sigIn: r.sig });
+      posAdd({ mint: o.mint, sym: o.sym, venue: "pump.fun", solIn: spent, tokens: est, estTok: true, t: Date.now(), auto, src: o.src, wallet: o.wallet || null, curve: key, jid, entryMcap: c0 && c0.mcap, sigIn: r.sig, unc: r.unc ? r.sig : undefined });
       X().txDelta(r.sig, o.mint).then(d => { if (!d) return; const p = posGet(o.mint); if (!p) return; const patch = { estTok: false }; if (d.tokens > 0) patch.tokens = d.tokens; if (d.sol !== null) patch.solIn = -d.sol; posUpd(o.mint, patch); if (p.jid && d.sol !== null) JOURNAL.upd(p.jid, { in: +(-d.sol).toFixed(9) }); realBal(true); }); }
     ST.entered++; mark("buy", o.sym);
     const txt = o.src === "copy" ? `🔁 KOPYALANDI <b>${esc(o.sym)}</b> · ${esc(lab(o.wallet))} alımından <b>${ms(r.m.ev2sent + (r.m.sent2conf || 0))}</b> sonra` : o.src === "watcher" ? `▲ GİRİŞ <b>${esc(o.sym)}</b> · İZLEYİCİ` : o.src === "grok" ? `▲ AL <b>${esc(o.sym)}</b> · AI önerisi` : `▲ ELLE AL <b>${esc(o.sym)}</b>`;
@@ -268,7 +272,10 @@ async function exit(mint, why, tEv, frac){ const p = posGet(mint); if (!p || ST.
     if (!isReal()){ if (!p.tokens) throw new Error("adet bilinmiyor"); const fl = FLOW.flow(mint);
       r = await X().sim({ action: "sell", tokens: sellTok, slip: C.slip, prio: C.prio, sym: p.sym, mint }, () => curveOf(mint), c0, tEv, { src: p.src, hc: simHcNow(fl && fl.mcaps) });
       out = r.sol; SIM.cash += out; simSave(); }
-    else { if (!W().unlocked()) throw new Error("BOT CÜZDANI kilitli"); r = await X().real({ action: "sell", mint, amount: part ? pctTxt + "%" : "100%", denominatedInSol: "false", slip: C.slip, prio: C.prio, pool: "auto", sym: p.sym }, tEv, { src: p.src, preKey: part ? null : "sell:" + mint, ref: c0 && c0.mcap });
+    else { if (!W().unlocked()) throw new Error("BOT CÜZDANI kilitli");
+      if (p.sellUnc || (X().pending && X().pending("sell:" + mint))){ const mo = ST.mons.get(mint); if (mo) mo.retryAt = Date.now() + 15000; return null; } /* v7.40: previous sell BELİRSİZ → no resend until settled */
+      try { r = await X().real({ action: "sell", mint, amount: part ? pctTxt + "%" : "100%", denominatedInSol: "false", slip: C.slip, prio: C.prio, pool: "auto", sym: p.sym }, tEv, { src: p.src, preKey: part ? null : "sell:" + mint, ref: c0 && c0.mcap }); }
+      catch(e){ if (!e.uncertain) throw e; posUpd(mint, { sellUnc: e.sig, sellUncWhy: why, sellUncPart: part ? f : 0 }); tl("err", `⚠ ${esc(p.sym)} satış onayı BELİRSİZ — tekrar GÖNDERİLMEDİ; zincir kontrol ediliyor`, "dn"); NOTIFY.ping("bad", `${p.sym}: satış BELİRSİZ`); return null; }
       out = c0 && p.tokens ? X().sellOut(c0, sellTok)*(1 - X().PP_FEE) - C.prio : 0; const est = out, acc0 = p.outAcc || 0;
       X().txDelta(r.sig, mint).then(d => { if (!d){ realBal(true); return; }
         if (part){ const q = posGet(mint); if (q){ const patch = {}; if (d.tokens > 0) patch.tokens = d.tokens; if (d.sol !== null) patch.outAcc = (q.outAcc || 0) + (d.sol - est); posUpd(mint, patch); } }
@@ -412,8 +419,8 @@ async function realWalletSol(){ if (!W() || !W().exists() || !W().pub()) return 
   for (let i = 0; i < 3; i++){ try { const b = await W().solBal(); if (isFinite(b)) return b >= 0.01 && b <= 10000 ? +b.toFixed(6) : null; } catch(e){} await new Promise(r => setTimeout(r, 700)); } return null; }
 async function simToReal(){ if (isReal()){ NOTIFY.toast("yalnızca SIM modunda", "bad"); return; }
   if (ST.on){ NOTIFY.toast("Önce OTO'yu durdur", "bad"); return; }
-  const b = await realWalletSol(), dep = b || SIM_FALLBACK;
-  if (!(await CONN.typedConfirm("SIM = GERÇEK BAKİYE", `SIM sanal bakiyesi <b>${fmt(dep, 4)} SOL</b> olur (${b ? "BOT CÜZDANI'nın şu anki SOL bakiyesi" : "cüzdan okunamadı → son gerçek bakiye 0.212 SOL"}). SIM pozisyonları, SIM eğrisi ve SIM risk durumu silinir (günlükteki SIM kayıtları kalır). Ayarlar ve limitler GERÇEK ile aynıdır.`, "SIFIRLA"))) return;
+  const b = await realWalletSol(); if (!b){ NOTIFY.toast("BOT CÜZDANI bakiyesi şu an okunamadı — SANAL sermaye değişmedi", "bad"); return; } const dep = b;
+  if (!(await CONN.typedConfirm("SIM = GERÇEK BAKİYE", `SIM <b>SANAL</b> sermayesi <b>${fmt(dep, 4)} SOL</b> olur (BOT CÜZDANI'nın şu anki SOL bakiyesinin kopyası; gerçek cüzdana dokunulmaz). SIM pozisyonları, SIM eğrisi ve SIM risk durumu silinir (günlükteki SIM kayıtları kalır). Ayarlar ve limitler GERÇEK ile aynıdır.`, "SIFIRLA"))) return;
   C.dep = dep; save(); simResetNow(); }
 async function mig77Sync(){ if (localStorage.getItem("neon.meme.sim77") !== "1") return; const b = await realWalletSol(); localStorage.removeItem("neon.meme.sim77");
   if (b && !ST.on && !SIM.n && !SIM.pos.length && !SIM.added && Math.abs(b - C.dep) > 1e-6){ C.dep = b; save(); SIM = simNew(b); simSave(); tl("mode", `v7.7: SIM bakiyesi BOT CÜZDANI ile eşlendi · ${fmt(b, 4)} SOL`, "y"); render(); } }
@@ -558,7 +565,7 @@ function html(){ const real = isReal(), ex = X().C;
       <div class="f2">${inp("slip", "Kayma %")}${inp("prio", "Öncelik ücreti SOL")}</div>
       <label>Özel RPC (HTTPS, ör. Helius — ilk sırada, paralel)<input data-x="rpc" value="${esc(ex.rpc)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://mainnet.helius-rpc.com/?api-key=…"></label>
       <label>Özel WebSocket (onay + kopya akışı)<input data-x="ws" value="${esc(ex.ws)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="wss://…"></label>
-      <div class="f2"><label class="chk"><input type="checkbox" data-x="fan" ${ex.fan ? "checked" : ""}> tüm RPC'lere paralel gönder</label><label class="chk"><input type="checkbox" data-x="skipPre" ${ex.skipPre ? "checked" : ""}> skipPreflight</label></div>
+      <div class="f2"><label class="chk"><input type="checkbox" data-x="fan" ${ex.fan ? "checked" : ""}> tüm RPC'lere paralel gönder</label><label class="chk"><input type="checkbox" data-x="skipPre" ${ex.skipPre ? "checked" : ""}> İLERİ: skipPreflight <small class="dn">(önerilmez — hatalı işlem de ücret yakar)</small></label></div>
       <div class="f2"><label class="chk"><input type="checkbox" data-x="jito" ${ex.jito ? "checked" : ""}> Jito paketi (işlem + bahşiş)</label><label>Jito bahşişi SOL<input data-x="tip" inputmode="decimal" value="${esc(ex.tip)}"></label></div>
       <div class="f2"><label>SIM gecikme modeli ms<input data-x="simDelay" inputmode="decimal" value="${esc(ex.simDelay)}"></label><label class="chk"><input type="checkbox" data-x="dryPipe" ${ex.dryPipe ? "checked" : ""}> SIM'de gerçek hattı ölç (hazırla + imzala, GÖNDERME)</label></div>
       <div class="plan-foot">Blockhash ~2 sn'de bir önbelleğe alınır; anahtar oturum boyunca bellekte açık kalır; adaylar ve açık pozisyonlar için işlem önceden hazırlanır (≤35 sn); imzalı işlem tüm RPC'lere (+ isteğe bağlı Jito) aynı anda gider; onay WebSocket ile beklenir.</div></details>
@@ -566,10 +573,10 @@ function html(){ const real = isReal(), ex = X().C;
       <div class="f2">${inp("gk.timeout", "Zaman aşımı ms")}<label>Cevap gelmezse<select data-m="gk.fallback"><option value="rules" ${C.gk.fallback === "rules" ? "selected" : ""}>kurallarla devam</option><option value="deny" ${C.gk.fallback === "deny" ? "selected" : ""}>alma</option></select></label></div>
       <div class="plan-foot">AI sekmesinde bir sağlayıcı ve anahtar kayıtlı olmalı. AI işlem açamaz; yalnızca bu kapıda "hayır" diyebilir.</div></details>
     <details class="keys"><summary>◎ SIM hesabı · otomatik başlat</summary>
-      <div class="f2">${inp("dep", "SIM sanal yatırım SOL")}<button type="button" id="mm-simreset" class="mini wide s" style="align-self:end">SIM'İ SIFIRLA</button></div>
+      <div class="f2">${inp("dep", "SIM SANAL sermaye SOL (gerçek değil)")}<button type="button" id="mm-simreset" class="mini wide s" style="align-self:end">SIM'İ SIFIRLA</button></div>
       ${real ? "" : `<button type="button" id="mm-simreal-b" class="mini wide">SIM = GERÇEK BAKİYE</button>`}
       <label class="chk real-chk"><input type="checkbox" id="mm-autostart" ${C.autoStart ? "checked" : ""}> ⚠ otomatik başlat <small>(sayfa açılınca OTO kendiliğinden başlar; GERÇEK modda BOT CÜZDANI kilidini açtığın an)</small></label>
-      <div class="plan-foot">SIM = GERÇEK BAKİYE: sanal bakiyeyi BOT CÜZDANI'nın SOL bakiyesine eşler (adres herkese açık RPC ile okunur, kilit açılmaz; okunamazsa 0.212 SOL). SIM; filtreler, pump skoru, çıkışlar, bileşik, işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut ve 2 kayıpta ara dahil GERÇEK ile <b>aynı</b> kuralları uygular. Fark yalnızca dolumların sanal olmasıdır (+ hızlı harekette dolum kesintisi). <b>TEST SERBEST</b> açıkken (yalnızca SIM) işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut, 2 kayıpta ara, kopya bekleme süreleri ve SIM onay ekranları uygulanmaz — yalnızca sanal nakit sınırlar; <b>+ BAKİYE EKLE</b> sanal SOL ekler. GERÇEK bu anahtardan hiç etkilenmez.</div></details>
+      <div class="plan-foot">SIM = GERÇEK BAKİYE: sanal bakiyeyi BOT CÜZDANI'nın SOL bakiyesine eşler (adres herkese açık RPC ile okunur, kilit açılmaz; okunamazsa hiçbir şey değişmez). SIM; filtreler, pump skoru, çıkışlar, bileşik, işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut ve 2 kayıpta ara dahil GERÇEK ile <b>aynı</b> kuralları uygular. Fark yalnızca dolumların sanal olmasıdır (+ hızlı harekette dolum kesintisi). <b>TEST SERBEST</b> açıkken (yalnızca SIM) işlem başı max, bütçe, günlük zarar, max pozisyon, kayıpta yarı boyut, 2 kayıpta ara, kopya bekleme süreleri ve SIM onay ekranları uygulanmaz — yalnızca sanal nakit sınırlar; <b>+ BAKİYE EKLE</b> sanal SOL ekler. GERÇEK bu anahtardan hiç etkilenmez.</div></details>
     <div class="plan-foot">SIM: gerçek canlı piyasa verisi (PumpPortal + Solana RPC), gerçekçi dolum (bonding curve, gecikme sonrası fiyat, pump.fun %1.25 + PumpPortal %0.5 + öncelik + ağ ücreti + token hesabı kirası), hiçbir işlem gönderilmez. GERÇEK: BOT CÜZDANI. Sayfa yenilenince OTO <b>kapalı</b> başlar (otomatik başlat açık değilse). Yatırım tavsiyesi değildir.</div></details>`; }
 
 function bind(){ const box = $("#meme-box");
@@ -578,6 +585,7 @@ function bind(){ const box = $("#meme-box");
   box.querySelectorAll("[data-m]").forEach(i => i.addEventListener("change", () => { try { setP(i.dataset.m, i.type === "checkbox" ? i.checked : i.value); if (i.dataset.m === "dep" && !isReal() && !SIM.n && !SIM.pos.length){ SIM = simNew(C.dep); simSave(); } if (i.dataset.m === "cmp.on"){ const b = $("#mm-cmpb"); if (b) b.classList.toggle("hidden", !C.cmp.on); } if (i.dataset.m && i.dataset.m.startsWith("goal.")) paintGoal(); paint(true); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); if (i.type === "checkbox") i.checked = !!getP(i.dataset.m); else i.value = getP(i.dataset.m); } }));
   box.querySelectorAll("[data-x]").forEach(i => i.addEventListener("change", () => { const k = i.dataset.x; let v = i.type === "checkbox" ? i.checked : i.value.trim();
     if (k === "rpc" && v && !/^https:\/\//.test(v)){ NOTIFY.toast("RPC https:// ile başlamalı", "bad"); return; } if (k === "ws" && v && !/^wss:\/\//.test(v)){ NOTIFY.toast("WS wss:// ile başlamalı", "bad"); return; }
+    if (k === "skipPre" && v === true && !window.confirm("skipPreflight AÇILSIN MI?\n\nRPC işlemi göndermeden önce simüle etmez: başarısız olacak bir işlem de zincire gönderilir ve ücret yakar. Yalnızca ne yaptığını biliyorsan aç.")){ i.checked = false; return; }
     if (k === "tip"){ v = +v.replace(",", "."); if (!(v >= 0.00001 && v <= 0.01)){ NOTIFY.toast("Jito bahşişi 0.00001–0.01 SOL", "bad"); return; } } if (k === "simDelay"){ v = +v; if (!(v >= 150 && v <= 10000)){ NOTIFY.toast("150–10000 ms", "bad"); return; } }
     X().set({ [k]: v }); NOTIFY.toast("Kaydedildi", "good"); }));
   $("#mm-autostart").onchange = async e => { if (e.target.checked){ const ok = await CONN.typedConfirm("OTOMATİK BAŞLAT", `Sayfayı her açtığında OTO <b>kendiliğinden</b> başlar (${C.mode} mod${isReal() ? ": BOT CÜZDANI kilidini açtığın an, onay sormadan gerçek SOL ile" : ""}). Kapatmak için bu kutuyu kaldır ya da ■ HEPSİNİ DURDUR.`, "BAŞLAT"); if (!ok){ e.target.checked = false; return; } }
@@ -728,7 +736,7 @@ async function ctl(cmd, a = {}){ switch (cmd){
   case "sell": { if (!posGet(a.mint)) throw new Error("bu tokenda açık pozisyon yok"); const r = await exit(a.mint, a.why || "elle satış (telefon)"); if (!r) throw new Error("satış başarısız (zaman çizelgesine bak)"); return "satıldı"; }
   case "mode": modeNow(a.mode); return C.mode;
   case "simReset": simResetNow(); return "SIM sıfırlandı";
-  case "simReal": { if (isReal()) throw new Error("yalnızca SIM"); if (ST.on) throw new Error("önce OTO'yu durdur"); const b = await realWalletSol(); C.dep = b || SIM_FALLBACK; save(); simResetNow(); return `SIM = ${fmt(C.dep, 4)} SOL${b ? "" : " (yedek değer)"}`; }
+  case "simReal": { if (isReal()) throw new Error("yalnızca SIM"); if (ST.on) throw new Error("önce OTO'yu durdur"); const b = await realWalletSol(); if (!b) throw new Error("BOT CÜZDANI okunamadı — SANAL sermaye değişmedi"); C.dep = b; save(); simResetNow(); return `SIM (sanal) = ${fmt(C.dep, 4)} SOL`; }
   case "track": COPY.add(a.addr, a.label || ""); return "takibe alındı";
   case "untrack": COPY.del(a.addr); return "takipten çıkarıldı";
   case "wtoggle": COPY.toggle(a.addr, !!a.on); return a.on ? "açık" : "kapalı";
@@ -750,6 +758,17 @@ if (isReal()){ realBal(true); X().keepWarm(true); }
 if (MIG77 || localStorage.getItem("neon.meme.sim77") === "1") setTimeout(() => mig77Sync().catch(() => {}), 1200);
 if (C.autoStart){ if (!isReal()) setTimeout(() => arm(true).then(ok => ok && NOTIFY.toast("otomatik başlat: OTO açıldı (SIM)", "good")), 1500);
   else { const iv = setInterval(() => { if (ST.on || !C.autoStart || C.mode !== "GERÇEK"){ clearInterval(iv); return; } if (W().unlocked()){ clearInterval(iv); arm(true).then(ok => ok && NOTIFY.ping("bad", "otomatik başlat: GERÇEK OTO açıldı")); } }, 2000); } }
+/* v7.40: background chain check of a BELİRSİZ GERÇEK tx (EXEC.bgSettle) → reconcile the position */
+window.addEventListener("exec:settled", ev => { const d = ev.detail || {}, [act, mint] = String(d.key || "").split(":"); if (!mint || !W() || !W().pos) return;
+  const L = W().pos.list(), p = L.find(x => x.mint === mint); if (!p) return; const ok = d.state === "CONFIRMED";
+  if (act === "buy" && p.unc === d.sig){ if (ok){ W().pos.save(L.map(x => x.mint === mint ? Object.assign(x, { unc: undefined }) : x)); tl("buy", `✔ ${esc(p.sym)} BELİRSİZ alım zincirde ONAYLANDI`, "up");
+      X().txDelta(d.sig, mint).then(t => { if (t && t.tokens > 0) posUpd(mint, { tokens: t.tokens, estTok: false }); realBal(true); }); }
+    else { W().pos.del(mint); stopMon(mint); if (p.jid) JOURNAL.upd(p.jid, { out: p.solIn, closeT: Date.now(), note: "alım zincire girmedi (BELİRSİZ → " + d.state + ")" }); tl("err", `✖ ${esc(p.sym)} BELİRSİZ alım zincire GİRMEDİ (${esc(d.state)}) — pozisyon silindi`, "dn"); realBal(true); } paint(); return; }
+  if (act === "sell" && p.sellUnc === d.sig){ if (!ok){ W().pos.save(L.map(x => x.mint === mint ? Object.assign(x, { sellUnc: undefined }) : x)); tl("err", `${esc(p.sym)} BELİRSİZ satış zincire girmedi — satış yeniden denenebilir`, "dn"); return; }
+    if (p.sellUncPart){ W().pos.save(L.map(x => x.mint === mint ? Object.assign(x, { sellUnc: undefined, tokens: x.tokens*(1 - p.sellUncPart) }) : x)); tl("sell", `✔ ${esc(p.sym)} BELİRSİZ kısmi satış ONAYLANDI`, "up"); realBal(true); return; }
+    X().txDelta(d.sig, mint).then(t => { const out = (t && t.sol !== null ? t.sol : 0) + (p.outAcc || 0), cost = p.cost0 || p.solIn, pnl = out - cost;
+      if (p.jid) JOURNAL.upd(p.jid, { out: +out.toFixed(9), closeT: Date.now(), sigOut: d.sig, note: "çıkış BELİRSİZ → zincirde onaylandı" }); W().pos.del(mint); stopMon(mint); riskOnClose(pnl);
+      tl("sell", `✔ ${esc(p.sym)} BELİRSİZ satış ONAYLANDI · ${sg(pnl, 4)} SOL · ${esc(p.sellUncWhy || "")}`, pnl >= 0 ? "up" : "dn"); realBal(true); paint(); }); } });
 return { realOpen: () => isReal() ? posList().length : 0, /* v7.30: SEC asks before MEME PASİF */ funnel: () => JSON.parse(JSON.stringify(FN)), realWalletSol, simToReal, sizeWhy, sizeExplain, FLOW, scStats, get WB(){ return WB; }, check, exit, xcfg, snap, ctl, get remote(){ return RMT(); }, get on(){ return ST.on; }, get mode(){ return C.mode; }, arm, stop, endPause, kill, manual, context, applySuggestion, gateInfo, render, paint, fab, get C(){ return C; }, setP, _ST: ST, get SIM(){ return SIM; }, get R(){ return R; }, equity, posList, sizeCalc, riskSize, riskCheck, riskOnClose, simFree, simAdd, fxWin, fxBuy, fxLoss, goalRestart };
 })();
 window.MEME = MEME;

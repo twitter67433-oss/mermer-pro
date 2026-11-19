@@ -83,7 +83,9 @@ async function onAnalysis(d){ if (!ST.bn) return; const S = d.data.signal, b = C
   if (S.active.mode !== "piyasa"){ alog(`Binance: ${esc(d.symbol)} ${S.dir} — kırılım henüz yok (tetik ${S.active.trigger}), bekleniyor`, "dim"); return; }
   if (d.src !== "fut"){ alog("Binance: SPOT verisiyle oto işlem yapılmaz", "dn"); return; }
   const c = T().keys.bget(); if (!c.testnet && !b.real){ return stopBn("GERÇEK API aktif ama 'Binance GERÇEK'te oto' kapalı"); }
-  const n = JOURNAL.list().filter(e => e.venue === "binance" && e.mode === "OTO" && e.openT >= today0()).length; if (n >= b.maxDay){ alog(`Binance: günlük oto işlem sınırı (${b.maxDay}) doldu`, "dim"); return; }
+  /* v7.40: kill switch + cumulative daily loss (ENGINE daily_loss_limit, realized from the journal) + max open + max/day + cooldown after 2 losses in a row */
+  const g = BFXSAFE.gate(JOURNAL.list().filter(e => e.venue === "binance" && e.mode === "OTO"), { now: Date.now(), day0: today0(), dailyLossLimit: ENGINE.config().daily_loss_limit, maxOpen: b.maxOpen || 3, maxDay: b.maxDay, lossStreak: 2, coolMin: 60, halted: !ST.bn });
+  if (!g.ok){ alog(`Binance: işlem yok — ${esc(g.why)}`, "dim"); if (g.stop) stopBn(g.why); return; }
   if (Date.now() - ST.lastBn < 60000) return; ST.lastBn = Date.now();
   try { const r = await T().auto.order(d, { lev: b.lev }); if (r.skipped){ alog(`Binance: ${esc(d.symbol)} atlandı — ${esc(r.skipped)}`, "dim"); return; }
     JOURNAL.add({ venue: "binance", mode: "OTO", wallet: r.testnet ? "TESTNET" : "GERÇEK", sym: r.symbol, side: r.side, in: +r.margin.toFixed(4), unit: "USDT", reason: `sinyal ${r.side} %${S.conf}`, note: `qty ${r.qty} @ ${r.px} · stop ${r.stop} · hedef ${r.target} · ${r.prot.join(", ")}`, sigIn: String(r.orderId), open: true });
@@ -111,7 +113,9 @@ async function setPump(on){ if (!on){ stopPump("elle kapatıldı"); return; } re
   const p = C.pump; if (!(await T().confirmSheet({ title: "PUMP.FUN OTO AL-SAT'I AÇ", mode: "GERÇEK", rows: [["Cüzdan", "BOT " + short(WALLET.pub())], ["İşlem başı", p.perTrade + " SOL"], ["Toplam bütçe", p.budget + " SOL"], ["Günlük max zarar", p.dailyLoss + " SOL", "dn"], ["Max açık pozisyon", String(p.maxPos)], ["Kâr al / zarar kes", `+%${p.tp} / −%${p.sl}`], ["Max tutma", p.holdMin + " dk"], ["Giriş", `${p.waitSec} sn sonra momentum ≥ %${p.minMom}, risk ≤ ${p.maxRisk}`]], warn: "Bundan sonra bot bu limitler içinde <b>onay sormadan</b> alıp satar. HEPSİNİ DURDUR her zaman ekranda.", okText: "ONAYLA · OTO BAŞLAT" }))) return render();
   ST.pump = true; alog("▶ pump.fun OTO başladı (BOT CÜZDANI)", "up"); if (!PUMP.live) PUMP.start(); for (const x of autoPos()) monitor(x.mint); afterToggle(); }
 async function setBn(on){ if (!on){ stopBn("elle kapatıldı"); return; } readForm(); const c = T().keys.bget();
-  if (!c.key || !c.secret){ alog("✖ Binance anahtarı yok (BAĞLANTILAR → BINANCE).", "dn"); return render(); }
+  if (c.key && c.kst === "locked" && !(await T().keys.ensureOpen(c.which))){ alog("✖ API Secret kilitli — PIN girilmedi, OTO açılmadı.", "dn"); return render(); }
+  if (!c.key || !(T().keys.bget().secret)){ alog("✖ Binance anahtarı yok (BAĞLANTILAR → BINANCE).", "dn"); return render(); }
+  if (!c.testnet && c.kst === "plain"){ alog("✖ GERÇEK API Secret düz metin — önce BAĞLANTILAR → BINANCE'ta PIN ile şifrele.", "dn"); return render(); }
   if (!c.testnet){ if (!C.bn.real){ alog("✖ GERÇEK API aktif: Binance oto için ayrıca 'Binance GERÇEK'te oto' kutusunu işaretle.", "dn"); return render(); }
     if (!(await CONN.typedConfirm("BINANCE GERÇEK HESAPTA OTO", `Bot, sinyal güveni %${C.bn.conf}+ olduğunda <b>gerçek Binance vadeli hesabında onay sormadan</b> emir açacak (${C.bn.lev}x, stop + hedef ile, günde en fazla ${C.bn.maxDay}). Kaldıraçlı işlemde kaybın teminatı aşabilir.`, "GERÇEK"))) return render(); }
   else if (!C.accepted){ if (!(await riskSheet())) return render(); C.accepted = true; save(); }

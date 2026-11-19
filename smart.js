@@ -128,7 +128,12 @@ function scoreOf(V, cnt, keys){ let s = 0, sw = 0, pos = 0, neg = 0; const parts
 function resolveTrade(b, i, d, stop, tp, maxBars){ const e = b[i].c; for (let j = i + 1; j <= Math.min(b.length - 1, i + maxBars); j++){ const x = b[j]; if (x.x === false) return null;
     if (d > 0 ? x.l <= stop : x.h >= stop) return { r: "SL", pnl: d*(stop - e)/e*100, j }; if (d > 0 ? x.h >= tp : x.l <= tp) return { r: "TP", pnl: d*(tp - e)/e*100, j }; }
   if (i + maxBars > b.length - 1 || b[i + maxBars].x === false) return null; const x = b[i + maxBars]; return { r: d*(x.c - e) >= 0 ? "+" : "−", pnl: d*(x.c - e)/e*100, j: i + maxBars }; }
-const bucket = () => ({ n: 0, tp: 0, sl: 0, pnl: 0 }), addB = (B, r) => { B.n++; if (r.r === "TP") B.tp++; else if (r.r === "SL") B.sl++; B.pnl += r.pnl - FEE; }, hitB = B => B.tp + B.sl ? B.tp/(B.tp + B.sl) : null;
+/* v7.40 outcome accounting: every completed trade lands in exactly one class — TP, SL, timeout in profit (to+), timeout in loss (to−);
+   unresolved/missing-data trades (resolveTrade → null) are never added. win = net (after FEE) > 0 over ALL completed trades.
+   hitB keeps the old meaning (TP / (TP + SL), timeouts excluded) for display only; winB / tpRateB are the honest rates. Same-bar SL+TP = SL (resolveTrade checks the stop first). */
+const bucket = () => ({ n: 0, tp: 0, sl: 0, top: 0, ton: 0, win: 0, pnl: 0 }),
+  addB = (B, r) => { B.n++; if (r.r === "TP") B.tp++; else if (r.r === "SL") B.sl++; else if (r.pnl - FEE > 0) B.top = (B.top || 0) + 1; else B.ton = (B.ton || 0) + 1; if (r.pnl - FEE > 0) B.win = (B.win || 0) + 1; B.pnl += r.pnl - FEE; },
+  hitB = B => B.tp + B.sl ? B.tp/(B.tp + B.sl) : null, winB = B => B.n ? (B.win || 0)/B.n : null, tpRateB = B => B.n ? B.tp/B.n : null;
 /* opts: { mode: "trend"|"rev", from, minN, minHit } ; returns live state at the last bar + replay list of A+ signals and breakouts (all decided walk-forward) */
 function walk(P, opts = {}){ const b = P.b, n = P.n, from = Math.max(60, opts.from || 60), mode = opts.mode === "rev" ? "rev" : "trend", minN = opts.minN || 20, minHit = opts.minHit || 0.55, keys = mode === "rev" ? FR : FT;
   const cntT = {}, cntR = {}, V = [], Sx = [], hourB = {}, setB = {}, patB = {}, sqB = { up: bucket(), dn: bucket(), ups: 0, dns: 0 }, pend = [], sqPend = [], sig = [], brk = [];
@@ -152,7 +157,7 @@ function walk(P, opts = {}){ const b = P.b, n = P.n, from = Math.max(60, opts.fr
     if (cand && mode === "rev" && !a.info.revCtx){ cand = false; why.push("dönüş bağlamı yok (uzama/seviye/formasyon)"); }
     if (cand && sPct < 0.15){ cand = false; why.push("hareket ücrete göre küçük"); }
     const key = mode + "|" + (Math.abs(sc.S) >= 0.4 ? "güçlü" : "orta"), SB = setB[key] || bucket(), sh = hitB(SB), net = SB.n ? SB.pnl/SB.n : null;
-    let aplus = cand; if (cand){ if (SB.n < minN){ aplus = false; why.push(`kurulum örneği az (${SB.n}/${minN})`); } else if (sh < minHit){ aplus = false; why.push(`kurulum geçmişte %${Math.round(sh*100)} tuttu (<%${Math.round(minHit*100)})`); } else if (net <= 0){ aplus = false; why.push("kurulum ücret sonrası zararda"); } }
+    let aplus = cand; if (cand){ if (SB.n < minN){ aplus = false; why.push(`kurulum örneği az (${SB.n}/${minN})`); } else if (Math.min(sh, winB(SB)) < minHit){ aplus = false; why.push(`kurulum geçmişte TP/SL %${Math.round(sh*100)} · net kazanç %${Math.round(winB(SB)*100)} (<%${Math.round(minHit*100)})`); } else if (net <= 0){ aplus = false; why.push("kurulum ücret sonrası zararda"); } }
     if (aplus && intraday && hb && hb.n >= 15 && hb.ok/hb.n < 0.47){ aplus = false; why.push(`bu saat (${hr}:00 UTC) tutmuyor`); }
     const stop = px - d*sdist, tp = px + d*sdist;
     if (cand && !isLive) pend.push({ i, d, stop, tp, key });
@@ -160,7 +165,7 @@ function walk(P, opts = {}){ const b = P.b, n = P.n, from = Math.max(60, opts.fr
     /* squeeze / breakout */
     let sq = null; if (a.T.sqz && P.box[i - 1]){ const bx = P.box[i - 1], h = bx.hi - bx.lo, dd = a.T.sqz; sq = { kind: dd > 0 ? "PUMP" : "DUMP", box: bx, stop: dd > 0 ? bx.lo : bx.hi, tp: px + dd*h, d: dd };
       if (!isLive){ sqPend.push({ i, d: dd, stop: sq.stop, tp: sq.tp, max: Math.max(10, Math.min(30, bx.len)) }); brk.push({ i, d: dd, t: b[i].t, entry: px, stop: sq.stop, tp: sq.tp }); if (dd > 0) sqB.ups++; else sqB.dns++; } }
-    if (i === n - 1){ const live = { i, a, sc, d, cand, aplus, why, key, setup: { n: SB.n, hit: sh, net }, plan: d ? { d, entry: px, stop, tp, tp2: px + 2*d*sdist, sPct, netR: (sPct - FEE)/sPct } : null, sq, hour: hr, hourB: hb, sess: SESS(hr) };
+    if (i === n - 1){ const live = { i, a, sc, d, cand, aplus, why, key, setup: { n: SB.n, hit: sh, net, win: winB(SB), tpRate: tpRateB(SB), to: (SB.top || 0) + (SB.ton || 0) }, plan: d ? { d, entry: px, stop, tp, tp2: px + 2*d*sdist, sPct, netR: (sPct - FEE)/sPct } : null, sq, hour: hr, hourB: hb, sess: SESS(hr) };
       /* fake-out: a breakout within the last 3 closed bars whose close is back inside its box */
       for (const k of brk.slice(-3)) if (i - k.i <= 3 && i > k.i){ const bx = P.box[k.i - 1]; if (bx && px < bx.hi && px > bx.lo) live.fake = { d: k.d, box: bx, at: k.i }; }
       const s0 = P.sq[i] || P.sq[i - 1]; if (!sq && s0) live.squeeze = { box: P.box[i] || P.box[i - 1], cond: s0 };
@@ -295,5 +300,5 @@ function mainView(dec, D, mi, tfL){ D = D || {}; const stD = D.state === "LONG" 
   const conflict = !!(dec.dir && own && own === -dec.dir) || !!(dec.d && stD && stD === -dec.d);
   const sub = dec.word === "BEKLE" ? `BEKLE · yön ${dec.dirW.toLocaleLowerCase("tr")}${dec.trig.length ? ", tetik: " + dec.trig[0].t : ""}` : dec.line;
   return { word: dec.word, sub, tag, conflict, note: conflict ? `bu aralık ters (${tfL || ""} ${own > 0 ? "yukarı" : "aşağı"}, genel yön ${dec.dirW.toLocaleLowerCase("tr")}): dikkat` : null }; }
-return { decision, mainView, DIRW, REV, revOf, revWhy, bosOf, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
+return { decision, mainView, DIRW, REV, revOf, revWhy, bosOf, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, winB, tpRateB, bucket, addB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
 });

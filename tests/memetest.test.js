@@ -11,7 +11,7 @@ const src = fs.readFileSync(path.join(__dirname, "..", "meme.js"), "utf8");
 { /* GERÇEK limits identical to the previous release: defaults and allowed ranges unchanged */
   let head = ""; try { head = cp.execSync("git show 3d74de4254:meme.js", { cwd: path.join(__dirname, ".."), encoding: "utf8" }); } catch(e){}
   if (!head){ console.log("SKIP no git history"); }
-  else { const def = s => (s.match(/const DEF = \{[^\n]*/) || [""])[0].replace(" simLoose: true,", ""), rng = s => (s.match(/const RANGE = \{[^\n]*\n[^\n]*/) || [""])[0];
+  else { const def = s => (s.match(/const DEF = \{[^\n]*/) || [""])[0].replace(" simLoose: true,", "").replace("SIM_FALLBACK", "SIM_DEFAULT") /* v7.40: SIM-only constant renamed, same value */, rng = s => (s.match(/const RANGE = \{[^\n]*\n[^\n]*/) || [""])[0];
     ok("GERÇEK defaults (maxTrade/budget/dailyLoss/maxPos/rules…) unchanged", def(src) === def(head));
     ok("allowed setting ranges unchanged", rng(src) === rng(head));
     const fn = (s, n) => { const i = s.indexOf("function " + n); if (i < 0) return "?"; const j = s.slice(i + 1).search(/\n(function |const |let |\/\*)/); return s.slice(i, i + 1 + j); }, lim = s => fn(s, "limitsErr"), rc = s => fn(s, "riskCheck"), pz = s => fn(s, "riskOnClose");

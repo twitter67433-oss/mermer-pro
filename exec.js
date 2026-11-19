@@ -12,9 +12,11 @@ const EXEC = (() => {
 const T = () => window.TRADE, W = () => window.WALLET;
 const now = () => performance.now();
 const K = "neon.exec";
-const DEF = { rpc: "", ws: "", jito: false, tip: 0.0001, skipPre: true, fan: true, simDelay: 600, dryPipe: true };
+const DEF = { rpc: "", ws: "", jito: false, tip: 0.0001, skipPre: false, fan: true, simDelay: 600, dryPipe: true }; /* v7.40: preflight ON by default (skipPre = advanced, with a warning) */
 let C = Object.assign({}, DEF, (() => { try { return JSON.parse(localStorage.getItem(K) || "{}"); } catch(e){ return {}; } })());
 if (!C.rpc){ const old = (localStorage.getItem("neon.rpc") || "").trim(); if (/^https:\/\//.test(old)) C.rpc = old; }
+/* v7.40 migration (once): skipPreflight was ON by default before — switch it OFF so the RPC simulates every GERÇEK tx before it lands; the user can re-enable it in the advanced settings */
+if ((C.pv|0) < 1){ C.skipPre = false; C.pv = 1; try { localStorage.setItem(K, JSON.stringify(C)); } catch(e){} }
 function set(o){ Object.assign(C, o); localStorage.setItem(K, JSON.stringify(C)); if (C.rpc) localStorage.setItem("neon.rpc", C.rpc); else localStorage.removeItem("neon.rpc"); }
 /* api.mainnet-beta.solana.com answers 403 to any browser Origin (HTTP and WS, checked 2026-11-10) → not used from the page */
 const PUB = ["https://solana-rpc.publicnode.com", "https://solana-mainnet.gateway.tatum.io"];
@@ -44,21 +46,41 @@ function swOpen(){ if (SW.ws) return; const ws = new WebSocket(wsUrl()); SW.ws =
   ws.onclose = () => { SW.ws = null; SW.open = false; SW.sub.clear(); }; ws.onerror = () => {}; }
 function wsWait(sig){ return new Promise(res => { const go = () => { const id = SW.id++; SW.req.set(id, res); SW.ws.send(JSON.stringify({ jsonrpc: "2.0", id, method: "signatureSubscribe", params: [sig, { commitment: "confirmed" }] })); };
   swOpen(); SW.open ? go() : SW.q.push(go); }); }
-async function confirm(sig, ms = 40000){ const t0 = Date.now(); let done = false;
-  const poll = (async () => { await new Promise(r => setTimeout(r, 900)); while (!done && Date.now() - t0 < ms){
-      try { const r = await T().ph.rpc("getSignatureStatuses", [[sig]]); const s = r && r.value && r.value[0];
-        if (s && (s.err || s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized")) return { err: s.err, via: "poll" }; } catch(e){}
-      await new Promise(r => setTimeout(r, 900)); } return null; })();
-  const ws = wsWait(sig).then(v => ({ err: v && v.err, via: "ws" }));
-  const to = new Promise(r => setTimeout(() => r(null), ms));
-  const r = await Promise.race([ws, poll.then(x => x || to), to]); done = true;
-  if (!r) throw new Error("onay zaman aşımı (işlem yine de gerçekleşmiş olabilir: Solscan'de kontrol et)");
-  if (r.err) throw Object.assign(new Error("işlem zincirde başarısız: " + JSON.stringify(r.err)), { chain: true }); return r.via; }
+/* v7.40: a timeout is NOT a failure. settle() keeps checking getSignatureStatuses (and the WS notification) until the tx is confirmed / failed,
+   or until its blockhash is no longer valid (isBlockhashValid = false → it can never land → EXPIRED). Only then is the outcome final.
+   If the RPCs cannot answer at all within the hard cap the result is BELİRSİZ: nothing is resent, the key stays blocked and a background check continues. */
+const SETTLE = { CONFIRMED: "ONAYLANDI", FAILED: "BAŞARISIZ", EXPIRED: "SÜRESİ DOLDU", UNKNOWN: "BELİRSİZ" };
+async function settle(io, sig, bh, o = {}){ const t0 = io.now(), cap = o.cap || 120000, minBh = o.minBh ?? 20000, step = o.step || 900; let rpcOk = false, bhOk = null;
+  while (io.now() - t0 < cap){
+    if (io.ws && io.ws.done){ const v = io.ws.value; return v && v.err ? { state: "FAILED", err: v.err, via: "ws" } : { state: "CONFIRMED", via: "ws" }; }
+    try { const s = await io.status(sig); rpcOk = true; if (s){ if (s.err) return { state: "FAILED", err: s.err, via: "poll" }; if (s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized") return { state: "CONFIRMED", via: "poll" }; } } catch(e){}
+    if (bh && io.now() - t0 >= minBh){ try { bhOk = await io.bhValid(bh); } catch(e){ bhOk = null; }
+      if (bhOk === false){ try { const s = await io.status(sig); if (s && s.err) return { state: "FAILED", err: s.err, via: "poll" }; if (s && (s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized")) return { state: "CONFIRMED", via: "poll" }; if (s) { await io.sleep(step); continue; } } catch(e){ await io.sleep(step); continue; }
+        return { state: "EXPIRED" }; } }
+    await io.sleep(step); }
+  return { state: "UNKNOWN", rpcOk }; }
+/* pending ledger (idempotency): key = "<buy|sell>:<mint>" → { sig, bh, t }. While a key is pending, real() refuses to send that action again. */
+const PK = "neon.exec.pend"; let PEND = (() => { try { return JSON.parse(localStorage.getItem(PK) || "{}") || {}; } catch(e){ return {}; } })();
+const pendSave = () => { try { localStorage.setItem(PK, JSON.stringify(PEND)); } catch(e){} };
+const pending = key => { const e = PEND[key]; if (e && Date.now() - e.t > 30*60000){ delete PEND[key]; pendSave(); return null; } return e || null; };
+function io(sig){ const w = { done: false, value: null }; wsWait(sig).then(v => { w.done = true; w.value = v; }).catch(() => {});
+  return { now: () => Date.now(), sleep: ms => new Promise(r => setTimeout(r, ms)), ws: w,
+    status: async s => { const r = await T().ph.rpc("getSignatureStatuses", [[s], { searchTransactionHistory: true }]); return r && r.value && r.value[0]; },
+    bhValid: async bh => { const r = await T().ph.rpc("isBlockhashValid", [bh, { commitment: "processed" }]); return r && typeof r.value === "boolean" ? r.value : null; } }; }
+function bgSettle(key, sig, bh){ (async () => { const r = await settle(io(sig), sig, bh, { cap: 15*60000, minBh: 0, step: 5000 }); if (r.state === "UNKNOWN") return; /* stays pending; expires from the ledger after 30 min */
+    delete PEND[key]; pendSave(); try { window.dispatchEvent(new CustomEvent("exec:settled", { detail: { key, sig, state: r.state, err: r.err || null } })); } catch(e){} })(); }
+async function confirm(sig, ms = 40000, bh){ const r = await settle(io(sig), sig, bh, { cap: bh ? Math.max(ms, 90000) : ms });
+  if (r.state === "CONFIRMED") return r.via;
+  if (r.state === "FAILED") throw Object.assign(new Error("işlem zincirde başarısız: " + JSON.stringify(r.err)), { chain: true, final: true });
+  if (r.state === "EXPIRED") throw Object.assign(new Error("işlem zincire girmedi (blockhash süresi doldu) — gönderilmemiş sayılır"), { expired: true, final: true });
+  throw Object.assign(new Error("onay BELİRSİZ: RPC yanıt vermedi — işlem gerçekleşmiş olabilir; tekrar GÖNDERİLMEDİ, arka planda kontrol ediliyor (Solscan: " + sig.slice(0, 10) + "…)"), { uncertain: true, sig }); }
 /* ---------------- send fan-out ---------------- */
 async function fan(raw){ const L = C.fan ? rpcs() : rpcs().slice(0, 1), enc = b64(raw);
   const opts = { encoding: "base64", skipPreflight: !!C.skipPre, preflightCommitment: "processed", maxRetries: 3 };
   const ps = L.map(u => post(u, "sendTransaction", [enc, opts], 6000).then(() => host(u)));
-  try { return await Promise.any(ps); } catch(e){ const errs = (e.errors || [e]).map(x => x.message); throw new Error("gönderilemedi: " + errs.join(" | ").slice(0, 220)); } }
+  try { return await Promise.any(ps); } catch(e){ const all = e.errors || [e], errs = all.map(x => x.message);
+    /* every RPC answered with a JSON-RPC error (e.g. preflight simulation failed) → definitively not sent; a network error/timeout on any RPC = maybe sent */
+    throw Object.assign(new Error("gönderilemedi: " + errs.join(" | ").slice(0, 220)), { final: all.length > 0 && all.every(x => x && x.rpc) }); } }
 async function tipAccounts(){ if (ST.tips) return ST.tips; ST.tips = await post(JITO + "/bundles", "getTipAccounts", [], 4000); return ST.tips; }
 async function jitoBundle(raw){ const w3 = await T().ph.web3(), kp = W().kpPub; if (!kp) throw new Error("kilitli");
   if (!ST.bh || bhAge() > 20000) await refreshBh(); const acc = (await tipAccounts())[Math.floor(Math.random()*8)];
@@ -77,18 +99,24 @@ function record(m){ ST.lat.unshift(m); if (ST.lat.length > 60) ST.lat.length = 6
 try { ST.lat = JSON.parse(sessionStorage.getItem("neon.lat") || "[]"); } catch(e){}
 /* ---------------- REAL swap (bot wallet) ---------------- */
 async function real(o, tEv, meta = {}){ const w = W(); if (!w || !w.unlocked()) throw new Error("BOT CÜZDANI kilitli ya da yok");
+  const key = (meta.key || (o.action + ":" + o.mint)), pe = pending(key); if (pe) throw Object.assign(new Error(`önceki ${o.action === "buy" ? "alım" : "satış"} BELİRSİZ (${pe.sig.slice(0, 8)}…) — sonuç netleşmeden tekrar gönderilmez`), { pendingBlock: true, sig: pe.sig });
   const m = { t: Date.now(), mode: "GERÇEK", sym: o.sym, side: o.action, src: meta.src || "", pre: false };
   const t0 = tEv || now(); ST.pend++;
   try { let bytes = meta.preKey ? takePre(meta.preKey, meta.ref, (o.slip || 20)/3) : null; m.pre = !!bytes; const tb = now();
     if (!bytes) bytes = await build(w.pub(), o); m.build = now() - tb;
     const w3 = await T().ph.web3(); const ts = now(); const tx = w3.VersionedTransaction.deserialize(bytes); w.sign(tx); m.sign = now() - ts;
-    const raw = tx.serialize(), sig = w.b58(tx.signatures[0]); m.sig = sig;
+    const raw = tx.serialize(), sig = w.b58(tx.signatures[0]); m.sig = sig; const bh = tx.message && tx.message.recentBlockhash;
+    PEND[key] = { sig, bh, t: Date.now() }; pendSave(); /* written BEFORE the send: a crash/reload mid-send still blocks a duplicate */
     const ps = [fan(raw)]; if (C.jito) ps.push(jitoBundle(raw).catch(() => null));
-    const tSend = now(); m.via = await Promise.any(ps.map(p => p.then(v => { if (!v) throw 0; return v; }))).catch(e => { throw new Error((e.errors && e.errors[0] && e.errors[0].message) || e.message || "gönderilemedi"); });
+    const tSend = now(); m.via = await Promise.any(ps.map(p => p.then(v => { if (!v) throw 0; return v; }))).catch(e => { const f = e.errors && e.errors[0]; throw Object.assign(new Error((f && f.message) || e.message || "gönderilemedi"), { final: !C.jito && !!(f && f.final) }); });
     m.ev2sent = tSend - t0; m.ack = now() - tSend; ST.sent++; window.BUS && BUS.emit("order", { to: "pf", from: "bt" });
-    const cv = await confirm(sig); m.sent2conf = now() - tSend; m.confVia = cv; ST.conf++; m.ok = true; record(m);
+    let cv; try { cv = await confirm(sig, 40000, bh); } catch(e){ if (e.uncertain){ m.unc = true; bgSettle(key, sig, bh); } else { delete PEND[key]; pendSave(); } throw e; }
+    delete PEND[key]; pendSave(); m.sent2conf = now() - tSend; m.confVia = cv; ST.conf++; m.ok = true; record(m);
     return { sig, m }; }
-  catch(e){ ST.fail++; m.ok = false; m.err = e.message; record(m); throw e; } finally { ST.pend--; } }
+  catch(e){ ST.fail++; m.ok = false; m.err = e.message; record(m);
+    if (e.final && PEND[key] && PEND[key].sig === m.sig){ delete PEND[key]; pendSave(); }
+    else if (!e.uncertain && !e.pendingBlock && PEND[key] && !e.final){ /* send itself failed (no RPC accepted it) → check once more that it did not land, then release */ const pe = PEND[key]; bgSettle(key, pe.sig, pe.bh); }
+    throw e; } finally { ST.pend--; } }
 /* exact SOL / token delta of a confirmed bot tx (off the critical path) */
 async function txDelta(sig, mint){ const pub = W().pub();
   for (let i = 0; i < 6; i++){ try { const tx = await T().ph.rpc("getTransaction", [sig, { encoding: "jsonParsed", commitment: "confirmed", maxSupportedTransactionVersion: 0 }]);
@@ -130,6 +158,6 @@ async function probe(mint){ const out = [];
   return out; }
 const stats = () => { const ok = ST.lat.filter(x => x.ok), avg = k => { const v = ok.map(x => x[k]).filter(x => isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0)/v.length : null; };
   return { n: ST.lat.length, ok: ok.length, ev2sent: avg("ev2sent"), sent2conf: avg("sent2conf"), build: avg("build"), pend: ST.pend, sent: ST.sent, conf: ST.conf, fail: ST.fail, bhAge: bhAge(), bhRtt: ST.bhRtt, bhVia: ST.bhVia, rtt: [...ST.rtt].map(([u, e]) => [host(u), e.ms, e.ok, e.bad]) }; };
-return { get C(){ return C; }, set, real, sim, txDelta, prebuild, takePre, keepWarm, refreshBh, probe, stats, confirm, buyOut, sellOut, get lat(){ return ST.lat; }, rpcs, wsUrl, PUMP_FEE, PP_FEE, RENT, BASE_FEE, _ST: ST };
+return { get C(){ return C; }, set, real, sim, settle, SETTLE, pending, get PEND(){ return PEND; }, txDelta, prebuild, takePre, keepWarm, refreshBh, probe, stats, confirm, buyOut, sellOut, get lat(){ return ST.lat; }, rpcs, wsUrl, PUMP_FEE, PP_FEE, RENT, BASE_FEE, _ST: ST };
 })();
 window.EXEC = EXEC;

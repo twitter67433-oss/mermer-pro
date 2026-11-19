@@ -40,11 +40,17 @@ function rd(k){ try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; 
   if (!p.key) localStorage.setItem(PK[w], JSON.stringify({ key: o.key, secret: o.secret }));
   o.active = o.active || w; delete o.key; delete o.secret; delete o.testnet; localStorage.setItem(BK, JSON.stringify(o)); } })();
 function base(){ return Object.assign({ active: "test", lev: 1, attach: true }, rd(BK)); }
-function prof(w){ return Object.assign({ key: "", secret: "" }, rd(PK[w])); }
-function bget(w){ const b = base(), a = w || b.active, p = prof(a); return Object.assign({}, b, { which: a, key: p.key, secret: p.secret, testnet: a !== "real" }); }
+/* v7.40: secret at rest is AES-GCM encrypted (BKEYS, PIN-derived key); plaintext records from ≤ v7.39 still work for TESTNET until sealed, GERÇEK orders need the sealed form */
+function prof(w){ const r = rd(PK[w]); return { key: r.key || "", secret: BKEYS.secretOf(r, w), enc: r.enc || null, st: BKEYS.state(r, w) }; }
+function pput(w, rec){ localStorage.setItem(PK[w], JSON.stringify({ key: rec.key, enc: rec.enc })); }
+async function ensureOpen(w){ w = w || base().active; const r = rd(PK[w]), st = BKEYS.state(r, w); if (st !== "locked") return st !== "none";
+  for (let i = 0; i < 3; i++){ const pin = await BKEYS.ask((w === "real" ? "GERÇEK" : "TEST") + " API SECRET KİLİDİNİ AÇ", "Secret bu cihazda PIN'inle şifreli. Sayfa yenilenince yeniden kilitlenir.", "KİLİDİ AÇ"); if (pin === null) return false;
+    try { await BKEYS.open(r, pin, w); return true; } catch(e){ try { NOTIFY.toast("✖ " + e.message, "bad"); } catch(x){} } } return false; }
+const lockedErr = w => new Error(`${w === "real" ? "GERÇEK" : "TEST"} API Secret kilitli — İŞLEM'de YENİLE'ye dokunup PIN gir (ya da BAĞLANTILAR → BINANCE).`);
+function bget(w){ const b = base(), a = w || b.active, p = prof(a); return Object.assign({}, b, { which: a, key: p.key, secret: p.secret, kst: p.st, testnet: a !== "real" }); }
 function bset(o){ const b = rd(BK); delete o.key; delete o.secret; delete o.testnet; localStorage.setItem(BK, JSON.stringify(Object.assign(b, o))); }
-function pset(w, o){ localStorage.setItem(PK[w], JSON.stringify(Object.assign(prof(w), o))); }
-function pdel(w){ localStorage.removeItem(PK[w]); }
+function pset(w, o){ const r = rd(PK[w]); if (o && o.secret) throw new Error("Secret düz metin saklanmaz — PIN ile şifrele"); localStorage.setItem(PK[w], JSON.stringify(Object.assign({ key: r.key, enc: r.enc }, o))); }
+function pdel(w){ localStorage.removeItem(PK[w]); BKEYS.lock(w); }
 const REST = t => t ? "https://testnet.binancefuture.com" : "https://fapi.binance.com";
 const WSAPI = t => t ? "wss://testnet.binancefuture.com/ws-fapi/v1" : "wss://ws-fapi.binance.com/ws-fapi/v1";
 const ERR_TR = { "-1000": "Binance bilinmeyen hata", "-1003": "Çok fazla istek, biraz bekle", "-1021": "Zaman damgası uyuşmuyor (saat senkronu); tekrar dene",
@@ -67,7 +73,7 @@ async function syncTime(t){ if (tFor === t && Date.now() - tAt < 300e3) return; 
 async function pub(path, c){ c = c || bget(); const r = await fetch(REST(c.testnet) + path, { cache: "no-store" }); const j = await r.json().catch(() => ({}));
   if (!r.ok || (j && j.code < 0)) throw new BErr({ http: r.status, code: j.code, msg: j.msg }); return j; }
 async function signed(method, path, params = {}, c){
-  c = c || bget(); if (!c.key || !c.secret) throw new Error("Önce API Key ve Secret gir (BAĞLANTILAR → BINANCE).");
+  c = c || bget(); if (c.key && !c.secret && c.kst === "locked") throw lockedErr(c.which); if (!c.key || !c.secret) throw new Error("Önce API Key ve Secret gir (BAĞLANTILAR → BINANCE).");
   await syncTime(c.testnet);
   const q = new URLSearchParams(Object.assign({}, params, { timestamp: Date.now() + tOff, recvWindow: 5000 })).toString();
   const sig = await hmac(c.secret, q);
@@ -87,7 +93,7 @@ function wsOpen(t){
   return wsc.ready;
 }
 async function wsCall(method, params, c){
-  c = c || bget(); if (!c.key || !c.secret) throw new Error("Önce API Key ve Secret gir (BAĞLANTILAR → BINANCE).");
+  c = c || bget(); if (c.key && !c.secret && c.kst === "locked") throw lockedErr(c.which); if (!c.key || !c.secret) throw new Error("Önce API Key ve Secret gir (BAĞLANTILAR → BINANCE).");
   await syncTime(c.testnet); await wsOpen(c.testnet);
   const p = Object.assign({}, params, { apiKey: c.key, timestamp: Date.now() + tOff, recvWindow: 5000 });
   const q = Object.keys(p).sort().map(k => k + "=" + p[k]).join("&"); p.signature = await hmac(c.secret, q);
@@ -113,8 +119,9 @@ async function meta(d){ const base = typeof d === "string" ? d : d.base, exact =
 const UM = () => (D && D.src === "fut") ? 1 : (M ? M.mult : 1);
 const floorStep = (x, step, d) => (Math.floor(x/step + 1e-9)*step).toFixed(d), roundTick = (x, tick, d) => (Math.round(x/tick)*tick).toFixed(d);
 let acct = null, dual = null, M = null;
-async function refreshAccount(){
-  const c = bget(); if (!c.key){ renderAcct(); return; }
+async function refreshAccount(interactive){
+  if (interactive === true && !(await ensureOpen())){ renderAcct("API Secret kilitli — YENİLE ile PIN gir"); return; }
+  const c = bget(); if (!c.key){ renderAcct(); return; } if (!c.secret && c.kst === "locked"){ acct = null; renderAcct("🔒 API Secret kilitli — YENİLE'ye dokunup PIN gir"); return; }
   try {
     let a; try { a = await signed("GET", "/fapi/v2/account"); } catch(e){ if (e.http === 404 || e.code === -5000) a = await signed("GET", "/fapi/v3/account"); else throw e; }
     let pos; try { pos = await signed("GET", "/fapi/v2/positionRisk"); } catch(e){ pos = await signed("GET", "/fapi/v3/positionRisk"); }
@@ -136,62 +143,72 @@ function renderAcct(err){
   el.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closePosition(b.dataset.close, b.dataset.ps));
 }
 function levelsFor(side){ const S = D && D.data.signal; if (!S) return null; return S.levels[side]; }
+/* v7.40: sizing goes through BFXSAFE.size() — manual quantity is validated against max zarar (incl. taker fees + slippage both legs), cap and margin;
+   NaN / Infinity / negative / zero-distance stops are rejected; minNotional vs max-loss conflicts block the order. Leverage change re-runs calc(). */
+function sizeNow(px, opt){ const cfg = ENGINE.config(), f = $("#bfx-form"), side = f.dataset.side, lev = +$("#bfx-lev").value || 1;
+  return BFXSAFE.size({ side, px, st: BFXSAFE.num($("#bfx-stop").value), tg: BFXSAFE.num($("#bfx-tgt").value), lev, manual: $("#bfx-qty").value, maxLoss: cfg.max_loss_per_trade,
+    accountSize: cfg.account_size, capPct: cfg.position_cap_pct, avail: opt && opt.avail !== undefined ? opt.avail : (acct ? acct.avail : null), M }); }
 async function calc(){
-  const out = $("#bfx-calc"); if (!out || !D) return null; const c = bget(), cfg = ENGINE.config();
-  const side = $("#bfx-form").dataset.side, L = side === "long", lev = +$("#bfx-lev").value || 1;
-  const px = (livePx || D.price) * UM(); const st = +$("#bfx-stop").value, tg = +$("#bfx-tgt").value;
+  const out = $("#bfx-calc"); if (!out || !D) return null; const c = bget();
   if (!M){ out.innerHTML = `<div class="err-line">✖ ${esc(D.base)} için Binance USDⓈ-M vadeli sözleşme bulunamadı (${c.testnet ? "testnet" : "gerçek"}).</div>`; return null; }
-  const rpu = Math.abs(px - st), riskQty = rpu > 0 ? cfg.max_loss_per_trade/rpu : 0;
-  let capN = cfg.account_size*cfg.position_cap_pct/100*lev, capBy = `pozisyon tavanı %${cfg.position_cap_pct} × ${lev}x`;
-  if (acct && acct.avail*lev*0.95 < capN){ capN = acct.avail*lev*0.95; capBy = "kullanılabilir bakiye × kaldıraç"; }
-  let raw = Math.min(riskQty, capN/px), by = riskQty <= capN/px ? `max zarar $${cfg.max_loss_per_trade}` : capBy;
-  const man = $("#bfx-qty").value.trim(); if (man){ raw = +man; by = "elle girildi"; }
-  const qty = +floorStep(raw, M.step, M.qdec), notional = qty*px, margin = notional/lev, loss = qty*rpu;
-  const issues = [];
-  if (L ? !(st < px && tg > px) : !(st > px && tg < px)) issues.push(L ? "LONG için stop fiyatın altında, hedef üstünde olmalı" : "SHORT için stop fiyatın üstünde, hedef altında olmalı");
-  if (qty < M.minQty) issues.push(`miktar minimumun altında (min ${M.minQty})`);
-  if (notional < M.minNotional) issues.push(`tutar $${notional.toFixed(2)} < Binance minimumu $${M.minNotional} (max zararı ya da kaldıracı artır)`);
-  if (qty > M.maxQty) issues.push("miktar üst sınırı aşıyor");
-  if (acct && margin > acct.avail) issues.push("teminat yetersiz");
+  const px = (livePx || D.price) * UM(), k = sizeNow(px), cfg = ENGINE.config();
   out.innerHTML = `<div class="kv"><span class="k">Sözleşme</span><span class="v">${esc(M.symbol)}${UM() > 1 ? ` (spot fiyatı ×${M.mult})` : ""} · ${D.src === "fut" ? "PERP" : "SPOT verisi"}</span>
-    <span class="k">Fiyat (canlı)</span><span class="v">${fp(px)}</span><span class="k">Miktar</span><span class="v">${qty.toFixed(M.qdec)} <small>(${esc(by)})</small></span>
-    <span class="k">Tutar / teminat</span><span class="v">$${notional.toFixed(2)} / $${margin.toFixed(2)}</span><span class="k">Stopta zarar ≈</span><span class="v dn">$${loss.toFixed(2)}</span>
-    <span class="k">Hedefte kâr ≈</span><span class="v up">$${(qty*Math.abs(tg - px)).toFixed(2)}</span></div>${issues.map(i => `<div class="err-line">✖ ${esc(i)}</div>`).join("")}`;
-  return { side, L, lev, px, st, tg, qty, notional, margin, loss, ok: !issues.length, issues };
-}
+    <span class="k">Fiyat (canlı)</span><span class="v">${fp(px)}</span><span class="k">Miktar</span><span class="v">${k.qty.toFixed(M.qdec)} <small>(${esc(k.by)}${k.maxQty > 0 ? ` · en çok ${BFXSAFE.floorStep(k.maxQty, M.step, M.qdec)}` : ""})</small></span>
+    <span class="k">Tutar / teminat</span><span class="v">$${k.notional.toFixed(2)} / $${k.margin.toFixed(2)}</span><span class="k">Stopta zarar ≈</span><span class="v dn">$${k.loss.toFixed(2)} <small>(ücret+kayma dahil · max $${cfg.max_loss_per_trade})</small></span>
+    <span class="k">Hedefte kâr ≈</span><span class="v up">$${k.gain.toFixed(2)} <small>(ücret sonrası)</small></span></div>${k.issues.map(i => `<div class="err-line">✖ ${esc(i)}</div>`).join("")}
+    <div class="dim" style="font-size:10.5px">varsayım: taker %${(k.fee*100).toFixed(2)} + kayma %${(k.slip*100).toFixed(2)} her bacakta</div>`;
+  return Object.assign({ side: k.L ? "long" : "short" }, k); }
+/* v7.40 order ledger: a symbol whose last order ended BELİRSİZ (reply lost) is blocked until reconciled — never resent blindly */
+const PENDK = "neon.bfx.pend", pendRd = () => { try { return JSON.parse(localStorage.getItem(PENDK) || "{}") || {}; } catch(e){ return {}; } }, pendWr = o => localStorage.setItem(PENDK, JSON.stringify(o));
+const inflight = new Set();
+function safeApi(c){ return { place: p => wsCall("order.place", p, c), algoPlace: p => wsCall("algoOrder.place", p, c), algoCancel: p => wsCall("algoOrder.cancel", p, c),
+  query: async p => { try { return await signed("GET", "/fapi/v1/order", p, c); } catch(e){ if (e && (e.code === -2013 || e.http === 400)) throw e; return await wsCall("order.status", p, c); } },
+  openAlgo: async sym => { const r = await signed("GET", "/fapi/v1/openAlgoOrders", { symbol: sym, algoType: "CONDITIONAL" }, c); return Array.isArray(r) ? r : (r && (r.orders || r.rows)) || []; },
+  positions: async sym => (await positionsNow(c)).filter(p => p.symbol === sym),
+  sleep: ms => new Promise(r => setTimeout(r, ms)), log: (m, cls) => log("#bfx-log", esc(m), cls), err: e => trErr(e),
+  critical: m => { log("#bfx-log", "‼ " + esc(m), "dn crit"); try { NOTIFY.ping("bad", "‼ " + m); } catch(e){} try { window.BUS && BUS.emit("critical", { msg: m }); } catch(e){} } }; }
+async function pendCheck(c, sym){ const P = pendRd(), e = P[sym]; if (!e) return true; if (Date.now() - e.t > 24*3600e3){ delete P[sym]; pendWr(P); return true; }
+  const o = await BFXSAFE.reconcile(safeApi(c), sym, e.cid, 2); if (o){ delete P[sym]; pendWr(P); log("#bfx-log", `Önceki BELİRSİZ emir çözüldü: ${esc(o.status)}`, "up"); return true; }
+  log("#bfx-log", `✖ ${esc(sym)}: önceki emir hâlâ BELİRSİZ (${esc(e.cid)}) — Binance'te kontrol et; yeni emir engellendi.`, "dn"); return false; }
 async function placeOrder(){
+  if (!(await ensureOpen())){ log("#bfx-log", "✖ API Secret kilitli/eksik — emir gönderilmedi.", "dn"); return; }
   const c = bget(); if (!c.key || !c.secret){ log("#bfx-log", "✖ Önce API anahtarlarını kaydet.", "dn"); return; }
+  if (!c.testnet && c.kst === "plain"){ log("#bfx-log", "✖ Güvenlik: GERÇEK API Secret düz metin saklanıyor — önce BAĞLANTILAR → BINANCE'ta PIN ile şifrele.", "dn"); return; }
   try { await syncTime(c.testnet); M = await meta(D); } catch(e){ log("#bfx-log", "✖ " + esc(trErr(e)), "dn"); return; }
   const k = await calc(); if (!k) return; if (!k.ok){ log("#bfx-log", "✖ Emir hazırlanamadı: " + esc(k.issues.join("; ")), "dn"); return; }
   const attach = $("#bfx-attach").checked, mode = c.testnet ? "TESTNET" : "GERÇEK";
+  if (!c.testnet && !attach){ log("#bfx-log", "✖ GERÇEK hesapta stop zorunlu: 'Stop ve hedef emirlerini ekle' kutusunu işaretle.", "dn"); return; }
+  if (inflight.has(M.symbol)){ log("#bfx-log", "✖ Bu sembolde bir emir zaten işleniyor (çift dokunma engellendi).", "dn"); return; }
+  if (!(await pendCheck(c, M.symbol))) return;
   let tMark = null; if (c.testnet) try { tMark = +(await pub("/fapi/v1/premiumIndex?symbol=" + M.symbol)).markPrice; } catch(e){}
   const rows = [["Mod", mode, c.testnet ? "" : "dn"], ["Sembol", M.symbol], ["Yön", k.L ? "LONG (BUY)" : "SHORT (SELL)", k.L ? "up" : "dn"], ["Tür", "MARKET (piyasa)"],
     ["Miktar", k.qty.toFixed(M.qdec)], ["Tutar ≈", "$" + k.notional.toFixed(2)], ["Kaldıraç", k.lev + "x", k.lev > 3 ? "dn" : ""], ["Teminat ≈", "$" + k.margin.toFixed(2)],
     ["Stop", attach ? roundTick(k.st, M.tick, M.pdec) + " (STOP_MARKET, tümünü kapat)" : "YOK", attach ? "dn" : "dn"], ["Hedef", attach ? roundTick(k.tg, M.tick, M.pdec) + " (TAKE_PROFIT_MARKET)" : "YOK", "up"],
-    ["Stopta zarar ≈", "$" + k.loss.toFixed(2), "dn"], ["Analiz fiyatı", fp(k.px) + (D.src === "fut" ? " (mainnet PERP)" : " (SPOT)")]];
+    ["Stopta zarar ≈", "$" + k.loss.toFixed(2) + " (ücret+kayma dahil)", "dn"], ["Analiz fiyatı", fp(k.px) + (D.src === "fut" ? " (mainnet PERP)" : " (SPOT)")]];
   if (tMark) rows.push(["Testnet mark fiyatı", fp(tMark), Math.abs(tMark/k.px - 1) > 0.01 ? "dn" : ""]);
   const warn = (k.lev > 3 ? "⚠ Yüksek kaldıraç: küçük bir hareket teminatını eritebilir, likidasyon riski var.<br>" : "") + (attach ? "" : "⚠ Stop eklenmedi: zarar sınırsız büyüyebilir.<br>") +
     (c.testnet ? `ℹ Testnet fiyatı gerçek piyasadan farklı olabilir${tMark && Math.abs(tMark/k.px - 1) > 0.01 ? ` (şu an %${((tMark/k.px - 1)*100).toFixed(1)} fark — stop/hedef testnette hemen tetiklenebilir ya da reddedilebilir)` : ""}. Analiz gerçek (mainnet) vadeli verisini kullanır.<br>` : "") +
     (D.src !== "fut" ? "⚠ Analiz SPOT verisiyle yapıldı (Futures erişilemedi); vadeli fiyat farklı olabilir.<br>" : "") +
     "Sinyal garanti değildir. Piyasa emri anlık fiyattan dolar; kayma olabilir.";
   if (!(await confirmSheet({ title: "EMRİ ONAYLA", rows, mode, warn, okText: "ONAYLA · " + (k.L ? "LONG" : "SHORT") }))){ log("#bfx-log", "Emir iptal edildi (onaylanmadı)."); return; }
-  const side = k.L ? "BUY" : "SELL", ex = k.L ? "SELL" : "BUY", ps = dual ? { positionSide: k.L ? "LONG" : "SHORT" } : {};
+  const Mo = M, sym = Mo.symbol; inflight.add(sym);
   try {
-    try { await signed("POST", "/fapi/v1/leverage", { symbol: M.symbol, leverage: k.lev }); log("#bfx-log", `Kaldıraç ${k.lev}x ayarlandı`); }
-    catch(e){ log("#bfx-log", "⚠ Kaldıraç ayarlanamadı: " + esc(trErr(e)), "dn"); if (e.code === -2015 || e.code === -2014 || e.code === -1022) throw e; }
-    const o = await wsCall("order.place", Object.assign({ symbol: M.symbol, side, type: "MARKET", quantity: k.qty.toFixed(M.qdec), newOrderRespType: "RESULT" }, ps));
+    /* re-validate right before sending: fresh account (margin) + fresh price, same inputs → same rules */
+    await refreshAccount(); if (!acct){ log("#bfx-log", "✖ Hesap okunamadı — emir gönderilmedi.", "dn"); return; }
+    let fresh = k.px; try { fresh = +(await pub("/fapi/v1/ticker/price?symbol=" + sym)).price || k.px; } catch(e){}
+    if (M !== Mo){ log("#bfx-log", "✖ Coin değişti — emir gönderilmedi.", "dn"); return; } const k2 = sizeNow(fresh, { avail: acct.avail }); if (!k2.ok || k2.qty > k.qty + 1e-12){ log("#bfx-log", "✖ Son kontrol başarısız (fiyat/teminat değişti): " + esc(k2.issues.join("; ") || "miktar arttı") + " — tekrar hazırla.", "dn"); calc().catch(() => {}); return; }
+    try { await signed("POST", "/fapi/v1/leverage", { symbol: sym, leverage: k.lev }); log("#bfx-log", `Kaldıraç ${k.lev}x ayarlandı`); }
+    catch(e){ log("#bfx-log", "✖ Kaldıraç ayarlanamadı: " + esc(trErr(e)) + " — emir gönderilmedi", "dn"); return; }
+    const cid = BFXSAFE.cid("mt"), P = pendRd(); P[sym] = { cid, t: Date.now(), net: c.testnet ? "t" : "m" }; pendWr(P);
+    const r = await BFXSAFE.openProtected(safeApi(c), { symbol: sym, L: k.L, qty: k2.qty.toFixed(Mo.qdec), stPx: roundTick(k.st, Mo.tick, Mo.pdec), tgPx: roundTick(k.tg, Mo.tick, Mo.pdec), dual: !!dual, attach, cid });
+    if (r.state !== "BELİRSİZ"){ const Q = pendRd(); delete Q[sym]; pendWr(Q); }
     window.BUS && BUS.emit("order", { to: "bn" });
-    log("#bfx-log", `✔ ${k.L ? "LONG" : "SHORT"} emri gönderildi · #${o.orderId} · ${esc(o.status)} · ort. ${o.avgPrice || "?"} · ${o.executedQty || k.qty}`, "up");
-    if (attach){
-      const ids = JSON.parse(localStorage.getItem("neon.algo." + (c.testnet ? "t" : "m")) || "{}"); ids[M.symbol] = ids[M.symbol] || [];
-      for (const [type, price, name] of [["STOP_MARKET", k.st, "Stop"], ["TAKE_PROFIT_MARKET", k.tg, "Hedef"]]){
-        try { const a = await wsCall("algoOrder.place", Object.assign({ algoType: "CONDITIONAL", symbol: M.symbol, side: ex, type, triggerPrice: roundTick(price, M.tick, M.pdec), closePosition: "true", workingType: "MARK_PRICE" }, ps));
-          ids[M.symbol].push(a.algoId); log("#bfx-log", `✔ ${name} emri kuruldu @ ${roundTick(price, M.tick, M.pdec)} · algo #${a.algoId}`, "up"); }
-        catch(e){ log("#bfx-log", `✖ ${name} emri kurulamadı: ` + esc(trErr(e)) + " — pozisyonu elle kontrol et!", "dn"); }
-      }
-      localStorage.setItem("neon.algo." + (c.testnet ? "t" : "m"), JSON.stringify(ids));
-    }
+    const ids = JSON.parse(localStorage.getItem("neon.algo." + (c.testnet ? "t" : "m")) || "{}"); ids[sym] = ids[sym] || [];
+    for (const x of [r.sl, r.tp]) if (x && x.ok && x.algoId && !ids[sym].includes(x.algoId)) ids[sym].push(x.algoId); localStorage.setItem("neon.algo." + (c.testnet ? "t" : "m"), JSON.stringify(ids));
+    const ok = /^AÇIK/.test(r.state);
+    log("#bfx-log", `${ok ? "✔" : "✖"} ${k.L ? "LONG" : "SHORT"} · ${esc(r.state)}${r.exec ? ` · dolan ${r.exec}${r.partial ? " (KISMİ)" : ""} @ ${r.avg || "?"}` : ""}${r.sl && r.sl.ok ? ` · stop ${r.sl.verified ? "borsada doğrulandı" : "kuruldu (doğrulanamadı)"}` : ""}${r.tp && r.tp.ok ? " · hedef kuruldu" : ""}${r.err ? " · " + esc(trErr(r.err)) : ""}`, ok ? "up" : "dn");
   } catch(e){ log("#bfx-log", "✖ Emir başarısız: " + esc(trErr(e)), "dn"); }
+  finally { inflight.delete(sym); }
   refreshAccount();
 }
 async function closePosition(sym, posSide){
@@ -204,12 +221,23 @@ async function closePosition(sym, posSide){
     if (!(await confirmSheet({ title: "POZİSYONU KAPAT", rows, mode: c.testnet ? "TESTNET" : "GERÇEK", okText: "ONAYLA · KAPAT" }))){ log("#bfx-log", "Kapatma iptal edildi."); continue; }
     try { const prm = { symbol: sym, side: L ? "SELL" : "BUY", type: "MARKET", quantity: String(Math.abs(amt)), newOrderRespType: "RESULT" };
       if (dual) prm.positionSide = p.positionSide; else prm.reduceOnly = "true";
-      const o = await wsCall("order.place", prm); log("#bfx-log", `✔ ${esc(sym)} kapatıldı · #${o.orderId} · ort. ${o.avgPrice || "?"}`, "up");
-      await cancelAll(sym, true);
+      prm.newClientOrderId = BFXSAFE.cid("mc"); let o; try { o = await wsCall("order.place", prm); } catch(e){ if (BFXSAFE.definitive(e)) throw e; o = await BFXSAFE.reconcile(safeApi(c), sym, prm.newClientOrderId); if (!o) throw new Error("kapatma emri durumu BELİRSİZ — yeniden gönderilmedi, Binance'te kontrol et"); }
+      log("#bfx-log", `✔ ${esc(sym)} kapatma · #${esc(o.orderId)} · ${esc(o.status)} · ort. ${esc(o.avgPrice || "?")}`, "up");
+      await cleanupAfterClose(c, sym, dual ? p.positionSide : null);
     } catch(e){ log("#bfx-log", "✖ Kapatılamadı: " + esc(trErr(e)), "dn"); }
   }
   refreshAccount();
 }
+/* v7.40: after a close, verify the position is gone and remove ONLY the orphaned protection orders of that side
+   (hedge mode: the other side's stop stays). If the position is still open, nothing is cancelled. */
+async function cleanupAfterClose(c, sym, posSide){ const api = safeApi(c); let left = null;
+  for (let i = 0; i < 3 && left !== 0; i++){ try { left = (await api.positions(sym)).filter(x => !posSide || (x.positionSide || "BOTH") === posSide).reduce((a, x) => a + Math.abs(+x.positionAmt || 0), 0); } catch(e){ left = null; } if (left) await api.sleep(700); }
+  if (left === null){ log("#bfx-log", "⚠ Pozisyon kapanışı doğrulanamadı — stop/hedef emirleri silinmedi.", "dn"); return; }
+  if (left > 0){ api.critical(`${sym}: kapatma sonrası hâlâ ${left} açık — stop/hedef korunuyor, elle kontrol et`); return; }
+  let list = null; try { list = await api.openAlgo(sym); } catch(e){}
+  if (list){ let n = 0; for (const a of list) if (!posSide || (a.positionSide || "BOTH") === posSide){ try { await api.algoCancel({ symbol: sym, algoId: a.algoId }); n++; } catch(e){} }
+    log("#bfx-log", `✔ ${n} artık stop/hedef emri temizlendi (${esc(sym)}${posSide ? " " + esc(posSide) : ""})`, "up"); return; }
+  if (!posSide) await cancelAll(sym, true); else log("#bfx-log", "⚠ Hedge: artık emirler listelenemedi — diğer yönün stopunu korumak için toplu iptal yapılmadı.", "dn"); }
 async function cancelAll(sym, silent){
   const c = bget(); if (!c.key){ log("#bfx-log", "✖ API anahtarı yok.", "dn"); return; }
   if (!silent && !(await confirmSheet({ title: "AÇIK EMİRLERİ İPTAL ET", rows: [["Mod", c.testnet ? "TESTNET" : "GERÇEK", c.testnet ? "" : "dn"], ["Sembol", sym], ["İşlem", "bekleyen tüm emirler + stop/hedef (algo) emirleri iptal"]], mode: c.testnet ? "TESTNET" : "GERÇEK", warn: "Açık pozisyon kapanmaz; yalnızca bekleyen emirler silinir. Stop iptal edilirse pozisyon korumasız kalır." }))) return;
@@ -253,7 +281,7 @@ function bindBfx(){
   $("#bfx-lev").onchange = e => { const v = +e.target.value; bset({ lev: v }); const w = $("#bfx-levwarn"); w.classList.toggle("hidden", v <= 3); w.innerHTML = `⚠ ${v}x kaldıraç: fiyat %${(100/v).toFixed(0)} ters giderse teminatın tamamı gider (likidasyon). 1x önerilir.`; recalc(); };
   for (const id of ["#bfx-qty", "#bfx-stop", "#bfx-tgt"]) $(id).oninput = recalc;
   $("#bfx-attach").onchange = e => bset({ attach: e.target.checked });
-  $("#bfx-go").onclick = placeOrder; $("#bfx-refresh").onclick = refreshAccount;
+  $("#bfx-go").onclick = placeOrder; $("#bfx-refresh").onclick = () => refreshAccount(true);
   $("#bfx-close").onclick = () => M ? closePosition(M.symbol) : log("#bfx-log", "✖ Vadeli sözleşme yok.", "dn");
   $("#bfx-cancel").onclick = () => M ? cancelAll(M.symbol) : log("#bfx-log", "✖ Vadeli sözleşme yok.", "dn");
   renderAcct();
@@ -388,33 +416,39 @@ function bindPh(){
    ===================================================================== */
 async function positionsNow(c){ let pos; try { pos = await signed("GET", "/fapi/v2/positionRisk", {}, c); } catch(e){ pos = await signed("GET", "/fapi/v3/positionRisk", {}, c); } return (pos || []).filter(p => +p.positionAmt !== 0); }
 async function autoOrder(d, { lev = 1, cfgOverride } = {}){
-  const c = bget(); if (!c.key || !c.secret) throw new Error("aktif Binance bölümünde anahtar yok");
+  const c = bget(); if (c.key && c.kst === "locked") throw lockedErr(c.which); if (!c.key || !c.secret) throw new Error("aktif Binance bölümünde anahtar yok");
+  if (!c.testnet && c.kst === "plain") throw new Error("GERÇEK API Secret düz metin — önce PIN ile şifrele");
   const S = d.data.signal; if (!S || (S.dir !== "LONG" && S.dir !== "SHORT")) throw new Error("sinyal yok");
   await syncTime(c.testnet); const m = await meta(d); if (!m) throw new Error(d.symbol + " vadeli sözleşmesi yok");
+  if (inflight.has(m.symbol)) return { skipped: "bu sembolde emir işleniyor" };
+  const P0 = pendRd(); if (P0[m.symbol] && Date.now() - P0[m.symbol].t < 24*3600e3) return { skipped: "önceki emir BELİRSİZ — elle kontrol et" };
   const open = await positionsNow(c); if (open.some(p => p.symbol === m.symbol)) return { skipped: "bu sembolde zaten açık pozisyon var" };
   try { dual = !!(await signed("GET", "/fapi/v1/positionSide/dual", {}, c)).dualSidePosition; } catch(e){ dual = false; }
   const L = S.dir === "LONG", a = S.active, cfg = Object.assign(ENGINE.config(), cfgOverride || {});
   let px = d.price; try { px = +(await pub("/fapi/v1/ticker/price?symbol=" + m.symbol, c)).price || px; } catch(e){}
-  const st = a.stop, tg = a.target; if (L ? !(st < px && tg > px) : !(st > px && tg < px)) return { skipped: "fiyat stop/hedef aralığının dışında" };
-  const rpu = Math.abs(px - st); let qty = Math.min(cfg.max_loss_per_trade/rpu, cfg.account_size*cfg.position_cap_pct/100*lev/px);
   let avail = null; try { const ac = await signed("GET", "/fapi/v2/account", {}, c); avail = +(((ac.assets || []).find(x => x.asset === "USDT") || {}).availableBalance ?? ac.availableBalance); } catch(e){}
-  if (avail !== null && isFinite(avail)) qty = Math.min(qty, avail*lev*0.9/px);
-  qty = +floorStep(qty, m.step, m.qdec); const notional = qty*px;
-  if (qty < m.minQty || notional < m.minNotional) return { skipped: `miktar çok küçük ($${notional.toFixed(2)} < min $${m.minNotional})` };
-  try { await signed("POST", "/fapi/v1/leverage", { symbol: m.symbol, leverage: lev }, c); } catch(e){}
-  const ps = dual ? { positionSide: L ? "LONG" : "SHORT" } : {};
-  const o = await wsCall("order.place", Object.assign({ symbol: m.symbol, side: L ? "BUY" : "SELL", type: "MARKET", quantity: qty.toFixed(m.qdec), newOrderRespType: "RESULT" }, ps), c);
-  window.BUS && BUS.emit("order", { to: "bn" });
-  const ids = JSON.parse(localStorage.getItem("neon.algo." + (c.testnet ? "t" : "m")) || "{}"); ids[m.symbol] = ids[m.symbol] || []; const prot = [];
-  for (const [type, price, name] of [["STOP_MARKET", st, "Stop"], ["TAKE_PROFIT_MARKET", tg, "Hedef"]]){
-    try { const r = await wsCall("algoOrder.place", Object.assign({ algoType: "CONDITIONAL", symbol: m.symbol, side: L ? "SELL" : "BUY", type, triggerPrice: roundTick(price, m.tick, m.pdec), closePosition: "true", workingType: "MARK_PRICE" }, ps), c);
-      ids[m.symbol].push(r.algoId); prot.push(name + " ✔"); } catch(e){ prot.push(name + " ✖ " + trErr(e)); } }
-  localStorage.setItem("neon.algo." + (c.testnet ? "t" : "m"), JSON.stringify(ids));
-  return { symbol: m.symbol, side: S.dir, qty, px: +o.avgPrice || px, notional, margin: notional/lev, stop: st, target: tg, orderId: o.orderId, testnet: c.testnet, prot }; }
+  if (!(avail >= 0)) return { skipped: "hesap/teminat okunamadı" };
+  const k = BFXSAFE.size({ side: L ? "long" : "short", px, st: a.stop, tg: a.target, lev, manual: "", maxLoss: cfg.max_loss_per_trade, accountSize: cfg.account_size, capPct: cfg.position_cap_pct, avail: avail*0.9/0.95, M: m });
+  if (!k.ok) return { skipped: k.issues.join("; ") };
+  try { await signed("POST", "/fapi/v1/leverage", { symbol: m.symbol, leverage: lev }, c); } catch(e){ return { skipped: "kaldıraç ayarlanamadı: " + trErr(e) }; }
+  inflight.add(m.symbol);
+  try { const cid = BFXSAFE.cid("ma"), P = pendRd(); P[m.symbol] = { cid, t: Date.now(), net: c.testnet ? "t" : "m" }; pendWr(P);
+    const r = await BFXSAFE.openProtected(safeApi(c), { symbol: m.symbol, L, qty: k.qty.toFixed(m.qdec), stPx: roundTick(a.stop, m.tick, m.pdec), tgPx: roundTick(a.target, m.tick, m.pdec), dual: !!dual, attach: true, cid });
+    if (r.state !== "BELİRSİZ"){ const Q = pendRd(); delete Q[m.symbol]; pendWr(Q); }
+    window.BUS && BUS.emit("order", { to: "bn" });
+    const ids = JSON.parse(localStorage.getItem("neon.algo." + (c.testnet ? "t" : "m")) || "{}"); ids[m.symbol] = ids[m.symbol] || [];
+    for (const x of [r.sl, r.tp]) if (x && x.ok && x.algoId && !ids[m.symbol].includes(x.algoId)) ids[m.symbol].push(x.algoId); localStorage.setItem("neon.algo." + (c.testnet ? "t" : "m"), JSON.stringify(ids));
+    if (!/^AÇIK/.test(r.state)) throw new Error(r.state + (r.err ? ": " + trErr(r.err) : ""));
+    const q = r.exec || k.qty, ap = r.avg || px;
+    return { symbol: m.symbol, side: S.dir, qty: q, px: ap, notional: q*ap, margin: q*ap/lev, stop: a.stop, target: a.target, orderId: r.orderId, testnet: c.testnet, state: r.state,
+      prot: [r.sl && r.sl.ok ? "Stop ✔" + (r.sl.verified ? " (borsada doğrulandı)" : "") : "Stop ✖", r.tp && r.tp.ok ? "Hedef ✔" : "Hedef ✖"].concat(r.partial ? ["KISMİ dolum"] : []) }; }
+  finally { inflight.delete(m.symbol); } }
 async function autoClose(sym){ const c = bget(); const list = (await positionsNow(c)).filter(p => p.symbol === sym); let n = 0;
-  for (const p of list){ const amt = +p.positionAmt, prm = { symbol: sym, side: amt > 0 ? "SELL" : "BUY", type: "MARKET", quantity: String(Math.abs(amt)), newOrderRespType: "RESULT" };
-    if ((p.positionSide || "BOTH") !== "BOTH") prm.positionSide = p.positionSide; else prm.reduceOnly = "true"; await wsCall("order.place", prm, c); n++; }
-  try { await cancelAll(sym, true); } catch(e){} return n; }
+  for (const p of list){ const amt = +p.positionAmt, hedge = (p.positionSide || "BOTH") !== "BOTH", prm = { symbol: sym, side: amt > 0 ? "SELL" : "BUY", type: "MARKET", quantity: String(Math.abs(amt)), newOrderRespType: "RESULT", newClientOrderId: BFXSAFE.cid("mk") };
+    if (hedge) prm.positionSide = p.positionSide; else prm.reduceOnly = "true";
+    try { await wsCall("order.place", prm, c); } catch(e){ if (BFXSAFE.definitive(e)) throw e; const o = await BFXSAFE.reconcile(safeApi(c), sym, prm.newClientOrderId); if (!o) throw new Error(sym + " kapatma durumu BELİRSİZ — yeniden gönderilmedi"); }
+    n++; await cleanupAfterClose(c, sym, hedge ? p.positionSide : null); }
+  return n; }
 async function realized(sym, since){ const c = bget(); const r = await signed("GET", "/fapi/v1/income", { symbol: sym, startTime: since - 60000, limit: 1000 }, c);
   return (r || []).filter(x => x.incomeType === "REALIZED_PNL" || x.incomeType === "COMMISSION" || x.incomeType === "FUNDING_FEE").reduce((s, x) => s + +x.income, 0); }
 /* ---------------- shell ---------------- */
@@ -432,9 +466,9 @@ return {
   onTick(p){ livePx = p; if (TAB === "bfx" && $("#bfx-calc") && Date.now() - calcT > 1000){ calcT = Date.now(); calc().catch(() => {}); } },
   _test: { hmac, trErr, wsCall, signed, meta, bget, bset },
   /* used by BAĞLANTILAR (conn.js) */
-  keys: { bget, bset, prof, pset, pdel },
+  keys: { bget, bset, prof, pset, pput, pdel, ensureOpen, raw: w => rd(PK[w]) },
   reset(){ acct = null; dual = null; tFor = null; xinfo.t = xinfo.m = undefined; delete xinfo.t; delete xinfo.m; M = null; if (wsc) try { wsc.ws.close(); } catch(e){} wsc = null; render(); },
-  async testProfile(w){ const c = bget(w); if (!c.key || !c.secret) throw new Error("bu bölümde anahtar yok");
+  async testProfile(w){ if (!(await ensureOpen(w))) throw new Error("Secret kilitli (PIN girilmedi)"); const c = bget(w); if (!c.key || !c.secret) throw new Error("bu bölümde anahtar yok");
     tFor = null; let a;
     try { a = await signed("GET", "/fapi/v2/account", {}, c); } catch(e){ if (e.http === 404 || e.code === -5000) a = await signed("GET", "/fapi/v3/account", {}, c); else if (e.name === "TypeError"){ const r = await wsCall("v2/account.balance", {}, c); return { via: "ws", usdt: (r || []).find(x => x.asset === "USDT") || {} }; } else throw e; }
     tFor = null; const u = (a.assets || []).find(x => x.asset === "USDT") || {};

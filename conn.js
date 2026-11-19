@@ -32,21 +32,33 @@ function bnHTML(){
       <div class="kc-h"><b>${real ? "⚠ GERÇEK API" : "TEST API (Testnet)"}</b>${on ? `<span class="kc-act">● AKTİF</span>` : `<button type="button" class="mini" data-act="${w}">AKTİF YAP</button>`}</div>
       <div class="kc-sub">${real ? `binance.com → API Yönetimi · <b>gerçek para</b> · emirler <b>fapi.binance.com</b>` : `<a href="https://testnet.binancefuture.com" target="_blank" rel="noopener">testnet.binancefuture.com</a> → API Key · test parası`}</div>
       <label>API Key<input data-k="${w}" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(p.key)}" placeholder="${real ? "gerçek API key" : "testnet API key"}"></label>
-      <label>API Secret<input data-s="${w}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${p.secret ? "•••••• kayıtlı (değiştirmek için yaz)" : "secret"}"></label>
+      <label>API Secret<input data-s="${w}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${p.st !== "none" ? "•••••• kayıtlı (değiştirmek için yaz)" : "secret"}"></label>
+      <label>API PIN (en az 6 · Secret bununla şifrelenir, saklanmaz)<input data-pin="${w}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="PIN"></label>
+      <div class="kc-sec ${p.st === "plain" ? "dn" : ""}">${p.st === "plain" ? `⚠ Secret DÜZ METİN saklanıyor (eski sürüm) — PIN yaz ve <button type="button" class="mini" data-enc="${w}">ŞİFRELE</button>${real ? " · GERÇEK emirler şifrelenene kadar kapalı" : ""}`
+        : p.st === "locked" ? `🔒 şifreli · kilitli <button type="button" class="mini" data-unl="${w}">KİLİDİ AÇ</button>` : p.st === "open" ? `🔓 şifreli · bu oturumda açık <button type="button" class="mini" data-lock="${w}">KİLİTLE</button>` : ""}</div>
       <div class="sheet-btns"><button type="button" data-del="${w}">SİL</button><button type="button" data-test="${w}">BAĞLANTIYI TEST ET</button><button type="button" class="save" data-save="${w}">KAYDET</button></div>
       <div class="kc-res" id="kres-${w}">${p.key ? `kayıtlı: ${esc(short(p.key))}` : "anahtar yok"}</div></div>`; };
   return `<div class="mode-row"><span class="mode-badge ${act === "real" ? "real" : "test"}">${act === "real" ? "⚠ GERÇEK API AKTİF" : "TEST API AKTİF"}</span><span class="dim">İŞLEM sekmesindeki emirler aktif bölümün anahtarıyla gider</span></div>
     <div class="kgrid">${sec("test")}${sec("real")}</div>
     <ol class="howto"><li>İzin: yalnızca <b>"Enable Futures"</b> + okuma. <b style="color:var(--r)">Para çekme (Withdrawals) izni ASLA açma.</b></li>
-    <li>İki bölüm ayrı saklanır (bu cihazın localStorage'ı). Anahtar GitHub'a ya da başka bir sunucuya gitmez; Secret cihazdan çıkmaz, imzayı burada atar.</li>
+    <li>İki bölüm ayrı saklanır (bu cihaz). <b>Secret, API PIN'inle şifrelenir</b> (PBKDF2 300 bin tur + AES-256-GCM); PIN saklanmaz, açılan Secret yalnızca bu oturumun belleğindedir. Secret cihazdan çıkmaz, imzayı burada atar. Sınır: kilit açıkken bu sayfada çalışan kötü amaçlı bir kod Secret'ı kullanabilir — bu yüzden para çekme izni KAPALI ve IP kısıtlaması önerilir.</li>
     <li>GERÇEK bölümü aktif yapmak için ayrıca <b>GERÇEK</b> yazıp onaylaman gerekir. Her emirde yine ONAYLA penceresi çıkar.</li></ol>
     <div class="sub-h">KAYIT</div><div id="bn-log" class="tlog"></div>`;
 }
 function bnBind(){
   const K = T().keys, box = $("#links-box");
-  box.querySelectorAll("[data-save]").forEach(b => b.onclick = () => { const w = b.dataset.save, k = box.querySelector(`[data-k="${w}"]`).value.trim(), s = box.querySelector(`[data-s="${w}"]`).value.trim(), p = K.prof(w);
-    if (!k || (!s && !p.secret)){ log("#bn-log", "✖ API Key ve Secret gerekli.", "dn"); return; }
-    K.pset(w, { key: k, secret: s || p.secret }); if (K.bget().which === w) T().reset(); render(); log("#bn-log", `${w === "real" ? "GERÇEK" : "TEST"} anahtarları bu cihaza kaydedildi.`, "up"); });
+  /* v7.40: Secret is saved only AES-GCM encrypted with the API PIN (PBKDF2 300k). Key-only change keeps the existing encrypted secret. */
+  box.querySelectorAll("[data-save]").forEach(b => b.onclick = async () => { const w = b.dataset.save, k = box.querySelector(`[data-k="${w}"]`).value.trim(), s = box.querySelector(`[data-s="${w}"]`).value.trim(), pin = box.querySelector(`[data-pin="${w}"]`).value, p = K.prof(w), raw = K.raw(w);
+    if (!k || (!s && p.st === "none")){ log("#bn-log", "✖ API Key ve Secret gerekli.", "dn"); return; }
+    if (s || p.st === "plain"){ if (!BKEYS.pinOk(pin)){ log("#bn-log", "✖ Secret'ı şifrelemek için en az 6 karakterlik API PIN gir.", "dn"); return; }
+      b.disabled = true; try { K.pput(w, await BKEYS.seal({ key: k, secret: s || raw.secret }, pin, w)); } catch(e){ log("#bn-log", "✖ " + esc(e.message), "dn"); b.disabled = false; return; } }
+    else K.pput(w, { key: k, enc: raw.enc });
+    if (K.bget().which === w) T().reset(); render(); log("#bn-log", `${w === "real" ? "GERÇEK" : "TEST"} anahtarları bu cihaza kaydedildi (Secret şifreli).`, "up"); });
+  box.querySelectorAll("[data-enc]").forEach(b => b.onclick = async () => { const w = b.dataset.enc, pin = box.querySelector(`[data-pin="${w}"]`).value, raw = K.raw(w);
+    if (!BKEYS.pinOk(pin)){ log("#bn-log", "✖ Önce PIN alanına en az 6 karakter yaz.", "dn"); return; }
+    try { K.pput(w, await BKEYS.seal(raw, pin, w)); render(); log("#bn-log", "✔ Secret şifrelendi; düz metin kayıt silindi.", "up"); } catch(e){ log("#bn-log", "✖ " + esc(e.message), "dn"); } });
+  box.querySelectorAll("[data-unl]").forEach(b => b.onclick = async () => { if (await K.ensureOpen(b.dataset.unl)){ render(); log("#bn-log", "🔓 Secret bu oturum için açıldı.", "up"); } });
+  box.querySelectorAll("[data-lock]").forEach(b => b.onclick = () => { BKEYS.lock(b.dataset.lock); T().reset(); render(); log("#bn-log", "🔒 Secret kilitlendi.", "up"); });
   box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { const w = b.dataset.del; K.pdel(w); if (w === "real" && K.bget().which === "real") K.bset({ active: "test" }); T().reset(); render(); log("#bn-log", `${w === "real" ? "GERÇEK" : "TEST"} anahtarları silindi.`, "up"); });
   box.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => { const w = b.dataset.act;
     if (w === "real"){ if (!K.prof("real").key){ log("#bn-log", "✖ Önce GERÇEK bölüme anahtar kaydet.", "dn"); return; }
