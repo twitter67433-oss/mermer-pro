@@ -49,7 +49,7 @@ function create(o){ const { SMT, SCM, fj, cb } = o, now = o.now || (() => Date.n
   function nextTask(){ const n = W.list.length, tn = now(); for (let k = 0; k < n; k++){ const s = W.list[(W.rr + k) % n], c = coin(s); if (tn < (c.backTo || 0)) continue;
       for (const t of TF){ const a = c.K[t]; if (!a) return { s, t, full: true, i: k }; }
       for (const t of TF){ if (due(c.K[t], tn) && !(tn < (c.retry[t] || 0))) return { s, t, full: false, i: k }; } } return null; }
-  async function step(){ if (W.busy || !W.list.length || now() < W.pauseTo || (typeof document !== "undefined" && document.hidden)) return; const job = nextTask(); if (!job){ evalDirty(); return; }
+  async function step(){ if (W.busy || !W.list.length || now() < W.pauseTo) return; const job = nextTask(); if (!job){ evalDirty(); return; }
     W.busy = true; W.rr = (W.rr + job.i + 1) % Math.max(1, W.list.length); const c = coin(job.s);
     try { const fresh = bars(await fj(`/fapi/v1/klines?symbol=${job.s}&interval=${job.t}&limit=${job.full ? 499 : 3}`)); W.calls++; const tn = now(); for (const b of fresh) if (b.T >= tn) b.x = false;
       if (!job.full && gap(c.K[job.t], fresh)) c.K[job.t] = null; else { const prev = c.K[job.t], closedNow = prev && prev.length ? prev[prev.length - 1] : null; c.K[job.t] = merge(prev, fresh);

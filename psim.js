@@ -67,7 +67,7 @@ const curSym = () => { const v = String(($("#ps-sym") || {}).value || sel || "")
 function sigFor(sym){ const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.dec) return { word: S.dec.word, d: S.G ? Math.sign(S.G.dir || 0) : 0, tf: S.tf, plan: /^GİR/.test(S.dec.word) && S.A ? { stop: S.A.stop, tp: S.A.tp } : null };
   try { const c = window.SGB && SGB._c; if (c) for (const [k, r] of c) if (k.startsWith("p:" + sym + "@") && r && r.word && !r.none) return { word: r.word, d: Math.sign(r.d || 0), tf: k.split("@")[1], plan: null }; } catch(e){} return null; }
 /* live prices: public aggTrade stream for the open + selected symbols; REST fallback every 3 s */
-function syms(){ const s = new Set(st.pos.map(p => p.sym)); for (const k of SR.sig.keys()) s.add(k); const c = curSym(); if (c && document.body.dataset.pg === "fut" && !document.hidden) s.add(c); return [...s].slice(0, 8); }
+function syms(){ const s = new Set(st.pos.map(p => p.sym)); for (const k of SR.sig.keys()) s.add(k); const c = curSym(); if (c && document.body.dataset.pg === "fut") s.add(c); return [...s].slice(0, 8); }
 function stream(){ const L = syms(), key = L.join(","); if (key === wsKey && ws && ws.readyState <= 1) return; wsKey = key; try { ws && ws.close(); } catch(e){} ws = null; if (!L.length) return;
   try { const w = new WebSocket("wss://fstream.binance.com/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade").join("/")); ws = w;
     w.onmessage = ev => { try { const d = JSON.parse(ev.data).data; if (!d) return; const s = d.s, p = +d.p; px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); if (p > e.hi) e.hi = p; if (p < e.lo) e.lo = p; } catch(e){} };

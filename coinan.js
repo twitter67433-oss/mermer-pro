@@ -181,7 +181,7 @@ function bind(){ window.addEventListener("sert:update", () => { if (S.A) try { p
   document.addEventListener("click", e => { if (!e.target.closest(".can-search") && !e.target.closest("#can-list")){ const l = $("#can-list"); l && l.classList.add("hidden"); } }); }
 function pick(sym){ const q = $("#can-q"); q.value = sym; $("#can-list").classList.add("hidden"); q.blur(); analyze(sym); }
 function init(){ const box = $("#coinan-box"); if (!box) return; box.innerHTML = html(); bind(); loadList().then(() => { if (document.body.dataset.pg === "fut") analyze(); });
-  setInterval(() => { if (!document.hidden && document.body.dataset.pg === "fut" && S.A && Date.now() - S.at > 60000) analyze(); }, 5000);
+  setInterval(() => { if (document.body.dataset.pg === "fut" && S.A && Date.now() - S.at > 60000) analyze(); }, 5000);
   window.addEventListener("hashchange", () => { if (document.body.dataset.pg === "fut" && !S.A && !S.busy) analyze(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 return { analyze, search, toTrade, pick, get S(){ return S; } };

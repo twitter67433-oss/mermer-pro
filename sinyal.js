@@ -280,7 +280,7 @@ function jLive(){ const bb = S.bSym === S.sym ? S.ovB["1m"] || base() : null, l 
   if (ch){ jSave(); paintJournal(); } else if (Date.now() - (jLive.p || 0) > 5000){ jLive.p = Date.now(); paintJournal(true); } }
 /* REST: fill gaps (app closed / other coins) from futures klines since the last check — conservative same-candle rule */
 let jBusy = false;
-async function jRemote(){ if (jBusy || document.hidden) return; jBusy = true; try { const open = S.J.filter(x => x.st === "open").sort((a, b) => a.chk - b.chk).slice(0, 40); let ch = false;
+async function jRemote(){ if (jBusy) return; jBusy = true; try { const open = S.J.filter(x => x.st === "open").sort((a, b) => a.chk - b.chk).slice(0, 40); let ch = false;
     for (const tr of open){ const t = JRN.gapTf(Math.max(tr.chk, tr.t), Date.now()); try { const st0t = Math.max(tr.t - JRN.TFMS[t], tr.chk - JRN.TFMS[t]), lim = Math.min(1500, Math.max(5, Math.ceil((Date.now() - st0t)/JRN.TFMS[t]) + 2)), k = bars(await fj(`/fapi/v1/klines?symbol=${tr.sym}&interval=${t}&startTime=${st0t}&limit=${lim}`));
         const st0 = tr.st; JRN.resolveBars(tr, k, now()); if (tr.st !== st0){ ch = true; jClosed(tr); } else ch = true; } catch(e){} await new Promise(r => setTimeout(r, 300)); }
     if (ch){ jSave(); paintJournal(); } } finally { jBusy = false; } }
@@ -427,7 +427,7 @@ function paintHist(){ const el = $("#sc-hist"); if (!el) return; const k = key()
     <button type="button" id="sc-clr" class="mini">bu coin + aralığın geçmişini sıfırla</button>`;
   $("#sc-clr").onclick = () => { if (!confirm(S.sym + " · " + TF_LBL[S.tf] + " sinyal geçmişi silinsin mi? (yalnızca bu cihaz)")) return; const a = H.load(); delete a[k]; H.save(a); const o = ST.load(); delete o[k]; localStorage.setItem(SK, JSON.stringify(o)); paintHist(); }; }
 function paintAll(){ paintHead(); paintSt(); paintMain(); paintJournal(); paintChart(); if (S.D) paintDetails(); paintHist(); }
-const engineOn = () => (document.body.dataset.pg === "scalp" || document.body.dataset.pg === "analiz") && !document.hidden;
+const engineOn = () => document.body.dataset.pg === "scalp" || document.body.dataset.pg === "analiz"; /* v7.29.3: keeps running in background */
 function tick(){ if (!S.started) return; if (!engineOn()) return; const b = base(), l = b[b.length - 1], cd = $("#sc-cd"); if (cd && l) cd.textContent = cdf(l.T + 1 - now());
   if (l && !S.err && !S.poll && ((!S.wsOk && now() > l.T + 5000) || (S.wsOk && Date.now() - Math.max(S.lastTick, S.wsAt || 0) > 10000))) startPoll();
   if (Date.now() - (S.der.at || 0) > 60000 && S.D){ S.der.at = Date.now(); loadDer(S.sym, S.gen); }

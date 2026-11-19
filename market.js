@@ -14,7 +14,7 @@ function onAnalysis(d){ D = d; if (sym !== d.symbol){ hist = []; grid = null; li
   const ok = d.src === "fut"; $("#mk-info").textContent = ok ? sym + " · 4 sn" : "yalnızca vadeli";
   if (!ok){ $("#depth-sum").innerHTML = `<div class="empty">SPOT verisinde vadeli derinlik / OI yok.</div>`; $("#oi-box").innerHTML = `<div class="empty">Vadeli sözleşme yok.</div>`; stop(); return; }
   $("#liq-log").innerHTML = `<div class="empty">likidasyon bekleniyor… (Binance @forceOrder, ${esc(sym)})</div>`; start(); }
-function start(){ stop(); depth(); oi(); hT = setInterval(() => { if (vis && !document.hidden) depth(); }, 4000); oT = setInterval(() => { if (!document.hidden) oi(); }, 60000); }
+function start(){ stop(); depth(); oi(); hT = setInterval(() => { if (vis) depth(); }, 4000); oT = setInterval(() => oi(), 60000); }
 function stop(){ clearInterval(hT); clearInterval(oT); }
 async function depth(){ if (!sym) return; const s = sym;
   try { const b = await j(`/fapi/v1/depth?symbol=${s}&limit=500`); if (s !== sym) return;
