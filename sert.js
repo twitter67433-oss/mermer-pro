@@ -44,8 +44,15 @@ function csv(J){ const q = v => /[;"\n]/.test(String(v)) ? '"' + String(v).repla
 /* v7.29 small tag for non-crypto contracts (kept in the scanner): gold → ALTIN, other commodities → EMTİA, stocks/ETFs → HİSSE */
 function kind(s){ if (!s) return ""; const b = String(s.baseAsset || s.symbol || "").replace(/USDT$/, ""), u = String(s.underlyingType || ""), sub = (s.underlyingSubType || []).join(",");
   if (/^(XAU|PAXG|XAUT)$/.test(b)) return "ALTIN"; if (u === "COMMODITY") return "EMTİA"; if (/EQUITY|PREMARKET/.test(u) || (/TradFi/.test(sub) && u !== "COIN")) return "HİSSE"; return ""; }
+/* v7.29 full universe: every USD-M PERPETUAL contract with status TRADING (crypto, gold, stocks …) */
+const universe = ei => ((ei && ei.symbols) || []).filter(s => s.contractType === "PERPETUAL" && s.status === "TRADING").map(s => s.symbol);
+/* scan order: priority (selected/watchlist) first, then by 24h quote volume, then the rest */
+function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of pri || []) if (x && !seen.has(x)){ seen.add(x); out.push(x); }
+  for (const x of (U || []).slice().sort((a, b) => ((vol && vol[b]) || 0) - ((vol && vol[a]) || 0))) if (!seen.has(x)){ seen.add(x); out.push(x); } return out; }
+/* incremental 15m bars: merge a short fresh fetch into the cached closed bars (new wins), keep the last max */
+function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || []) m.set(x.t, x); for (const x of nb || []) m.set(x.t, x); return [...m.values()].sort((a, b) => a.t - b.t).slice(-max); }
 const okRisk = (entry, stop) => entry > 0 && stop > entry && (stop - entry)/entry <= MAXR;
-return { kind, top, pre, simExit, simLong, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
+return { kind, universe, order, merge, top, pre, simExit, simLong, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
 });
 
 if (typeof window !== "undefined" && typeof document !== "undefined") window.SERTS = (() => {
@@ -65,19 +72,30 @@ const sqOn = sym => { const q = window.SQZ && SQZ.peek(sym); return !!(q && q.on
 const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</b></span> · <span>stop <b class="dn">${fp(r.stop)}</b></span> · <span>çıkış 1×ATR iz / 60dk</span> <small class="sert-tag">SERT SHORT</small></div>`;
 /* VADELİ main block */
 function big(sym){ const r = active(sym); if (!r || sqOn(sym)) return ""; return `<div class="sert-big dn">GİR SHORT</div>${line(r)}`; }
-async function one(s, closeT){ const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=120`); const b = k.filter(x => +x[6] < Date.now()).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
+/* 15m bars per symbol: first pass limit=110 (weight 2), then limit=6 (weight 1) merged into the cache */
+const C = new Map();
+async function bars15(s){ const now = Date.now(), lastT = Math.floor(now/900000)*900000 - 900000, o = C.get(s), inc = o && o.length >= 101 && o[o.length - 1].t >= lastT - 4*900000;
+  const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=${inc ? 6 : 110}`), nb = k.filter(x => +x[6] < now).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
+  const b = inc ? X.merge(o, nb) : nb.slice(-110); C.set(s, b); return b; }
+async function one(s){ const b = await bars15(s);
   if (!X.pre(b)){ R.sig.delete(s); return; } const last = b[b.length - 1], cT = last.t + 900000;
   const [oh, on, fr] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
   const ago = (oh || []).filter(x => +x.timestamp <= cT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN, oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN;
   const r = window.PSIM.sertShort(b, oi1, fr && fr[0] ? +fr[0].fundingRate : NaN); r.sym = s; r.entry = last.c; r.until = cT + 900000; r.close = cT;
-  if (r.sig && X.okRisk(r.entry, r.stop)) R.sig.set(s, r); else R.sig.delete(s); }
-const KIND = {}; let kindAt = 0;
-async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } kindAt = Date.now(); } catch(e){} }
+  R.cand = (R.cand || 0) + 1; if (r.sig && X.okRisk(r.entry, r.stop)){ R.sig.set(s, r); paintList(); } else R.sig.delete(s); }
+const KIND = {}; let kindAt = 0, UNI = [], VOL = {}, volAt = 0;
+async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } UNI = X.universe(ei); kindAt = Date.now(); } catch(e){} }
 const ktag = sym => KIND[sym] ? ` <small class="sert-k">${KIND[sym]}</small>` : "";
-async function scan(force){ const slot = Math.floor(Date.now()/900000); if (R.busy || (!force && slot === R.slot) || !window.PSIM) return; R.busy = true; R.slot = slot;
-  try { if (Date.now() - R.topAt > 3600000 || !R.top.length){ R.top = X.top(await fj("/fapi/v1/ticker/24hr"), 50); R.topAt = Date.now(); } } catch(e){}
-  await loadKinds(); const L = list(); R.n = L.length; let i = 0; const work = async () => { while (i < L.length){ const s = L[i++]; try { await one(s); } catch(e){} await new Promise(r => setTimeout(r, 60)); } };
-  await Promise.all([work(), work(), work(), work()]); R.scanned = Date.now(); R.busy = false;
+/* full pass over every TRADING perpetual (~570): 5 workers, ~6 requests/s → ~1.5–2 min per pass, weight ≈ 600–1200 per pass (limit 2400/min).
+   OI/funding only for candidates passing the cheap kline check. 429/418 → pause 60 s and continue. */
+const sleep = ms => new Promise(z => setTimeout(z, ms));
+async function scan(force){ const slot = Math.floor(Date.now()/900000); if (R.busy || (!force && slot === R.slot) || !window.PSIM) return; R.busy = true; R.slot = slot; R.t0 = Date.now();
+  await loadKinds(); try { if (Date.now() - volAt > 3600000){ for (const x of await fj("/fapi/v1/ticker/24hr")) VOL[x.symbol] = +x.quoteVolume; volAt = Date.now(); } } catch(e){}
+  const L = X.order(UNI.length ? UNI : list(), list(), VOL); R.n = R.total = L.length; R.done = 0; R.cand = 0; let i = 0, lastP = 0;
+  const work = async () => { while (i < L.length){ while (R.pause > Date.now()) await sleep(1000); const s = L[i++];
+      try { await one(s); } catch(e){ if (/HTTP (429|418)/.test(e.message)){ R.e429 = (R.e429 || 0) + 1; R.pause = Date.now() + 60000; L.push(s); continue; } }
+      R.done++; if (Date.now() - lastP > 1500){ lastP = Date.now(); paintList(); } await sleep(650); } };
+  await Promise.all([work(), work(), work(), work(), work()]); R.scanned = Date.now(); R.dur = R.scanned - R.t0; R.busy = false;
   const nw = [...R.sig.values()].filter(r => !J.some(j => j.sym === r.sym && j.t === r.close)); const go = (await Promise.all(nw.map(fresh))).filter(Boolean); alertAll(go);
   resolve(); paint(); window.dispatchEvent(new CustomEvent("sert:update")); }
 /* new trigger: log it to the live ledger and alert (respects SİNYAL 🔊/📳/🔔 settings); squeeze-risk coins get no GİR SHORT alert */
@@ -104,7 +122,7 @@ let SEL = "", CH = { sym: "", b: null, at: 0 };
 const pct = (x, d = 2) => x === null || !isFinite(x) ? "—" : (x >= 0 ? "+" : "−") + Math.abs(x*100).toFixed(d) + "%";
 function paintList(){ const el = $("#sert-box"); if (!el) return; const rows = [...R.sig.keys()].map(active).filter(Boolean);
   if (!SEL || !rows.some(r => r.sym === SEL)) SEL = rows.length ? (rows.find(r => !sqOn(r.sym)) || rows[0]).sym : "";
-  el.innerHTML = `<div class="sert-h">SHORT TETİKLERİ · 15dk <small class="dim">${R.n} coin · ${R.scanned ? tm(R.scanned) : "taranıyor…"}</small></div>`
+  el.innerHTML = `<div class="sert-h">SHORT TETİKLERİ · 15dk <small class="dim">${R.busy ? `taranan ${R.done || 0}/${R.total || "…"}` : `${R.n} kontrat · ${R.scanned ? tm(R.scanned) : "taranıyor…"}`}</small></div>`
     + (rows.length ? rows.map(r => { const q = sqOn(r.sym), opened = window.PSIMUI && PSIMUI.st.pos.some(p => p.rule === "sert" && p.sym === r.sym);
       return `<div class="sert-r${r.sym === SEL ? " on" : ""}" data-sgo="${esc(r.sym)}" role="button" tabindex="0"><b class="${q ? "y" : "dn"}">${esc(r.sym.replace("USDT", ""))}${ktag(r.sym)}</b><span>${q ? "SHORT GİRME · squeeze" : ((L) => `giriş ${fp(r.entry)} · SL ${fp(r.stop)} · TP1 ${fp(L.tp1)} · TP2 ${fp(L.tp2)}`)(X.levels(r.entry, r.stop, -1))}</span>${q ? "" : opened ? `<small class="dim">simde</small>` : `<button type="button" class="mini" data-ssim="${esc(r.sym)}">SİMDE AÇ</button>`}</div>`; }).join("")
       : `<div class="dim">şu an SHORT tetiği yok · her 15dk kapanışında taranır</div>`); }
