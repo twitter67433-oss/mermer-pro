@@ -53,10 +53,11 @@ function csv(J){ const q = v => /[;"\n]/.test(String(v)) ? '"' + String(v).repla
 function kind(s){ if (!s) return ""; const b = String(s.baseAsset || s.symbol || "").replace(/USDT$/, ""), u = String(s.underlyingType || ""), sub = (s.underlyingSubType || []).join(",");
   if (/^(XAU|PAXG|XAUT)$/.test(b)) return "ALTIN"; if (u === "COMMODITY") return "EMTİA"; if (/EQUITY|PREMARKET/.test(u) || (/TradFi/.test(sub) && u !== "COIN")) return "HİSSE"; return ""; }
 /* v7.29 full universe: every USD-M PERPETUAL contract with status TRADING (crypto, gold, stocks …) */
-const universe = ei => ((ei && ei.symbols) || []).filter(s => (s.contractType === "PERPETUAL" || s.contractType === "TRADIFI_PERPETUAL") && s.status === "TRADING").map(s => s.symbol); /* gold/stocks are TRADIFI_PERPETUAL */
+const isUsdt = s => s && (s.quoteAsset ? s.quoteAsset === "USDT" : /USDT$/.test(s.symbol || "")); /* v7.33.1: only USDT-quoted perps (no USDC / other quotes) */
+const universe = ei => ((ei && ei.symbols) || []).filter(s => (s.contractType === "PERPETUAL" || s.contractType === "TRADIFI_PERPETUAL") && s.status === "TRADING" && isUsdt(s)).map(s => s.symbol); /* gold/stocks are TRADIFI_PERPETUAL */
 /* scan order: priority (selected/watchlist) first, then by 24h quote volume, then the rest */
-function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of pri || []) if (x && !seen.has(x)){ seen.add(x); out.push(x); }
-  for (const x of (U || []).slice().sort((a, b) => ((vol && vol[b]) || 0) - ((vol && vol[a]) || 0))) if (!seen.has(x)){ seen.add(x); out.push(x); } return out; }
+function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of pri || []) if (x && /USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); }
+  for (const x of (U || []).slice().sort((a, b) => ((vol && vol[b]) || 0) - ((vol && vol[a]) || 0))) if (/USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); } return out; }
 /* incremental 15m bars: merge a short fresh fetch into the cached closed bars (new wins), keep the last max */
 function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || []) m.set(x.t, x); for (const x of nb || []) m.set(x.t, x); return [...m.values()].sort((a, b) => a.t - b.t).slice(-max); }
 /* ===== v7.32 RULE BOOK — SHORT tab: SHORT · SQUEEZE SHORT · SQUEEZE DEVAM (SHORT); LONG tab: LONG · SQUEEZE LONG · KAPİTÜLASYON · SQUEEZE DEVAM (LONG).
@@ -266,6 +267,6 @@ function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el
   window.addEventListener("sec:change", e => { if (e.detail && e.detail.sec === "short"){ if (e.detail.on){ liqOpen(); resolve(); scan(true); } paint(); } });
   window.addEventListener("themechange", () => { const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-async function push(r){ if (!R.L[r.k] || ON[r.k] === false) return; r.sym = r.sym; R.L[r.k].set(r.sym, r); if (!J.some(j => j.k === r.k && j.sym === r.sym && j.t === r.close)){ const g = await fresh(r); if (g) alertAll([g]); } paint(); } /* v7.33 external lists (TOPLAMA / DAĞITIM) */
+async function push(r){ if (!R.L[r.k] || ON[r.k] === false || !/USDT$/.test(r.sym || "")) return; r.sym = r.sym; R.L[r.k].set(r.sym, r); if (!J.some(j => j.k === r.k && j.sym === r.sym && j.t === r.close)){ const g = await fresh(r); if (g) alertAll([g]); } paint(); } /* v7.33 external lists (TOPLAMA / DAĞITIM) */
 return { R, ON, push, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
 })();
