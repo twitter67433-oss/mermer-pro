@@ -123,7 +123,7 @@ let SEL = "", CH = { sym: "", b: null, at: 0 };
 const pct = (x, d = 2) => x === null || !isFinite(x) ? "—" : (x >= 0 ? "+" : "−") + Math.abs(x*100).toFixed(d) + "%";
 function paintList(){ const el = $("#sert-box"); if (!el) return; const rows = [...R.sig.keys()].map(active).filter(Boolean);
   if (!SEL || !rows.some(r => r.sym === SEL)) SEL = rows.length ? (rows.find(r => !sqOn(r.sym)) || rows[0]).sym : "";
-  el.innerHTML = `<div class="sert-h">SHORT TETİKLERİ · 15dk <small class="dim">${R.busy ? `taranan ${R.done || 0}/${R.total || "…"}` : `${R.n} kontrat · ${R.scanned ? tm(R.scanned) : "taranıyor…"}`}</small></div>`
+  el.innerHTML = `<div class="sert-h">SHORT TETİKLERİ · 15dk <small class="dim">${window.SEC && !SEC.on("short") ? "PASİF — tarama durdu" : R.busy ? `taranan ${R.done || 0}/${R.total || "…"}` : `${R.n} kontrat · ${R.scanned ? tm(R.scanned) : "taranıyor…"}`}</small></div>`
     + (rows.length ? rows.map(r => { const q = sqOn(r.sym), opened = window.PSIMUI && PSIMUI.st.pos.some(p => p.rule === "sert" && p.sym === r.sym);
       return `<div class="sert-r${r.sym === SEL ? " on" : ""}" data-sgo="${esc(r.sym)}" role="button" tabindex="0"><b class="${q ? "y" : "dn"}">${esc(r.sym.replace("USDT", ""))}${ktag(r.sym)}</b><span>${q ? "SHORT GİRME · squeeze" : ((L) => `giriş ${fp(r.entry)} · SL ${fp(r.stop)} · TP1 ${fp(L.tp1)} · TP2 ${fp(L.tp2)}`)(X.levels(r.entry, r.stop, -1))}</span>${q ? "" : opened ? `<small class="dim">simde</small>` : `<button type="button" class="mini" data-ssim="${esc(r.sym)}">SİMDE AÇ</button>`}</div>`; }).join("")
       : `<div class="dim">şu an SHORT tetiği yok · her 15dk kapanışında taranır</div>`); }
@@ -167,7 +167,7 @@ function init(){ const el = $("#short-box"); if (el) el.onclick = e => { const s
   setInterval(() => { if (Math.floor(Date.now()/900000) !== R.slot && Date.now() % 900000 > 4000) scan(false); else paintList(); }, 10000); setInterval(resolve, 60000);
   setInterval(() => { if (document.body.dataset.pg === "short" && !document.hidden && SEL) paintDet(); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) resolve(); });
-  window.addEventListener("sqz:update", paint); window.addEventListener("themechange", () => { if (document.body.dataset.pg === "short") paintDet(); }); }
+  window.addEventListener("sqz:update", paint); window.addEventListener("sec:change", e => { if (e.detail && e.detail.sec === "short"){ if (e.detail.on){ resolve(); scan(true); } paintList(); } }); /* v7.30 resume: back-fill DEFTER + fresh pass */ window.addEventListener("themechange", () => { if (document.body.dataset.pg === "short") paintDet(); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 return { R, scan, active, big, line, sqOn, paint, show, resolve, select: s => { SEL = s; paint(); }, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
 })();

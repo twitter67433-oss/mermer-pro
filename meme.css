@@ -504,3 +504,11 @@ body.simple #psim .plan-foot,body.simple #psim>h3 small{display:none}
 .sert-btns{display:flex;gap:8px;margin-top:8px}
 .sert-j .sert-h{font-weight:700;letter-spacing:.06em}
 .sert-k{font-size:9px;font-weight:600;letter-spacing:.06em;padding:0 4px;border:1px solid #9a7432;border-radius:3px;color:#9a7432;vertical-align:middle}
+/* v7.30 AKTİF / PASİF */
+.sec-tg{margin-left:6px;font:600 10px/1 system-ui,sans-serif;letter-spacing:.06em;padding:4px 7px;border-radius:6px;border:1px solid #0f6b45;color:#0f6b45;background:transparent;cursor:pointer;white-space:nowrap}
+.sec-tg + .sec-tg{margin-left:6px}
+.sec-tg.off{border-color:#9b1c31;color:#fff;background:#9b1c31}
+h3 .sec-tg{flex:0 0 auto}
+#nav button.sec-off{position:relative}
+#nav button.sec-off::before{content:"PASİF";position:absolute;top:1px;right:2px;font:700 7px/1 system-ui,sans-serif;letter-spacing:0;color:#fff;background:#9b1c31;border-radius:3px;padding:1px 2px}
+section.sec-off > div{opacity:.55}
