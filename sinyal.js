@@ -64,6 +64,7 @@ function html(){ return `<div class="sg-top"><div class="can-search sc-search"><
    <details class="keys"><summary>🧭 GENEL YÖN nasıl hesaplanır · geçmiş testi</summary><div id="sd-gen"></div></details>
    <details class="keys"><summary>⚡ Canlı uyarılar</summary><div id="sg-alerts" class="sg-alerts"></div></details>
    <details class="keys"><summary>🧠 Neden bu sinyal?</summary><div id="sd-why"></div></details>
+   <details class="keys" id="sd-s8d"><summary>🧪 SİNYAL 8 · deneysel <small class="dim">kanıtlanmadı · yalnız bilgi</small></summary><div id="sd-s8"></div></details>
    <details class="keys"><summary>⚖ Öğrenilen ağırlıklar</summary><div id="sd-w"></div></details>
    <details class="keys"><summary>🕯 Mum formasyonları</summary><div id="sd-pat"></div></details>
    <details class="keys"><summary>🗜 Sıkışma / kırılım</summary><div id="sd-sq"></div></details>
@@ -142,7 +143,7 @@ function decide(R){ const W = R.W, L = W.live, P = R.P, b = P.b, i = L.i, px = b
   out.state = "BEKLE"; out.lean = out.lean || (Math.abs(L.sc.S) >= 0.1 ? L.d : 0); out.reason = out.reason || L.why[0] || "net kurulum yok"; out.conf = L.setup; return out; }
 let lastRun = 0;
 function compute(force){ if (!base().length) return; const t = Date.now(); if (!force && t - lastRun < 2000) return; lastRun = t;
-  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); bump(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; summarize(); }
+  try { const R = run(false); if (!R){ S.err = "yeterli mum yok (en az 120 gerekir) — daha kısa aralık seç"; paintAll(); bump(); return; } S.R = R; S.W = R.W; if (S.oiH.length) S.liq = SMT.liqMagnets(S.oiH, R.P.c[R.P.n - 1], R.P.b); S.D = decide(R); S.err = null; summarize(); s8Run(); }
   catch(e){ S.err = "hesap hatası: " + e.message; } bump(); if (visible()) paintAll(); }
 function finalize(){ const b = base().filter(x => x.x), l = b[b.length - 1]; if (!l || l.t <= S.lastFinal) return; S.lastFinal = l.t; jTrigCheck(l); let R, D; try { R = run(true); if (!R) return; D = decide(R); } catch(e){ return; }
   saveLearn(R.W); const all = H.load(), L = all[key()] = all[key()] || []; if (L.length && L[0].t >= l.t) return; const prev = L[0], act = ["LONG", "SHORT", "PUMP", "DUMP"].includes(D.state) && D.plan && fin(D.plan.stop);
@@ -384,6 +385,36 @@ function paintChart(){ const cv = $("#sc-cv"); if (!cv) return; const w = cv.cli
   if (D.plan){ hl(D.plan.stop, "#9b1c31", "STOP"); hl(D.plan.tp, "#0f6b45", "HEDEF"); hl(D.plan.longAbove, "#0f6b45", "↑KIRIL"); hl(D.plan.shortBelow, "#9b1c31", "↓KIRIL"); }
   const px = all[all.length - 1].c; if (inR(px)){ x.strokeStyle = "rgba(184,151,90,.9)"; x.lineWidth = 1; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(0, Y(px)); x.lineTo(pw, Y(px)); x.stroke(); x.setLineDash([]); x.fillStyle = "#8a6a2c"; x.fillRect(pw, Y(px) - 8, axis, 16); x.fillStyle = "#f3f0eb"; x.font = "bold 10px monospace"; x.fillText(fp(px).slice(0, 9), pw + 3, Y(px) + 4); }
   x.fillStyle = "#415674"; x.font = "10px monospace"; x.fillText(`${S.sym} · ${TF_LBL[S.tf]} · ${b.length} mum${off ? " · ←" + off : ""}`, 4, h - 5); }
+/* ---------------- v7.50 SİNYAL 8 (deneysel): weighted-evidence candidates, rejected with reasons, frequency per coin/interval.
+   Signal-only and information-only: it never changes the main LONG/SHORT/BEKLE word, never journals, never alerts, never orders or auto-buys. */
+const S8K = { min: "neon.sig8.min", cost: "neon.sig8.cost", freq: "neon.sig8.freq" }, s8J = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? d; } catch(e){ return d; } };
+function s8Cfg(){ const G = window.SIG8; const m = s8J(S8K.min, "medium"); return Object.assign({}, G.DEF, { minShow: ["strong", "medium", "weak"].includes(m) ? m : "medium" }); }
+function s8Cost(){ const G = window.SIG8, c = s8J(S8K.cost, null), o = Object.assign({}, G.COST); if (c) for (const k of ["taker", "maker", "spread", "slip", "fund8h"]) if (fin(+c[k]) && +c[k] >= 0 && +c[k] < 2) o[k] = +c[k]; return o; }
+function s8Run(){ const G = window.SIG8; if (!G) return; try { const T = tfs(), b = base().filter(x => x.x !== false); if (b.length < 60){ S.S8 = { err: "mum az" }; return; }
+    const lt = b[b.length - 1].t, now0 = now(); if (S.S8 && S.S8.key === key() && S.S8.t === lt && now0 - S.S8.at < 30000) return;
+    const F = G.prep(b, { tms: TF_MS[S.tf], h1: S.b[T[1]], h2: S.b[T[2]] }), q = G.dq(b, TF_MS[S.tf], now0), cfg = s8Cfg();
+    const r = G.evalAt(F, F.n - 1, cfg, { dq: q, live: { fund: S.der.fund, oiCh: S.der.oiCh, tk: S.der.tk }, cost: s8Cost() });
+    if (!S.S8 || S.S8.t !== lt || S.S8.key !== key()){ let st = s8J(S8K.freq, {}); for (const c of r.cands.concat(r.rejected)) if (c.grade) st = G.freqAdd(st, S.sym, S.tf, c.grade, lt);
+      const ks = Object.keys(st); if (ks.length > 80) for (const k of ks.slice(0, ks.length - 80)) delete st[k]; try { localStorage.setItem(S8K.freq, JSON.stringify(st)); } catch(e){} }
+    S.S8 = { key: key(), t: lt, at: now0, r, cfg }; const d = $("#sd-s8d"); if (d && d.open) paintS8(); } catch(e){ S.S8 = { err: e.message }; } }
+function paintS8(){ const el = $("#sd-s8"), G = window.SIG8; if (!el || !G) return; const X = S.S8; if (!X || X.err){ el.innerHTML = `<div class="dim">${esc(X ? X.err : "hesaplanıyor…")}</div>`; return; }
+  const r = X.r, cfg = X.cfg, st = s8J(S8K.freq, {}), f1 = G.freqOf(st, S.sym, S.tf, now(), 864e5), f7 = G.freqOf(st, S.sym, S.tf, now(), 7*864e5), C = s8Cost(), BT = G.BT || {};
+  const gc = g => g === "strong" ? "up" : g === "medium" ? "m" : "dim", side = d => d > 0 ? '<b class="up">LONG</b>' : '<b class="dn">SHORT</b>';
+  const row8 = c => `<tr><td class="${gc(c.grade)}">${c.grade ? G.GRADE[c.grade] : "—"}</td><td>${side(c.d)} ${esc(c.name)}</td><td>${c.score}</td><td>${fp(c.entry)}<br><small>stop ${fp(c.stop)}</small></td><td><small>${fp(c.tp1)} / ${fp(c.tp2)} / ${fp(c.tp3)}</small></td><td>${fin(c.netRR) ? c.netRR.toFixed(2) : "—"}</td></tr>`;
+  const bt = BT.grades ? Object.entries(BT.grades).map(([g, v]) => `${G.GRADE[g]}: ${v.n} işlem · kazanan %${(v.win*100).toFixed(0)} · ${v.expR >= 0 ? "+" : ""}${v.expR.toFixed(2)}R/işlem`).join(" · ") : "—";
+  el.innerHTML = `<div class="sc-veto"><div>⚠ <b>KANITLANMADI.</b> ${esc(BT.note || "Geçmiş testte ücret + kayma sonrası net beklenti negatif.")} Ana karar (LONG / SHORT / BEKLE) bundan etkilenmez; emir yok, otomatik alım yok.${S.tf !== "15m" ? ` <b>${esc(TF_LBL[S.tf])} aralığı hiç test edilmedi</b> (test yalnız 15dk).` : ""}</div></div>
+    <div class="can-kv">${row("rejim", esc(r.regime.k) + (r.regime.flags && r.regime.flags.length ? " · " + esc(r.regime.flags.join(", ")) : ""))}${row("veri kalitesi", r.dq.s + "/100" + (r.dq.why.length ? " · " + esc(r.dq.why.join(", ")) : ""), r.dq.ok ? "" : "dn")}
+    ${row("gösterim eşiği", `<select id="s8-min">${["strong", "medium", "weak"].map(g => `<option value="${g}" ${cfg.minShow === g ? "selected" : ""}>${G.GRADE[g]}+</option>`).join("")}</select>`)}
+    ${row("sıklık (bu coin · " + TF_LBL[S.tf] + ")", `24s: ${f1.n} <small>(G ${f1.strong} · O ${f1.medium} · Z ${f1.weak})</small> · 7g: ${f7.n}`)}</div>
+    ${r.hard ? `<div class="dn">⛔ ${esc(r.hard)}</div>` : ""}
+    <div class="sub-h">ADAYLAR (${G.GRADE[cfg.minShow]}+) ${r.conflict ? '<small class="m">· iki yönde de aday var (çatışma)</small>' : ""}</div>
+    ${r.cands.length ? `<table class="can-t"><tr><th>sınıf</th><th>strateji</th><th>teknik güven</th><th>giriş / stop</th><th>TP1/2/3</th><th>net R/R</th></tr>${r.cands.map(row8).join("")}</table>
+      ${r.cands.map(c => c.warn.length ? `<div class="dim sc-note">${side(c.d)} ${esc(c.name)}: ${c.warn.map(esc).join(" · ")}${c.noDer ? " · türev verisi yok (katman çıkarıldı)" : ""}</div>` : "").join("")}` : '<div class="dim">bu mumda eşiği geçen aday yok</div>'}
+    <details class="keys"><summary>reddedilen / eşik altı (${r.rejected.length}) — nedenleriyle</summary>${r.rejected.length ? `<table class="can-t"><tr><th>aday</th><th>güven</th><th>neden</th></tr>${r.rejected.map(c => `<tr><td>${side(c.d)} ${esc(c.name)}</td><td>${c.score}</td><td><small>${esc(c.reason)}${c.warn.length ? " · " + c.warn.map(esc).join(" · ") : ""}</small></td></tr>`).join("")}</table>` : '<div class="dim">bu mumda reddedilen aday yok</div>'}</details>
+    <div class="dim sc-note">Teknik güven (0–100) kazanma olasılığı DEĞİLDİR. Geçmiş test (walk-forward, örneklem dışı, ${esc(BT.span || "15dk")}, canlı sonuç değil): ${bt}.<br>
+      Maliyet varsayımı (%, değiştirilebilir): ${[["taker", "taker/bacak"], ["maker", "maker"], ["spread", "spread"], ["slip", "kayma/bacak"], ["fund8h", "funding/8s"]].map(([k, l]) => `<label class="s8c">${l} <input data-s8c="${k}" inputmode="decimal" size="4" value="${C[k]}"></label>`).join(" ")} (stopta kayma ×${C.stopSlipX}). Yalnız kapanmış mumlar kullanılır.</div>`;
+  el.querySelectorAll("[data-s8c]").forEach(i => i.onchange = () => { const c = s8J(S8K.cost, {}) || {}, v = +String(i.value).replace(",", "."); if (isFinite(v) && v >= 0 && v < 2) c[i.dataset.s8c] = v; else i.value = s8Cost()[i.dataset.s8c]; try { localStorage.setItem(S8K.cost, JSON.stringify(c)); } catch(e){} S.S8 = null; s8Run(); paintS8(); });
+  const m = $("#s8-min"); if (m) m.onchange = () => { try { localStorage.setItem(S8K.min, JSON.stringify(m.value)); } catch(e){} S.S8 = null; s8Run(); paintS8(); }; }
 /* ---------------- details ---------------- */
 const NM = k => SMT.NAMES[k] || ({ fund: "Funding", oi: "OI değişimi", tk: "Taker oranı", ls: "Long/Short", wall: "Defter duvarları", ob: "Defter dengesizliği" }[k] || k), vc = v => v > 0.1 ? "up" : v < -0.1 ? "dn" : "dim", ar = v => v > 0.1 ? "▲" : v < -0.1 ? "▼" : "•";
 function paintDetails(){ const D = S.D, W = S.W; if (!D || !W) return; const L = D.L, cn = S.mode === "rev" ? W.cntR : W.cntT;
@@ -447,7 +478,7 @@ function bind(){ const q = $("#sc-q"); q.oninput = () => paintList(q.value); q.o
   $("#al-ntf").onclick = async () => { const b = $("#al-ntf"); if (S.al.ntf){ S.al.ntf = false; alSave(); b.textContent = "🔕"; return; } if (!window.Notification){ alert("Bu tarayıcı bildirim desteklemiyor."); return; }
     let p = Notification.permission; if (p === "default") try { p = await Notification.requestPermission(); } catch(e){} S.al.ntf = p === "granted"; alSave(); b.textContent = S.al.ntf ? "🔔" : "🔕"; if (!S.al.ntf) alert("Bildirim izni verilmedi — ses/titreşim yine çalışır."); };
   box.addEventListener("pointerdown", () => { try { const C = window.AudioContext || window.webkitAudioContext; if (C && !alarm.ac) alarm.ac = new C(); alarm.ac && alarm.ac.resume && alarm.ac.resume(); } catch(e){} }, { once: true });
-  box.addEventListener("toggle", e => { if (e.target.id === "sg-jr" && e.target.open){ const bx = $("#jr-box"); if (bx) delete bx.dataset.ok; paintJournal(); } if (e.target.querySelector && e.target.querySelector("#sd-gen") && e.target.open) paintGenDet(); }, true);
+  box.addEventListener("toggle", e => { if (e.target.id === "sg-jr" && e.target.open){ const bx = $("#jr-box"); if (bx) delete bx.dataset.ok; paintJournal(); } if (e.target.querySelector && e.target.querySelector("#sd-gen") && e.target.open) paintGenDet(); if (e.target.id === "sd-s8d" && e.target.open){ s8Run(); paintS8(); } }, true);
   /* drag to scroll back in time */ const cv = $("#sc-cv"); let dx = null, o0 = 0; const pos = e => (e.touches ? e.touches[0].clientX : e.clientX);
   cv.addEventListener("pointerdown", e => { dx = e.clientX; o0 = S.view.off; cv.setPointerCapture && cv.setPointerCapture(e.pointerId); }); cv.addEventListener("pointermove", e => { if (dx === null) return; const cw = (cv.clientWidth - 62)/S.view.n; S.view.off = Math.max(0, Math.round(o0 + (e.clientX - dx)/cw)); paintChart(); });
   ["pointerup", "pointercancel", "pointerleave"].forEach(t => cv.addEventListener(t, () => { dx = null; })); void pos;

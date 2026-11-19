@@ -10,7 +10,10 @@
 "use strict";
 (function (root, factory){ const M = factory(typeof module === "object" && module.exports ? require("./scalp.js") : root.SCM); if (typeof module === "object" && module.exports) module.exports = M; else root.SMT = M; })(typeof self !== "undefined" ? self : this, function (SCM){
 const fin = x => typeof x === "number" && isFinite(x), clip = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x)), sgn = (x, band = 0) => x > band ? 1 : x < -band ? -1 : 0, last = a => a[a.length - 1];
-const FEE = 0.10; /* % round trip, taker both sides */
+let FEE = 0.10; /* % round trip, taker both sides — the A+/GİR GATE cost. v7.50: configurable (setFee). Measured on 40 coins × 120 days 15m (docs/BACKTEST_REPORT.md):
+   gating with a realistic 0.15 % (fees + spread + slippage) did NOT improve net results (A+ trend worse, SCALP slightly better), so the default stays 0.10;
+   honest net figures incl. spread / slippage / funding come from SIG8.costPct in the backtest and the SİNYAL 8 panel. */
+const setFee = x => { if (typeof x === "number" && isFinite(x) && x >= 0 && x < 2) FEE = x; return FEE; };
 const NAMES = { ema: "EMA 9/21/50", vwap: "VWAP", rsi: "RSI 14", rdiv: "RSI uyumsuzluk", srsi: "Stoch RSI", macd: "MACD", bb: "Bollinger", st: "SuperTrend", adx: "ADX/DMI", ichi: "Ichimoku", psar: "Parabolic SAR",
   cci: "CCI", wr: "Williams %R", mfi: "MFI", obv: "OBV", cvd: "CVD / taker delta", vol: "Hacim patlaması", ha: "Heikin Ashi", pat: "Mum formasyonu (bağlamlı)", cvdd: "CVD uyumsuzluğu", lvl: "Kilit seviye", sqz: "Sıkışma kırılımı",
   btc: "BTC öncülük", mtf: "Üst zaman dilimleri", ext: "Aşırı uzama" };
@@ -300,5 +303,5 @@ function mainView(dec, D, mi, tfL){ D = D || {}; const stD = D.state === "LONG" 
   const conflict = !!(dec.dir && own && own === -dec.dir) || !!(dec.d && stD && stD === -dec.d);
   const sub = dec.word === "BEKLE" ? `BEKLE · yön ${dec.dirW.toLocaleLowerCase("tr")}${dec.trig.length ? ", tetik: " + dec.trig[0].t : ""}` : dec.line;
   return { word: dec.word, sub, tag, conflict, note: conflict ? `bu aralık ters (${tfL || ""} ${own > 0 ? "yukarı" : "aşağı"}, genel yön ${dec.dirW.toLocaleLowerCase("tr")}): dikkat` : null }; }
-return { decision, mainView, DIRW, REV, revOf, revWhy, bosOf, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, winB, tpRateB, bucket, addB, NAMES, FT, FR, SESS, FEE, H_OUT, H_LAB };
+return { decision, mainView, DIRW, REV, revOf, revWhy, bosOf, gReplay, gGate, tfRel, relAcc, relMul, consensus, action, summary, prepHigher, GW, G_BIG, G_MID, G_SHORT, G_ALL, patternsAt, prep, votesAt, walk, wOf, scoreOf, squeezeDir, liqMagnets, walls, replay, resolveTrade, hitB, winB, tpRateB, bucket, addB, NAMES, FT, FR, SESS, get FEE(){ return FEE; }, setFee, H_OUT, H_LAB };
 });
