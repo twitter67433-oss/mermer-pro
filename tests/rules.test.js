@@ -2,7 +2,7 @@
 const assert = require("assert"), X = require("../sert.js"), P = require("../psim.js");
 const base = (n = 300, px = 100) => Array.from({ length: n }, (_, i) => ({ t: i*900000, o: px, h: px*1.004, l: px*0.996, c: px*(i % 2 ? 1.001 : 0.999), qv: 1000, tb: 500 }));
 const set = (b, x) => { b[b.length - 1] = Object.assign({ t: b[b.length - 1].t }, x); return b; };
-assert.strictEqual(X.LISTS.length, 7); assert.deepStrictEqual(X.LISTS.filter(l => l.tab === "short").map(l => l.k), ["sert", "sqs", "dvs"]); assert.deepStrictEqual(X.LISTS.filter(l => l.tab === "long").map(l => l.k), ["lng", "sql", "kap", "dvl"]);
+assert.strictEqual(X.LISTS.length, 9); assert.deepStrictEqual(X.LISTS.filter(l => l.tab === "short").map(l => l.k), ["sert", "sqs", "dag", "dvs"]); assert.deepStrictEqual(X.LISTS.filter(l => l.tab === "long").map(l => l.k), ["lng", "sql", "kap", "top", "dvl"]);
 for (const l of X.LISTS) assert.ok(l.bt && /45g test/.test(l.bt) && l.maxR > 0 && l.maxR <= 0.05);
 // red breakdown, 4× volume, 70 % taker sell
 let b = set(base(), { o: 100, h: 100.3, l: 98.6, c: 98.8, qv: 4000, tb: 1200 });

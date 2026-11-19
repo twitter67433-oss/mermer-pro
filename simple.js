@@ -1,7 +1,7 @@
 /* MERMER TERMİNAL v7.26 — SADE GÖRÜNÜM. Default: body.simple → one result per coin (GİR LONG / GİR SHORT / BEKLE + giriş/stop/hedef).
    Every engine keeps running; only the UI hides the detail texts. One global "detay" switch (off by default, saved) brings them back. */
 "use strict";
-(function(){ const K = "mermer.detay", PANELS = ["scalp", "psim", "coinan", "meme", "pump"];
+(function(){ const K = "mermer.detay", PANELS = ["scalp", "psim", "coinan", "meme", "pump", "agg"];
   const on = () => { try { return localStorage.getItem(K) === "1"; } catch(e){ return false; } };
   function apply(){ const d = on(); document.body.classList.toggle("simple", !d);
     document.querySelectorAll(".dt-tg").forEach(b => { b.setAttribute("aria-pressed", String(d)); b.textContent = d ? "detay ▴" : "detay ▾"; b.title = d ? "detayları gizle (sade görünüm)" : "detayları göster"; });

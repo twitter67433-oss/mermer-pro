@@ -535,3 +535,10 @@ section.sec-off > div{opacity:.55}
 .hx-jl .mini small{opacity:.7}
 .hx~.sert-j,#hx-j-short,#hx-j-long{margin-top:12px}
 .hx-jl .mini{font-size:11px!important;padding:4px 8px!important;min-height:0!important}
+/* v7.33 TOPLAMA / DAĞITIM */
+.agg-src{font-size:10.5px;margin-bottom:4px}
+.agg-r{font-size:12px;line-height:1.45;padding:4px 0;border-top:1px solid #e3d8c4}
+.agg-r small{opacity:.7}
+.agg-det{font-size:10.5px;line-height:1.35}
+body.simple .agg-det{display:none}
+.agg-live{font-size:12px;margin-top:6px;padding-top:6px;border-top:1px dashed #d9cbb3}

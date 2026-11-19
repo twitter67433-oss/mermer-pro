@@ -65,10 +65,12 @@ function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || 
 const LISTS = [
   { k: "sert", side: -1, tab: "short", name: "SHORT", sub: "SERT SHORT · 1s dip kırılımı · hacim≥3× · satış≥%55 · OI↑ / funding↑", maxR: 0.03, bt: "45g test: n=276 · stoplu %37 +0.04% · stopsuz %47 +0.04%" },
   { k: "sqs", side: -1, tab: "short", name: "SQUEEZE SHORT", sub: "pompa sonrası söndürme · funding≥%0.05 ya da 72s +%30 & funding≥%0.03 · kırmızı kırılım", maxR: 0.05, bt: "45g test: n≈160 · stoplu %43 +0.35% · stopsuz %52 +0.23% (az coin, kanıtlanmadı)" },
+  { k: "dag", side: -1, tab: "short", ext: 1, name: "DAĞITIM (SHORT)", sub: "çok borsa: fiyat 4s ≥+%3 · taker satış ≥%10 ağır · toplam OI 1s ≥+%1", maxR: 0.05, bt: "45g test: n=271 · stoplu %35 −0.03% · stopsuz %54 −0.15% — ZARARDA" },
   { k: "dvs", side: -1, tab: "short", name: "SQUEEZE DEVAM (SHORT)", sub: "long tasfiyesi sürüyor · sert düşüş · OI↓ · funding≥0 · hacim≥3×", maxR: 0.05, bt: "45g test: n=99 · stoplu %27 −0.23% · stopsuz %32 −0.42% — ZARARDA" },
   { k: "lng", side: 1, tab: "long", name: "LONG", sub: "1s tepe kırılımı · hacim≥3× · alış≥%55 · OI≥+%1", maxR: 0.03, bt: "45g test: n=299 · stoplu %32 −0.17% · stopsuz %36 −0.31% — ZARARDA" },
   { k: "sql", side: 1, tab: "long", name: "SQUEEZE LONG", sub: "short kalabalık · funding≤−%0.03 · OI≥0 · 1s tepe kırılımı · hacim≥2×", maxR: 0.05, bt: "45g test: n=179 · stoplu %41 +0.42% · stopsuz %56 +1.06% (19 coin, kanıtlanmadı)" },
   { k: "kap", side: 1, tab: "long", name: "KAPİTÜLASYON (LONG)", sub: "3 kırmızı sonrası · aralık≥2 ATR · hacim≥3× · alt fitil≥%50", maxR: 0.05, bt: "45g test: n=404 · stoplu %31 −0.06% · stopsuz %45 −0.09% — ZARARDA" },
+  { k: "top", side: 1, tab: "long", ext: 1, name: "TOPLAMA (LONG)", sub: "çok borsa: fiyat 1s ±%1 / 4s ±%2 · hacim ≥1.5× · toplam OI 1s ≥+%3 · taker alış ≥%3", maxR: 0.05, bt: "45g test: n=102 · stoplu %41 +0.17% · stopsuz %53 +0.16% (kanıtlanmadı)" },
   { k: "dvl", side: 1, tab: "long", name: "SQUEEZE DEVAM (LONG)", sub: "short squeeze sürüyor · sert yükseliş · OI↓ · funding≤%0.01 · hacim≥3×", maxR: 0.05, bt: "45g test: n=32 · stoplu %28 −0.14% · stopsuz %41 +0.12% (çok az örnek)" } ];
 const LK = Object.fromEntries(LISTS.map(l => [l.k, l]));
 function feat(b){ const n = (b || []).length; if (n < 101) return null; const x = b[n - 1], P = b.slice(Math.max(0, n - 289), n - 1);
@@ -99,7 +101,7 @@ function stopK(k, f){ const x = f.x; return k === "dvs" ? f.hi4*1.0005 : k === "
 const okR = (side, e, st, maxR) => e > 0 && (st - e)*side < 0 && Math.abs(st - e)/e <= maxR;
 /* every rule for one coin → triggers [{ k, side, entry, stop, atr, why }] */
 function evalAll(b, oi1, fr, on){ const f = feat(b); if (!f) return []; const out = [];
-  for (const l of LISTS){ if (on && on[l.k] === false) continue; if (!fullK(l.k, f, oi1, fr)) continue; const st = stopK(l.k, f), e = f.x.c; if (!okR(l.side, e, st, l.maxR)) continue;
+  for (const l of LISTS){ if (l.ext || (on && on[l.k] === false)) continue; if (!fullK(l.k, f, oi1, fr)) continue; const st = stopK(l.k, f), e = f.x.c; if (!okR(l.side, e, st, l.maxR)) continue;
     out.push({ k: l.k, side: l.side, entry: e, stop: st, atr: f.atr, vr: f.vr, sell: f.sell, oi1, fr, why: `hacim ${f.vr.toFixed(1)}× · satış %${Math.round(f.sell*100)} · 15dk ${(f.r15*100).toFixed(1)}% · OI 1s ${fin(oi1) ? (oi1*100).toFixed(1) + "%" : "—"} · funding ${fin(fr) ? (fr*100).toFixed(3) + "%" : "—"}` }); }
   return out; }
 /* generic follow-up for one journal record on 1m bars: main side, mirrored (TERSİ), stopsuz both, TP tracking */
@@ -149,18 +151,19 @@ const C = new Map();
 async function bars15(s){ const now = Date.now(), lastT = Math.floor(now/900000)*900000 - 900000, o = C.get(s), inc = o && o.length >= 101 && o[o.length - 1].t >= lastT - 4*900000;
   const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=${inc ? 6 : 300}`), nb = k.filter(x => +x[6] < now).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
   const b = inc ? X.merge(o, nb, 300) : nb.slice(-300); C.set(s, b); return b; }
-async function one(s){ const b = await bars15(s), f = X.feat(b); const ks = X.LISTS.filter(l => ON[l.k] !== false && X.preK(l.k, f)).map(l => l.k);
+async function one(s){ const b = await bars15(s), f = X.feat(b); const ks = SCAN.filter(l => ON[l.k] !== false && X.preK(l.k, f)).map(l => l.k);
   if (f && X.preK("sert", f)) R.brN = (R.brN || 0) + 1; if (f) R.brD = (R.brD || 0) + 1;
-  if (!ks.length){ for (const k in R.L) R.L[k].delete(s); return; } const last = b[b.length - 1], cT = last.t + 900000; let oi1 = NaN, fr = NaN;
+  if (!ks.length){ for (const l of SCAN) R.L[l.k].delete(s); return; } const last = b[b.length - 1], cT = last.t + 900000; let oi1 = NaN, fr = NaN;
   if (ks.some(X.needX)){ const [oh, on, fq] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
     const ago = (oh || []).filter(x => +x.timestamp <= cT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN; oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN; fr = fq && fq[0] ? +fq[0].fundingRate : NaN; }
   R.cand = (R.cand || 0) + 1; const T = X.evalAll(b, oi1, fr, ON), got = new Set(T.map(t => t.k));
   for (const t of T){ Object.assign(t, { sym: s, close: cT, until: cT + 900000, t: last.t }); R.L[t.k].set(s, t); }
-  for (const k in R.L) if (!got.has(k)) R.L[k].delete(s); if (T.length) paintLists(); }
+  for (const l of SCAN) if (!got.has(l.k)) R.L[l.k].delete(s); if (T.length) paintLists(); }
 const KIND = {}; let kindAt = 0, UNI = [], VOL = {}, volAt = 0;
 async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } UNI = X.universe(ei); kindAt = Date.now(); } catch(e){} }
 const ktag = sym => KIND[sym] ? ` <small class="sert-k">${KIND[sym]}</small>` : "";
 const sleep = ms => new Promise(z => setTimeout(z, ms));
+const SCAN = X.LISTS.filter(l => !l.ext); /* scanner-owned lists (TOPLAMA / DAĞITIM come from agg.js) */
 const anyOn = () => X.LISTS.some(l => ON[l.k] !== false);
 /* full pass over every TRADING perpetual (~810): 5 workers, 650 ms gap → ~6 req/s; OI/funding only for bar-level candidates. 429/418 → pause 60 s */
 async function scan(force){ const slot = Math.floor(Date.now()/900000); if (R.busy || (!force && slot === R.slot) || !anyOn()) return; R.busy = true; R.slot = slot; R.t0 = Date.now();
@@ -263,5 +266,6 @@ function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el
   window.addEventListener("sec:change", e => { if (e.detail && e.detail.sec === "short"){ if (e.detail.on){ liqOpen(); resolve(); scan(true); } paint(); } });
   window.addEventListener("themechange", () => { const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { R, ON, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
+async function push(r){ if (!R.L[r.k] || ON[r.k] === false) return; r.sym = r.sym; R.L[r.k].set(r.sym, r); if (!J.some(j => j.k === r.k && j.sym === r.sym && j.t === r.close)){ const g = await fresh(r); if (g) alertAll([g]); } paint(); } /* v7.33 external lists (TOPLAMA / DAĞITIM) */
+return { R, ON, push, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
 })();

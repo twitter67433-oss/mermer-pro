@@ -8,9 +8,9 @@
 (function (root, factory){ const M = factory(); if (typeof module === "object" && module.exports) module.exports = M; else root.SECX = M; })(typeof self !== "undefined" ? self : this, function (){
 const FILES = { "meme.js": "meme", "copy.js": "meme", "exec.js": "meme", "pump.js": "meme",
   "coinan.js": "fut", "market.js": "fut", "psim.js": "fut", "app.js": "fut", "chart.js": "fut",
-  "watch.js": "scalp", "sinyal.js": "sig", "analiz.js": "analiz", "sert.js": "short", "badge.js": "badge" };
-const SECS = ["meme", "fut", "scalp", "analiz", "short", "badge"];
-const LABEL = { meme: "MEME", fut: "VADELİ", scalp: "SİNYAL", analiz: "ANALİZ", short: "SHORT/LONG tarayıcı", badge: "ROZET" };
+  "watch.js": "scalp", "sinyal.js": "sig", "analiz.js": "analiz", "sert.js": "short", "badge.js": "badge", "agg.js": "agg" };
+const SECS = ["meme", "fut", "scalp", "analiz", "short", "badge", "agg"];
+const LABEL = { meme: "MEME", fut: "VADELİ", scalp: "SİNYAL", analiz: "ANALİZ", short: "SHORT/LONG tarayıcı", badge: "ROZET", agg: "TOPLAMA / DAĞITIM" };
 /* which section owns a call: first app .js frame in the stack (vendor and this file are skipped; an unmapped app file → nobody) */
 function ownerOf(stack){ for (const ln of String(stack || "").split("\n")){ if (ln.indexOf("/vendor/") >= 0) continue; const m = /\/([A-Za-z0-9_.-]+\.js)(?:\?[^:\s)]*)?:\d+/.exec(ln); if (!m) continue;
     if (m[1] === "sections.js") continue; return FILES[m[1]] || null; } return null; }
@@ -61,8 +61,8 @@ const M = X.create(env);
 W.setTimeout = M.setTimeout; W.setInterval = M.setInterval; W.clearTimeout = M.clearTimeout; W.clearInterval = M.clearInterval; W.requestAnimationFrame = M.raf; W.cancelAnimationFrame = M.caf;
 function PWS(url, prot){ return M.makeWS(url, prot); } PWS.prototype = RealWS.prototype; for (const k of ["CONNECTING", "OPEN", "CLOSING", "CLOSED"]) PWS[k] = RealWS[k]; W.WebSocket = PWS;
 /* ---- UI: one small toggle per section header, PASİF marker on the nav tab ---- */
-const HOST = { meme: "#meme h3", fut: "#coinan h3", scalp: "#scalp h3", analiz: "#analiz h3", badge: "#scalp h3" }; /* v7.32: SHORT/LONG scanner has per-list toggles (sert.js) */
-const NAVP = { meme: "meme", fut: "fut" }, PANEL = { meme: ["#meme", "#pump"], fut: ["#coinan", "#psim"], scalp: ["#scalp"], analiz: ["#analiz"], short: ["#short", "#long"] };
+const HOST = { meme: "#meme h3", fut: "#coinan h3", scalp: "#scalp h3", analiz: "#analiz h3", badge: "#scalp h3", agg: "#agg h3" }; /* v7.32: SHORT/LONG scanner has per-list toggles (sert.js) */
+const NAVP = { meme: "meme", fut: "fut" }, PANEL = { meme: ["#meme", "#pump"], fut: ["#coinan", "#psim"], scalp: ["#scalp"], analiz: ["#analiz"], short: ["#short", "#long"], agg: ["#agg"] };
 function realGuard(){ try { const m = W.MEME; if (!m || m.mode !== "GERÇEK") return 0; const g = m.realOpen ? m.realOpen() : 0; return g; } catch(e){ return 0; } }
 function paint(){ for (const s of X.SECS){ const on = M.on[s] !== false;
     document.querySelectorAll(`[data-sec="${s}"]`).forEach(b => { b.textContent = (s === "badge" ? "ROZET " : "") + (on ? "AKTİF" : "PASİF"); b.classList.toggle("off", !on); b.setAttribute("aria-pressed", on); b.title = `${X.LABEL[s]}: ${on ? "akışlar açık — dokun: PASİF (websocket, zamanlayıcı, tarama durur)" : "PASİF — dokun: AKTİF"}`; });
