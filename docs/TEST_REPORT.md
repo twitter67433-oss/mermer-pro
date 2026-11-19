@@ -16,10 +16,13 @@ Her sekme gezilir (SHORT → LONG → VADELİ → MEME → AI → CÜZDAN → SH
 | Ortam | Koşu | Emir isteği | Sayfa hatası | CSP ihlali | Not |
 |---|---|---|---|---|---|
 | yerel (python http.server) | 1 | 0 | 0 | 0 | APP_V 8.0.0, act.js çalışıyor |
-LIVE_ROWS
+| canlı GitHub Pages (8.0.0) — tüm sekmeler | 6 (3+3 paralel) | 0 | 0 | 0 | `securitypolicyviolation` olayı 0, `data-onerr` canlı çalıştı |
+| canlı — SİNYAL 8 paneli 15dk / 1s / 4s | 3 | 0 | 0 | 0 | APP_V 8.0.0, SIG8 yüklü |
+
+v7.51'de 5 canlı koşudan 1'inde görülen tek CSP mesajı v8.0'da 9 canlı + 1 yerel koşuda **tekrarlanmadı**. Mesajın tam metni o zaman 200 karakterde kesildiği için kaynağı kesin belirlenemedi; artık tam metin ve `securitypolicyviolation` ayrıntıları (yönerge, URI, dosya, satır) kaydediliyor (`v800.js`).
 
 ## Android
 APK derlendi (Gradle 8.14.3, compileSdk 36), aynı sertifikayla imzalandı, `apksigner verify` v2 geçti, `aapt2` versionCode 800 / versionName 8.0, NeonKeystorePlugin dex içinde. **Gerçek cihazda/emülatörde çalıştırılmadı.**
 
 ## Kaynak arşivi
-`git archive` → `MermerTerminal-kaynak-v8.0.zip`; jks/keystore/properties/private key/API secret taraması: ZIP_SCAN
+`git archive` → `MermerTerminal-kaynak-v8.0.zip`; jks/keystore/properties/private key/API secret taraması: dosya adlarında `.jks/.keystore/.p12/.pem/keystore.properties/.env/.apk` yok; içerikte `PRIVATE KEY`, `storePassword/keyPassword`, Binance gizli anahtar biçimi (64 karakter alfanümerik `secret` ataması), Solana 64-bayt gizli anahtar dizisi aranır → bulgu yok (bkz. teslim notu).
