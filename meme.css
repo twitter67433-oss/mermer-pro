@@ -479,3 +479,12 @@ body.simple #psim .plan-foot,body.simple #psim>h3 small{display:none}
 /* v7.27 squeeze warning: one line */
 .sqz-line{margin:4px 0 6px;padding:5px 9px;border-radius:8px;border:1px solid #9b1c31;background:rgba(155,28,49,.07);color:#9b1c31;font:700 12px/1.35 var(--sans,Inter,sans-serif)}
 .ps-sert{margin:6px 0 8px;font-size:12.5px}.ps-sert .ps-sr{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #e2d6c2}.ps-sert .ps-sr span{flex:1}
+/* v7.28 SERT SHORT main signal + scanner — plain, one line each */
+.sert-tag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid currentColor;border-radius:4px;font-size:10px;letter-spacing:.06em;color:#9b1c31;vertical-align:middle}
+.sert-big{font-family:var(--serif,inherit);font-size:34px;font-weight:700;line-height:1.1;margin:6px 0 2px;color:#9b1c31}
+.sert-l{font-size:13px}
+#sert-box{display:flex;flex-direction:column;gap:6px;font-size:13px}
+#sert-box .sert-h{font-weight:700;letter-spacing:.06em}
+#sert-box .sert-r{display:flex;gap:10px;align-items:center;justify-content:space-between;width:100%;padding:8px 10px;border:1px solid rgba(155,28,49,.35);border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+#sert-box .sert-r b{min-width:64px}
+#sert-box .sert-live{font-size:12px}

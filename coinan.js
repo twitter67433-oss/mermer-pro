@@ -124,7 +124,7 @@ function paintV(loading){ const el = $("#can-v"); if (!el) return; const A = S.A
   /* v7.26: ONE verdict — the smart-engine badge (same as SİNYAL/ANALİZ). The old "BEKLE güven %84" CAN verdict duplicated it and is gone;
      its score/factors/plan stay under "detay" as background analysis. */
   el.innerHTML = `<div class="can-head"><div><b class="can-sym">${esc(A.sym)}</b> <span>${fp(h ? h.px : NaN)}</span> <small class="${A.chg24 >= 0 ? "up" : "dn"}">${pc(A.chg24)} 24s</small></div>
-    <div class="can-one">${window.SGB ? SGB.tag({ perp: A.sym }) : ""}</div></div>${window.SQZ ? SQZ.html(A.sym) : ""}
+    <div class="can-one">${window.SGB ? SGB.tag({ perp: A.sym }) : ""}</div></div>${window.SERTS ? SERTS.big(A.sym) : ""}${window.SQZ ? SQZ.html(A.sym) : ""}
     ${P && P.side ? `<div class="can-plan">${row("giriş bölgesi", fp(P.zone[0]) + " – " + fp(P.zone[1]))}${row("stop", fp(P.stop) + ` <small>(risk %${P.riskPct.toFixed(2)})</small>`, "dn")}${row("TP1", fp(P.tp1) + ` <small>R:R ${P.rr1.toFixed(1)}</small>`, "up")}${row("TP2", fp(P.tp2) + ` <small>R:R ${P.rr2.toFixed(1)}</small>`, "up")}</div>`
       : P ? `<div class="can-plan">${row("LONG için", "1s kapanış > " + fp(P.longAbove))}${row("SHORT için", "1s kapanış < " + fp(P.shortBelow))}${row("destek / direnç", fp(P.sup) + " / " + fp(P.res))}</div>` : ""}
     <div class="can-f">${V.factors.map(f => `<span class="${f.v > 0.15 ? "up" : f.v < -0.15 ? "dn" : "dim"}">${f.v > 0.15 ? "▲" : f.v < -0.15 ? "▼" : "•"} ${esc(f.why)}</span>`).join("")}</div>
@@ -172,7 +172,7 @@ async function toTrade(){ const A = S.A, P = A && A.v.plan; if (!P || !P.side){ 
       const set = (id, v) => { const e = $(id); if (e){ e.value = (+v).toFixed(S.dec); e.dispatchEvent(new Event("input", { bubbles: true })); } }; set("#bfx-stop", P.stop); set("#bfx-tgt", P.tp1);
       $("#trade").scrollIntoView({ block: "start" }); window.NOTIFY && NOTIFY.toast(`COIN ANALİZ planı İŞLEM'e aktarıldı (${P.side} · stop ${fp(P.stop)} · TP1 ${fp(P.tp1)}). Emir için EMRİ HAZIRLA → ONAYLA.`, "good"); return true; } }
   window.NOTIFY && NOTIFY.toast("İŞLEM formu yüklenemedi", "bad"); return false; }
-function bind(){ window.addEventListener("sqz:update", e => { if (S.A && e.detail && e.detail.sym === S.A.sym) try { paintV(); } catch(x){} }); window.addEventListener("detay:change", () => { try { draw(); } catch(e){} }); const q = $("#can-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); paintList(""); };
+function bind(){ window.addEventListener("sert:update", () => { if (S.A) try { paintV(); } catch(x){} }); window.addEventListener("sqz:update", e => { if (S.A && e.detail && e.detail.sym === S.A.sym) try { paintV(); } catch(x){} }); window.addEventListener("detay:change", () => { try { draw(); } catch(e){} }); const q = $("#can-q"); q.oninput = () => paintList(q.value); q.onfocus = () => { q.select(); paintList(""); };
   q.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const r = search(q.value)[0]; if (r) pick(r.s); } };
   $("#can-list").onclick = e => { const b = e.target.closest("[data-cs]"); if (b) pick(b.dataset.cs); };
   $("#can-go").onclick = () => { const r = search(q.value)[0]; pick(r ? r.s : q.value.trim().toUpperCase()); };

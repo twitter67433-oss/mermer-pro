@@ -43,7 +43,8 @@ function tag(o){ const k = o.perp ? "p:" + o.perp : o.mint ? "m:" + o.mint : nul
 const DEXTF = () => X.DEX_TF.includes(tfNow()) ? tfNow() : "15m";
 const SIMPLE = () => document.body.classList.contains("simple"), LBL0 = r => SIMPLE() ? X.labelS(r) : X.label(r);
 /* v7.27: a SHORT badge on a coin with an active squeeze warning (already cached by SQZ) shows "SHORT GİRME" instead — display only */
-const LBL = (r, k) => { const L = LBL0(r), q = k && k.startsWith("p:") && window.SQZ && SQZ.peek(k.slice(2)); return q && q.on && /SHORT/.test(L.txt) ? { txt: "SHORT GİRME", cls: "y" } : L; };
+const LBL = (r, k) => { const L0 = LBL0(r), p = k && k.startsWith("p:") ? k.slice(2) : "", q = p && window.SQZ && SQZ.peek(p), L = p && window.SERTS && SERTS.active(p) ? { txt: "GİR SHORT", cls: "dn" } : L0; /* v7.28 SERT SHORT */
+  return q && q.on && /SHORT/.test(L.txt) ? { txt: "SHORT GİRME", cls: "y" } : L; };
 const inner = (L, tf, dex, r) => SIMPLE() ? `<b>${esc(L.txt)}</b>` : `<b>${esc(L.txt)}</b><small>${esc(TFL()[tf] || tf)}${dex ? " · DEX" : ""}${r && fin(r.conf) && !r.none ? " · %" + r.conf : ""}</small>`;
 const fin = x => typeof x === "number" && isFinite(x);
 function get(k, tf){ const kk = k + "@" + tf, c = cache.get(kk); const sym = k.slice(2);
@@ -85,6 +86,6 @@ function snapshot(){ const out = []; const tf = tfNow(); const S = window.SCALP 
   for (const [kk, r] of cache){ if (Date.now() - r.at > 300000 || r.none || r.err) continue; const [k, t] = kk.split("@"); out.push({ coin: k.slice(2), aralik: t, karar: r.word, egilim: r.d > 0 ? "LONG" : r.d < 0 ? "SHORT" : "yatay", kaynak: r.src === "dex" ? "DEX (düşük güven)" : "Binance vadeli" }); }
   const W = window.SCALP && SCALP._j && SCALP._j.WE; if (W) for (const [k, x] of Object.entries(W.W.last)) out.push({ coin: k.split("@")[0], aralik: k.split("@")[1], karar: x.word, egilim: x.d > 0 ? "LONG" : x.d < 0 ? "SHORT" : "yatay", kaynak: "izleme listesi" });
   void tf; return out.slice(0, 25); }
-setInterval(scan, 2000); document.addEventListener("scroll", () => { clearTimeout(scan.t); scan.t = setTimeout(scan, 300); }, { passive: true }); window.addEventListener("sinyal:update", () => repaint()); window.addEventListener("sqz:update", () => repaint());
+setInterval(scan, 2000); document.addEventListener("scroll", () => { clearTimeout(scan.t); scan.t = setTimeout(scan, 300); }, { passive: true }); window.addEventListener("sinyal:update", () => repaint()); window.addEventListener("sqz:update", () => repaint()); window.addEventListener("sert:update", () => repaint());
 return { tag, snapshot, scan, repaint, _c: cache };
 })();

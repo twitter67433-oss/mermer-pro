@@ -67,11 +67,11 @@ function paint(){ const el = $("#az-r"), S = Sx(); if (!el || !S) return; if (!t
   if (!ready){ el.innerHTML = `<div class="az-card az-load"><div class="az-coin">${coin} <small>${tfL}</small></div><div class="az-wait">analiz ediliyor… <b>${have}</b>/12 aralık okundu</div><div class="az-cbar"><span style="width:${Math.round(have/12*100)}%"></span></div></div>`; setTimeout(paint, 700); return; }
   const v = ANZ.view({ dec: S.dec, C: S.G, A: S.A, I: S.I, sum: S.sum, TF: TF_SEL }); if (!v) return; const when = new Date(S.decAt || Date.now()).toLocaleTimeString("tr-TR", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const dots = v.dirs.map(d => `<span class="az-d ${d.d > 0 ? "up" : d.d < 0 ? "dn" : d.st === "SIKIŞMA" ? "m" : d.d === null ? "na" : "n"}${d.t === S.tf ? " on" : ""}"><i>${d.d === null ? "·" : d.st === "SIKIŞMA" ? "◇" : d.d > 0 ? "↑" : d.d < 0 ? "↓" : "•"}</i><small>${TF_LBL[d.t]}</small></span>`).join("");
-  const sq = window.SQZ ? SQZ.get(S.sym) : null, blockS = !!(sq && sq.on && v.word === "GİR SHORT"), sqH = window.SQZ ? SQZ.html(S.sym) : ""; /* v7.27 warning only */
+  const ss = window.SERTS ? SERTS.active(S.sym) : null, sq = window.SQZ ? SQZ.get(S.sym) : null, blockS = !!(sq && sq.on && (v.word === "GİR SHORT" || ss)), sqH = window.SQZ ? SQZ.html(S.sym) : "", sOn = !!ss && !blockS; /* v7.27 squeeze warning · v7.28 SERT SHORT main verdict */
   const open = (azOpen === null ? !!(window.DETAY && DETAY.on()) : azOpen) ? " open" : "";
   el.innerHTML = `<div class="az-card ${v.cls}"><div class="az-coin">${coin} <small>${tfL} · ${fp(S.D ? S.D.px : null)}</small></div>
-    <div class="az-word ${blockS ? "y" : v.cls}">${blockS ? "SHORT GİRME" : esc(v.word)}</div>${sqH}
-    ${v.go && !blockS ? `<div class="az-plan"><div><small>giriş</small><b>${fp(v.plan.entry)}</b></div><div><small>stop</small><b class="dn">${fp(v.plan.stop)}</b></div><div><small>hedef</small><b class="up">${fp(v.plan.tp)}</b></div></div>` : ""}
+    <div class="az-word ${blockS ? "y" : sOn ? "dn" : v.cls}">${blockS ? "SHORT GİRME" : sOn ? "GİR SHORT" : esc(v.word)}</div>${sqH}${sOn ? SERTS.line(ss) : ""}
+    ${v.go && !blockS && !sOn ? `<div class="az-plan"><div><small>giriş</small><b>${fp(v.plan.entry)}</b></div><div><small>stop</small><b class="dn">${fp(v.plan.stop)}</b></div><div><small>hedef</small><b class="up">${fp(v.plan.tp)}</b></div></div>` : ""}
     <canvas id="az-cv" class="az-cv" aria-label="mum grafiği: giriş, stop, hedef, destek/direnç ve formasyonlar"></canvas>
     <details class="az-det"${open}><summary>detay</summary>
     <div class="az-mode">${sc ? "SCALP · " + esc(tfL) + " + emir akışı" : (S.sel === "rev" ? "DÖNÜŞ" : "TREND") + " · 12 aralık"}</div>${v.rev ? `<div class="az-rev ${v.rev.d > 0 ? "up" : "dn"}" role="note"><b>⚠ DÖNÜŞ UYARISI</b> ${esc(v.rev.why)}</div>` : ""}
@@ -87,7 +87,7 @@ function paint(){ const el = $("#az-r"), S = Sx(); if (!el || !S) return; if (!t
   chart($("#az-cv"), S, v); }
 function init(){ const box = $("#analiz-box"); if (!box || inited) return; inited = true; box.innerHTML = html(); bind();
   window.addEventListener("sinyal:update", () => { if (document.body.dataset.pg !== "analiz" || pend) return; pend = true; setTimeout(() => { pend = false; paint(); }, 400); });
-  window.addEventListener("themechange", () => paint()); window.addEventListener("detay:change", () => { azOpen = null; paint(); }); window.addEventListener("sqz:update", e => { const S = Sx(); if (S && e.detail && e.detail.sym === S.sym && document.body.dataset.pg === "analiz") paint(); });
+  window.addEventListener("themechange", () => paint()); window.addEventListener("detay:change", () => { azOpen = null; paint(); }); window.addEventListener("sert:update", () => { if (document.body.dataset.pg === "analiz") paint(); }); window.addEventListener("sqz:update", e => { const S = Sx(); if (S && e.detail && e.detail.sym === S.sym && document.body.dataset.pg === "analiz") paint(); });
   window.addEventListener("sinyal:mode", () => { const S = Sx(); document.querySelectorAll(".az-sm [data-sel]").forEach(b => { const on = b.dataset.sel === S.sel; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
     document.querySelectorAll("[data-azt]").forEach(b => b.classList.toggle("on", b.dataset.azt === S.tf)); if (t0) t0 = Date.now(); paint(); }); window.addEventListener("resize", () => { if (document.body.dataset.pg === "analiz") paint(); }); }
 function show(){ init(); const S = Sx(); if (!S || !inited) return; document.querySelectorAll("[data-azt]").forEach(b => b.classList.toggle("on", b.dataset.azt === S.tf)); const q = $("#az-q"); if (q && document.activeElement !== q) q.value = S.sym;

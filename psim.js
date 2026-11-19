@@ -1,4 +1,4 @@
-/* MERMER TERMİNAL v7.26 — VADELİ SİMÜLATÖR (kağıt işlem). Live Binance USD-M prices, VIRTUAL balance only.
+/* MERMER TERMİNAL v7.28 — VADELİ SİMÜLATÖR (kağıt işlem). Live Binance USD-M prices, VIRTUAL balance only.
    No API key, no order endpoint, nothing is ever sent to Binance except public price reads (fstream aggTrade / fapi ticker).
    Core (PSIM) is pure and unit-tested; the UI below only runs in the browser. */
 "use strict";
@@ -100,30 +100,19 @@ function paint(){ const box = $("#psim-box"); if (!box || !box.firstChild) retur
   const S = P.stats(st), pc = x => x === null ? "—" : "%" + Math.round(x*100);
   $("#ps-sum").innerHTML = `<span>${S.n} işlem</span><span>kazanma <b>${pc(S.winRate)}</b></span><span>toplam <b class="${S.total >= 0 ? "up" : "dn"}">${us(S.total)}</b></span><span>sinyal doğruluğu <b>${pc(S.sigAcc)}</b> <small>(${S.sigN})</small></span>`;
   const hb = $("#ps-hist"); if (hb && hb.closest("details").open) hb.innerHTML = st.hist.length ? st.hist.slice(0, 40).map(r => `<div class="ps-hr"><span>${new Date(r.t1).toLocaleString("tr-TR", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><b>${esc(r.sym.replace("USDT", ""))} ${r.side > 0 ? "L" : "S"} ${r.lev}x</b><span>${fp(r.entry)}→${fp(r.exit)}</span><span>${esc(r.why)}</span><b class="${r.net >= 0 ? "up" : "dn"}">${us(r.net)}</b><small>${r.rule === "sert" ? "SERT SHORT" : r.sig ? esc(r.sig.word) : "—"}</small></div>`).join("") : `<div class="empty">henüz işlem yok</div>`; }
-/* ---- SERT SHORT scanner: selected coin + SİNYAL watchlist, once per closed 15m candle ---- */
-const SR = { sig: new Map(), scanned: 0, slot: 0, busy: false, n: 0 };
-const fj = async u => { const r = await fetch("https://fapi.binance.com" + u); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); };
-function sertList(){ const s = new Set(); const c = curSym(); if (c) s.add(c); try { const W = window.SCALP && SCALP._j && SCALP._j.WE; if (W) for (const x of W.W.list) s.add(x); } catch(e){} return [...s].slice(0, 12); }
-async function sertScan(force){ const slot = Math.floor(Date.now()/900000); if (SR.busy || (!force && slot === SR.slot)) return; SR.busy = true; SR.slot = slot; const L = sertList(); SR.n = L.length;
-  for (const s of L){ try {
-      const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=120`); const b = k.filter(x => +x[6] < Date.now()).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
-      const last = b[b.length - 1], closeT = last.t + 900000;
-      const [oh, on, fr] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
-      const ago = (oh || []).filter(x => +x.timestamp <= closeT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN, oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN;
-      const r = P.sertShort(b, oi1, fr && fr[0] ? +fr[0].fundingRate : NaN); r.sym = s; r.until = closeT + 900000;
-      if (r.sig) SR.sig.set(s, r); else SR.sig.delete(s);
-    } catch(e){} await new Promise(r => setTimeout(r, 250)); }
-  SR.scanned = Date.now(); SR.busy = false; paintSert(); }
+/* ---- SERT SHORT: v7.28 the scanner lives in sert.js (SERTS, watchlist + top 50 alts); the simulator reads the same triggers ---- */
+const SR = window.SERTS ? SERTS.R : { sig: new Map(), scanned: 0, n: 0 }, simOpened = new Set();
+function sertScan(force){ if (window.SERTS){ SERTS.want(curSym()); return SERTS.scan(force); } }
 function paintSert(){ const el = $("#ps-sert"); if (!el) return; const now = Date.now(); for (const [s, r] of SR.sig) if (now > r.until) SR.sig.delete(s);
   const S = P.stats(st, "sert"), pc = x => x === null ? "—" : "%" + Math.round(x*100);
-  const rows = [...SR.sig.values()].map(r => { const p = px[r.sym], risk = p ? (r.stop - p)/p : NaN; const ok = p && risk > 0 && risk <= P.SERT.maxRisk;
+  const rows = [...SR.sig.values()].filter(r => !simOpened.has(r.sym + "@" + r.close)).map(r => { const p = px[r.sym], risk = p ? (r.stop - p)/p : NaN; const ok = p && risk > 0 && risk <= P.SERT.maxRisk;
     return `<div class="ps-sr"><span><b class="dn">${esc(r.sym.replace("USDT", ""))}</b> stop ${fp(r.stop)}${isFinite(risk) ? ` (%${(risk*100).toFixed(1)})` : ""} · iz ${fp(r.atr)} · 60 dk</span>${ok ? `<button type="button" class="mini" data-sert="${esc(r.sym)}">SİMDE AÇ</button>` : `<small class="dim">${p ? "stop >%3 / geçti" : "fiyat bekleniyor"}</small>`}</div>`; }).join("");
   el.innerHTML = (rows || `<div class="dim">tetik yok · ${SR.n} coin · ${SR.scanned ? new Date(SR.scanned).toLocaleTimeString("tr-TR", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }) : "taranıyor…"}</div>`)
     + `<div class="dim">kural geçmişi: ${S.n} işlem · kazanma ${pc(S.winRate)} · net ${us(S.total)} USDT</div>`; }
 function sertOpen(sym){ const r = SR.sig.get(sym), p = px[sym]; if (!r){ NOTIFY.toast("tetik süresi doldu", "bad"); return; }
   try { const risk = (r.stop - p)/p; if (!(p > 0) || !(risk > 0) || risk > P.SERT.maxRisk) throw new Error("stop %3'ten uzak ya da fiyat stopu geçti — atlandı");
     const q = P.open(st, { sym, side: -1, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: "sert", sig: { word: "SERT SHORT", d: -1, tf: "15m" } });
-    ext[sym] = { hi: p, lo: p }; SR.sig.delete(sym); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
+    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 function setSide(s){ side = s; document.querySelectorAll("[data-ps]").forEach(b => b.classList.toggle("on", +b.dataset.ps === s)); paint(); }
 function fill(){ const sym = curSym(); if (!sym) return; const g = sigFor(sym); if (!g){ NOTIFY.toast("Bu coin için sinyal yok — önce ANALİZ/SİNYAL'de aç", "bad"); return; }
   if (g.d) setSide(g.d); const P2 = g.plan; $("#ps-stop").value = P2 && P2.stop ? +P2.stop : ""; $("#ps-tp").value = P2 && P2.tp ? +P2.tp : "";
@@ -141,7 +130,7 @@ function init(){ const box = $("#psim-box"); if (!box || box.dataset.on) return;
   $("#ps-addb").onclick = () => { try { P.addBal(st, $("#ps-add").value.replace(",", ".")); save(); paint(); NOTIFY.toast("✔ sanal bakiye eklendi", "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } };
   $("#ps-reset").onclick = async () => { const ok = window.CONN && CONN.typedConfirm ? await CONN.typedConfirm("SİMÜLATÖRÜ SIFIRLA", "Sanal bakiye <b>1000 USDT</b> olur; açık sanal pozisyonlar ve geçmiş silinir. Gerçek hesap etkilenmez.", "SIFIRLA") : confirm("Simülatör sıfırlansın mı?"); if (!ok) return; P.reset(st, 1000); save(); stream(); paint(); };
   $("#ps-sert").onclick = e => { const b = e.target.closest("[data-sert]"); if (b) sertOpen(b.dataset.sert); };
-  setInterval(() => { if (document.body.dataset.pg === "fut" && !document.hidden) sertScan(false); paintSert(); }, 20000); setTimeout(() => sertScan(true), 3000);
+  $("#ps-sym").addEventListener("change", () => window.SERTS && SERTS.want(curSym())); if (window.SERTS) SERTS.want(curSym()); window.addEventListener("sert:update", paintSert); setInterval(paintSert, 20000);
   stream(); poll(); paint(); setInterval(tick, 500); setInterval(stream, 2000); pollT = setInterval(poll, 3000); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 return { get st(){ return st; }, px, sigFor, paint, _save: save, SR, sertScan, sertOpen, paintSert };
