@@ -1,6 +1,6 @@
 /* NEON//TERMINAL v6 — MEME platform, agents, orb, GROK chat, page tabs */
-body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]),body[data-pg="analiz"] [data-pgs]:not([data-pgs~="analiz"]),body[data-pg="analiz"] #adv-bus{display:none!important}
-#nav{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:8px 14px 0;padding:6px;border-radius:14px;background:rgba(244,242,237,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ded7c8;box-shadow:0 6px 24px rgba(40,30,15,0.2)}
+body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]),body[data-pg="analiz"] [data-pgs]:not([data-pgs~="analiz"]),body[data-pg="short"] [data-pgs]:not([data-pgs~="short"]),body[data-pg="analiz"] #adv-bus{display:none!important}
+#nav{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:8px 14px 0;padding:6px;border-radius:14px;background:rgba(244,242,237,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ded7c8;box-shadow:0 6px 24px rgba(40,30,15,0.2)}
 #nav button{font-family:var(--disp);font-size:10px;letter-spacing:1px;padding:10px 2px;border-radius:10px;border:1px solid #ddd6c8;background:transparent;color:#2c3a4e;cursor:pointer;white-space:nowrap;min-width:0}
 #nav button.on{color:#f3f0eb;background:linear-gradient(90deg,#1e3a5f,#0f6b45);border-color:transparent;box-shadow:none;font-weight:900}
 body.meme-on #nav button[data-go="meme"]::after{content:" ●";color:#9a7432}
@@ -488,3 +488,19 @@ body.simple #psim .plan-foot,body.simple #psim>h3 small{display:none}
 #sert-box .sert-r{display:flex;gap:10px;align-items:center;justify-content:space-between;width:100%;padding:8px 10px;border:1px solid rgba(155,28,49,.35);border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 #sert-box .sert-r b{min-width:64px}
 #sert-box .sert-live{font-size:12px}
+/* v7.29 SHORT tab */
+#nav button.nav-short{font-weight:800}
+#short-box{display:flex;flex-direction:column;gap:14px}
+#sert-box .sert-r.on{border-color:#9b1c31;box-shadow:inset 3px 0 0 #9b1c31}
+#sert-box .sert-r span{flex:1}
+.sert-det{border-top:1px solid #e2d8c6;padding-top:10px}
+.sert-coin{font-weight:700;letter-spacing:.04em}
+.sert-sum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin:6px 0}
+.sert-sum2{opacity:.85}
+.sert-tw{overflow-x:auto}
+.sert-t{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.sert-t th{text-align:left;font-weight:600;opacity:.7;padding:4px 6px 4px 0;border-bottom:1px solid #e2d8c6}
+.sert-t td{padding:4px 6px 4px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.sert-btns{display:flex;gap:8px;margin-top:8px}
+.sert-j .sert-h{font-weight:700;letter-spacing:.06em}
+.sert-k{font-size:9px;font-weight:600;letter-spacing:.06em;padding:0 4px;border:1px solid #9a7432;border-radius:3px;color:#9a7432;vertical-align:middle}

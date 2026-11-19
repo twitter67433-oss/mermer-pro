@@ -12,9 +12,9 @@
 <link rel="stylesheet" href="vendor/fonts-marble.css?v=7.18">
 <link rel="stylesheet" href="style.css?v=7.18">
 <link rel="stylesheet" href="holo.css?v=7.18">
-<link rel="stylesheet" href="meme.css?v=7.28">
+<link rel="stylesheet" href="meme.css?v=7.29">
 <link rel="stylesheet" href="marble.css?v=7.26">
-<link rel="stylesheet" href="night.css?v=7.28">
+<link rel="stylesheet" href="night.css?v=7.29">
 <link rel="preconnect" href="https://pumpportal.fun" crossorigin>
 <link rel="preconnect" href="https://solana-rpc.publicnode.com" crossorigin>
 
@@ -36,7 +36,7 @@
 </div>
 
 <header id="top">
-  <div class="brand"><span class="lux-logo">MERMER <em>TERMİNAL</em></span><small>v7.28 · MEME OTO · AKILLI SİNYAL · KOPYA · AI · PERP</small></div>
+  <div class="brand"><span class="lux-logo">MERMER <em>TERMİNAL</em></span><small>v7.29 · MEME OTO · AKILLI SİNYAL · KOPYA · AI · PERP</small></div>
   <div class="hdr-right">
     <span class="dot live"></span><span id="conn">CANLI VERİ</span>
     <span class="sep">│</span><span id="clock">--:--:--</span><small id="tzl">Berlin</small><button id="thm" type="button" aria-label="Tema">◐</button><button id="gear" type="button" aria-label="Ayarlar">⚙</button>
@@ -44,7 +44,7 @@
 </header>
 
 <div id="tape"><div id="tape-track"></div></div>
-<nav id="nav" role="tablist" aria-label="Bölümler"><button type="button" data-go="analiz" class="on nav-main">ANALİZ</button><button type="button" data-go="scalp">SİNYAL</button><button type="button" data-go="fut">VADELİ</button><button type="button" data-go="meme">MEME</button><button type="button" data-go="grok">AI</button><button type="button" data-go="wal">CÜZDAN</button></nav>
+<nav id="nav" role="tablist" aria-label="Bölümler"><button type="button" data-go="analiz" class="on nav-main">ANALİZ</button><button type="button" data-go="short" class="nav-short">SHORT</button><button type="button" data-go="scalp">SİNYAL</button><button type="button" data-go="fut">VADELİ</button><button type="button" data-go="meme">MEME</button><button type="button" data-go="grok">AI</button><button type="button" data-go="wal">CÜZDAN</button></nav>
 
 <details class="mm-adv-ext" id="adv-bus"><summary>Gelişmiş · veri yolu</summary>
 <section id="busbox" aria-label="Veri yolu: Binance, Motor, Sinyal, Risk, Emir, Phantom, Bot cüzdanı, pump.fun">
@@ -53,6 +53,7 @@
 </section>
 </details>
 
+<section id="short" class="panel holo show" data-pgs="short"><h3><span>SHORT</span> <small>SERT SHORT · 15dk · kanıtlanmadı · emir yok</small></h3><div id="short-box"><div id="sert-box"><div class="empty">SHORT tarayıcı yükleniyor…</div></div><div id="sert-det" class="sert-det" hidden></div><div id="sert-j" class="sert-j"></div></div></section>
 <section id="analiz" class="panel holo show az-panel" data-pgs="analiz"><h3><span>ANALİZ</span> <small>coin · mum · tek cevap · emir yok</small></h3><div id="analiz-box"><div class="empty">yükleniyor…</div></div></section>
 <details class="mm-adv-ext" data-pgs="meme" id="adv-srv"><summary>Gelişmiş · SUNUCU</summary>
 <section id="srv" class="panel holo show p-trade" data-pgs="meme"><h3><span class="num">🖥</span> SUNUCU · 7/24 <small id="srv-h"></small></h3><div id="srv-box"><div class="empty">yükleniyor…</div></div></section>
@@ -60,7 +61,6 @@
 <section id="meme" class="panel holo show p-trade" data-pgs="meme"><h3><span class="num">⚡</span> MEME OTO · PUMP.FUN <small>izleyici · kopyacı · yürütücü · risk</small></h3><div id="meme-box"><div class="empty">yükleniyor…</div></div></section>
 <section id="psim" class="panel holo show" data-pgs="fut"><h3><span class="num">🧪</span> SİMÜLATÖR · VADELİ <small>kağıt işlem · canlı fiyat · gerçek emir yok</small></h3><div id="psim-box"><div class="empty">yükleniyor…</div></div></section>
 <section id="coinan" class="panel holo show" data-pgs="fut"><h3><span class="num">🔎</span> COIN ANALİZ · BINANCE PERP <small>analiz · garanti değil · emir göndermez</small></h3><div id="coinan-box"><div class="empty">yükleniyor…</div></div></section>
-<section id="sert" class="panel holo show" data-pgs="scalp"><div id="sert-box"><div class="empty">SHORT tarayıcı yükleniyor…</div></div></section>
 <section id="scalp" class="panel holo show" data-pgs="scalp"><h3><span class="num">⏱</span> <span>AKILLI SİNYAL · <b class="sc-h-tf">15dk</b></span> <small>öğrenen · yalnızca A+ · emir yok</small></h3><div id="scalp-box"><div class="empty">yükleniyor…</div></div></section>
 <form id="cmd" autocomplete="off" data-pgs="fut">
   <label for="cmd-input" class="prompt">coin&gt;</label>
@@ -146,7 +146,7 @@
   <div id="links-st" class="links-st"></div>
   <div id="links-box"><div class="empty">yükleniyor…</div></div>
 </section>
-<footer>MERMER TERMİNAL · v7.28 · SERT SHORT ana sinyal + 15dk SHORT tarayıcı (kanıtlanmadı, emir yok) · ⚠ SQUEEZE RİSKİ (uyarı) · SİMÜLATÖR: SERT SHORT (kanıtlanmadı, yalnızca sanal) · SADE GÖRÜNÜM (detay anahtarı) · GRAFİKTE FORMASYON + DESTEK/DİRENÇ · VADELİ SİMÜLATÖR (kağıt) · MEME TEST: BAKİYE EKLE + TEST SERBEST · TEK SEÇİCİ: SCALP | TREND | DÖNÜŞ · DÖNÜŞ UYARISI · AÇILIŞ UYARISI · SİNYAL ROZETLERİ (her sekmede, yalnızca gösterim) · ANALİZ · İZLEME LİSTESİ · GECE MODU · AKILLI SİNYAL + GENEL YÖN (1dk–1G tek yön, öğrenen, yalnızca A+): yalnızca sinyal, yalnızca Binance USDⓈ-M vadeli veri, emir göndermez, olasılıksaldır · MEME OTO: SIM varsayılan (GERÇEK ile aynı ayar ve limitler, sanal para, canlı veri), GERÇEK yalnızca BOT CÜZDANI · AI yalnızca önerir · veri: Binance USDⓈ-M Futures public API, CoinGecko, Hacker News · yöntem: <a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">Jakeschincariol/day-trader-skill</a> (MIT) · yatırım tavsiyesi değildir · sinyal garanti değildir · emirler yalnızca senin onayınla, anahtarlar yalnızca bu cihazda · pump.fun verisi: PumpPortal + Solana RPC · OTO AL-SAT varsayılan KAPALI, yalnızca BOT CÜZDANI ile</footer>
+<footer>MERMER TERMİNAL · v7.29 · SHORT sekmesi + DEFTER (tersi LONG kıyas) · SERT SHORT ana sinyal + 15dk SHORT tarayıcı (kanıtlanmadı, emir yok) · ⚠ SQUEEZE RİSKİ (uyarı) · SİMÜLATÖR: SERT SHORT (kanıtlanmadı, yalnızca sanal) · SADE GÖRÜNÜM (detay anahtarı) · GRAFİKTE FORMASYON + DESTEK/DİRENÇ · VADELİ SİMÜLATÖR (kağıt) · MEME TEST: BAKİYE EKLE + TEST SERBEST · TEK SEÇİCİ: SCALP | TREND | DÖNÜŞ · DÖNÜŞ UYARISI · AÇILIŞ UYARISI · SİNYAL ROZETLERİ (her sekmede, yalnızca gösterim) · ANALİZ · İZLEME LİSTESİ · GECE MODU · AKILLI SİNYAL + GENEL YÖN (1dk–1G tek yön, öğrenen, yalnızca A+): yalnızca sinyal, yalnızca Binance USDⓈ-M vadeli veri, emir göndermez, olasılıksaldır · MEME OTO: SIM varsayılan (GERÇEK ile aynı ayar ve limitler, sanal para, canlı veri), GERÇEK yalnızca BOT CÜZDANI · AI yalnızca önerir · veri: Binance USDⓈ-M Futures public API, CoinGecko, Hacker News · yöntem: <a href="https://github.com/Jakeschincariol/day-trader-skill" target="_blank" rel="noopener">Jakeschincariol/day-trader-skill</a> (MIT) · yatırım tavsiyesi değildir · sinyal garanti değildir · emirler yalnızca senin onayınla, anahtarlar yalnızca bu cihazda · pump.fun verisi: PumpPortal + Solana RPC · OTO AL-SAT varsayılan KAPALI, yalnızca BOT CÜZDANI ile</footer>
 <div id="sheet" class="hidden" role="dialog" aria-label="Ayarlar">
   <form id="sheet-form" class="sheet-box">
     <div class="sheet-title">⚙ AYARLAR</div>
@@ -162,7 +162,7 @@
 <script src="simple.js?v=7.26"></script>
 <script src="patterns.js?v=7.26"></script>
 <script src="squeeze.js?v=7.27"></script>
-<script src="sert.js?v=7.28"></script>
+<script src="sert.js?v=7.29"></script>
 <script src="bus.js?v=7.18"></script>
 <script src="engine.js?v=7"></script>
 <script src="chart.js?v=7.19"></script>
@@ -192,6 +192,6 @@
 <script src="psim.js?v=7.28"></script>
 <script src="splash.js?v=7.23"></script>
 <script src="ai.js?v=7.22"></script>
-<script src="nav.js?v=7.21"></script>
+<script src="nav.js?v=7.29"></script>
 </body>
 </html>
