@@ -88,7 +88,7 @@ async function curveNow(k){ const r = await T().ph.rpc("getAccountInfo", [k, { e
 const sellQuote = (c, tokens) => c ? Math.max(0, (c.vSol - c.vSol*c.vTok/(c.vTok + tokens))*(1 - FEE)) : null;
 /* ------------------------- feed UI ------------------------- */
 function rowHTML(t){ const [rl, rc] = rlab(t.risk), sol = S.solUsd, m = t.meta || {};
-  return `<div class="pf-row ${S.sel === t ? "sel" : ""}" data-mint="${esc(t.mint)}"><div class="pf-img">${m.image && !BADIMG.has(m.image) ? `<img src="${esc(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="PUMP.badImg(this)">` : `<span>${esc((t.symbol || "?").slice(0, 2))}</span>`}</div>
+  return `<div class="pf-row ${S.sel === t ? "sel" : ""}" data-mint="${esc(t.mint)}"><div class="pf-img">${m.image && !BADIMG.has(m.image) ? `<img src="${esc(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-onerr="pumpbad">` : `<span>${esc((t.symbol || "?").slice(0, 2))}</span>`}</div>
     <div class="pf-mid"><div><b>${esc(t.symbol.slice(0, 12))}</b> <span class="pf-name">${esc(t.name.slice(0, 26))}</span></div>
       <div class="pf-sub"><span>mcap <b>${t.mcap ? fmt(t.mcap, 1) + " SOL" : "—"}</b>${sol && t.mcap ? " · " + usd(t.mcap*sol) : ""}</span><span data-age="${t.at}">${age(t.at)}</span></div>
       <div class="pf-sub dim"><span>dev ${short(t.creator)} · %${fmt(t.devPct, 1)} · ${fmt(t.devSol, 2)} SOL</span><span>${m.tw ? "𝕏" : ""}${m.tg ? " ✈" : ""}${m.web ? " 🌐" : ""}${t.pool !== "pump" ? ` <span class="pill">${esc(t.pool)}</span>` : ""}${t.migrated ? ` <span class="pill g">AMM</span>` : ""}</span></div></div>
@@ -134,7 +134,7 @@ function posLine(p, c){ const v = p.tokens && c ? sellQuote(c, p.tokens) : null,
   return `<div class="pos ${pn === null ? "" : pn >= 0 ? "l" : "s"}"><b>BOT pozisyonu ${p.auto ? "· OTO" : ""}</b><span>${fmt(p.tokens, 0)} ${esc(p.sym)} · maliyet ${fmt(p.solIn, 4)} SOL</span><span class="${pn >= 0 ? "up" : "dn"}">${v === null ? "değer —" : "değer ≈ " + fmt(v, 4) + " SOL (" + (pn >= 0 ? "+" : "") + pn.toFixed(1) + "%)"}</span></div>`; }
 function detail(){ const el = $("#pf-detail"), t = S.sel; if (!el) return; if (!t){ el.innerHTML = ""; return; } const m = t.meta || {}, [rl, rc] = rlab(t.risk), s = PS();
   const bot = window.WALLET && WALLET.exists();
-  el.innerHTML = `<div class="pfd"><div class="pfd-h"><div class="pf-img big">${m.image && !BADIMG.has(m.image) ? `<img src="${esc(m.image)}" alt="" referrerpolicy="no-referrer" onerror="PUMP.badImg(this)">` : `<span>${esc(t.symbol.slice(0, 2))}</span>`}</div>
+  el.innerHTML = `<div class="pfd"><div class="pfd-h"><div class="pf-img big">${m.image && !BADIMG.has(m.image) ? `<img src="${esc(m.image)}" alt="" referrerpolicy="no-referrer" data-onerr="pumpbad">` : `<span>${esc(t.symbol.slice(0, 2))}</span>`}</div>
       <div class="pfd-t"><b>${esc(t.symbol)}</b> <span>${esc(t.name)}</span> ${window.SGB ? SGB.tag({ mint: t.mint, sym: t.symbol }) : ""}<small class="pfd-mint">${esc(t.mint)}</small><small>yaratıcı <a href="https://solscan.io/account/${esc(t.creator)}" target="_blank" rel="noopener">${short(t.creator)} ↗</a> · yaş <span id="pfd-age">${age(t.at)}</span></small></div>
       <button type="button" class="mini" id="pfd-x" aria-label="kapat">✕</button></div>
     <div class="pfd-links"><a href="https://pump.fun/coin/${esc(t.mint)}" target="_blank" rel="noopener">pump.fun ↗</a><a href="https://solscan.io/token/${esc(t.mint)}" target="_blank" rel="noopener">Solscan ↗</a><a href="https://dexscreener.com/solana/${esc(t.mint)}" target="_blank" rel="noopener">DexScreener ↗</a>${m.tw ? `<a href="${esc(m.tw)}" target="_blank" rel="noopener nofollow">𝕏 ↗</a>` : ""}${m.tg ? `<a href="${esc(m.tg)}" target="_blank" rel="noopener nofollow">Telegram ↗</a>` : ""}${m.web ? `<a href="${esc(m.web)}" target="_blank" rel="noopener nofollow">Web ↗</a>` : ""}<button type="button" class="mini" id="pfd-copy">MINT KOPYALA</button></div>
@@ -166,11 +166,25 @@ async function tradeLocal(pubkey, o){ const r = await fetch("https://pumpportal.
   return new Uint8Array(await r.arrayBuffer()); }
 /* bot-wallet trade (no popup). Used by manual BOT trades after ONAYLA, and by OTO AL-SAT. */
 async function botTrade(o){ const W = window.WALLET; if (!W || !W.unlocked()) throw new Error("BOT CÜZDANI kilitli ya da yok");
-  const pre = await W.solBal(); const bytes = await tradeLocal(W.pub(), o); const sig = await W.signSendVersioned(bytes); window.BUS && BUS.emit("order", { to: "pf", from: "bt" });
+  const key = "pf:" + o.action + ":" + o.mint; if (window.EXEC && EXEC.guard) EXEC.guard(key); /* v8.0: no second tx while the previous one for this mint/side is BELİRSİZ */
+  const pre = await W.solBal(); const bytes = await tradeLocal(W.pub(), o); let sig;
+  try { sig = await W.signSendVersioned(bytes, key); } catch(e){ if (e.uncertain){ window.BUS && BUS.emit("order", { to: "pf", from: "bt" });
+      W.recordTrade({ venue: "pump.fun", mint: o.mint, sym: o.sym, side: o.action, solDelta: o.action === "buy" ? -(+o.amount || 0) : 0, sig: e.sig, auto: !!o.auto, reason: o.reason, mcapSol: o.mcap, curve: o.curve, unc: true }); }
+    throw e; }
+  window.BUS && BUS.emit("order", { to: "pf", from: "bt" });
   let post = await W.solBal(), tokens = null; if (o.action === "buy") for (let i = 0; i < 6; i++){ tokens = await W.tokenBal(o.mint).catch(() => 0); if (tokens > 0) break; await new Promise(r => setTimeout(r, 1500)); }
   if (o.action === "buy" && post >= pre) post = await W.solBal();
   W.recordTrade({ venue: "pump.fun", mint: o.mint, sym: o.sym, side: o.action, solDelta: post - pre, sig, auto: !!o.auto, reason: o.reason, tokens, mcapSol: o.mcap, curve: o.curve });
   setTimeout(() => W.paintBal && W.paintBal(), 1500); return { sig, solDelta: post - pre, tokens }; }
+/* v8.0: a BELİRSİZ bot pump.fun trade settled in the background → finish its bookkeeping (exact deltas from the confirmed tx; nothing is resent) */
+if (typeof window !== "undefined") window.addEventListener("exec:settled", async ev => { const d = ev.detail || {}, m = /^pf:(buy|sell):(.+)$/.exec(d.key || ""); const W = window.WALLET; if (!m || !W) return;
+  const [, side, mint] = m, a = W.pos.list(), p = a.find(x => x.mint === mint), ok = d.state === "CONFIRMED";
+  if (side === "buy" && p && p.unc === d.sig){ if (ok){ const t = window.EXEC && EXEC.txDelta ? await EXEC.txDelta(d.sig, mint).catch(() => null) : null; delete p.unc; if (t){ if (t.sol !== null) p.solIn = -t.sol; p.tokens = t.tokens; } W.pos.save(a); if (p.jid) JOURNAL.upd(p.jid, { in: +p.solIn.toFixed(9), note: "BELİRSİZ alım → ONAYLANDI" }); }
+    else { W.pos.del(mint); if (p.jid) JOURNAL.upd(p.jid, { in: 0, out: 0, closeT: Date.now(), note: "BELİRSİZ alım zincire girmedi / başarısız — pozisyon yok" }); } }
+  if (side === "sell" && p && p.sellUnc === d.sig){ if (ok){ const t = window.EXEC && EXEC.txDelta ? await EXEC.txDelta(d.sig, mint).catch(() => null) : null; W.recordTrade({ venue: p.venue || "pump.fun", mint, sym: p.sym, side: "sell", solDelta: t && t.sol !== null ? t.sol : 0, sig: d.sig, auto: !!p.auto, reason: "BELİRSİZ satış → ONAYLANDI" }); }
+    else { delete p.sellUnc; W.pos.save(a); } }
+  plog(`${ok ? "✔" : "✖"} BELİRSİZ ${side === "buy" ? "alım" : "satış"} netleşti: ${ok ? "ONAYLANDI" : d.state === "EXPIRED" ? "zincire girmedi" : "başarısız"} · <a href="https://solscan.io/tx/${esc(d.sig)}" target="_blank" rel="noopener">${esc(String(d.sig).slice(0, 10))}…</a>`, ok ? "up" : "dn");
+  try { window.dispatchEvent(new CustomEvent("pump:settled", { detail: { side, mint, ok, state: d.state } })); } catch(e){} });
 function plog(msg, cls){ const el = $("#pf-log"); if (!el) return; el.insertAdjacentHTML("afterbegin", `<div class="${cls || ""}"><small>${tm(Date.now())}</small> ${msg}</div>`); while (el.children.length > 40) el.lastChild.remove(); }
 async function manual(action){ const t = S.sel; if (!t){ plog("✖ Önce akıştan bir token seç.", "dn"); return; } const s = PS(), useBot = s.wallet === "bot";
   const v = { slip: +($("#pf-slip").value || "").replace(",", "."), prio: +($("#pf-prio").value || "").replace(",", "."), pool: $("#pf-pool").value }, raw = ($("#pf-amt").value || "").trim().replace(",", ".");
@@ -192,10 +206,14 @@ async function manual(action){ const t = S.sel; if (!t){ plog("✖ Önce akışt
   try { plog("İşlem hazırlanıyor (PumpPortal trade-local)…");
     if (useBot){ const r = await botTrade(o); plog(`✔ Onaylandı: <a href="https://solscan.io/tx/${esc(r.sig)}" target="_blank" rel="noopener">${esc(r.sig.slice(0, 10))}…</a> · SOL ${r.solDelta >= 0 ? "+" : ""}${r.solDelta.toFixed(5)}`, "up"); NOTIFY.ping("good", `${t.symbol} ${action === "buy" ? "alındı" : "satıldı"} (BOT)`); }
     else { const P = T().ph, p = P.prov(), bytes = await tradeLocal(P.pk, o), W = await P.web3(), tx = W.VersionedTransaction.deserialize(bytes);
-      const res = await p.signAndSendTransaction(tx); const sig = res.signature || res; window.BUS && BUS.emit("order", { to: "pf" });
+      /* v8.0: ledger + settle (no second Phantom tx for this mint/side while one is BELİRSİZ); the journal row is written once it is sent */
+      const key = "ph:pf:" + action + ":" + t.mint, X = window.EXEC && EXEC.phSend ? EXEC : null; let sig, st = null;
+      if (X){ const r = await X.phSend(key, p, tx, tx.message.recentBlockhash); sig = r.sig; st = r; } else { const res = await p.signAndSendTransaction(tx); sig = res.signature || res; }
+      window.BUS && BUS.emit("order", { to: "pf" });
+      if (st && (st.state === "FAILED" || st.state === "EXPIRED")){ plog(`✖ ${st.state === "EXPIRED" ? "zincire girmedi (gönderilmemiş sayılır)" : "zincirde başarısız"}: ${esc(st.err || "")} · <a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">Solscan</a>`, "dn"); detailLive(); return; }
       JOURNAL.add({ venue: "pump.fun", mode: "MANUEL", wallet: "PHANTOM", sym: t.symbol, mint: t.mint, side: action === "buy" ? "AL" : "SAT", [action === "buy" ? "in" : "out"]: action === "buy" ? amt : null, unit: "SOL", [action === "buy" ? "sigIn" : "sigOut"]: String(sig), note: action === "sell" ? "satış miktarı: " + raw : "" });
-      plog(`✔ Gönderildi: <a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${esc(String(sig).slice(0, 10))}… (Solscan)</a>`, "up"); }
-  } catch(e){ plog("✖ " + esc(e.code === 4001 ? "Phantom'da reddedildi" : (e.message || String(e))), "dn"); }
+      plog(st && st.state === "BELİRSİZ" ? `⏳ Gönderildi, onay BELİRSİZ — tekrar gönderilmedi, arka planda kontrol ediliyor: <a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${esc(String(sig).slice(0, 10))}… (Solscan)</a>` : `✔ ${st ? "Onaylandı" : "Gönderildi"}: <a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${esc(String(sig).slice(0, 10))}… (Solscan)</a>`, st && st.state === "BELİRSİZ" ? "dn" : "up"); }
+  } catch(e){ if (e.uncertain) plog(`⏳ BELİRSİZ: ${esc(e.message)}`, "dn"); else plog("✖ " + esc(e.code === 4001 ? "Phantom'da reddedildi" : (e.message || String(e))), "dn"); }
   detailLive(); }
 /* ------------------------- section UI ------------------------- */
 async function solPrice(){ try { const j = await (await fetch("https://lite-api.jup.ag/price/v3?ids=So11111111111111111111111111111111111111112", { cache: "no-store" })).json(); S.solUsd = +(j.So11111111111111111111111111111111111111112 || {}).usdPrice || S.solUsd; } catch(e){}

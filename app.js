@@ -386,7 +386,7 @@ function renderAnalyst(a){
   const circ = num(a.circulating_supply), mx = num(a.max_supply) || num(a.total_supply); const sp = circ && mx ? Math.min(100, circ/mx*100) : null;
   const athPos = num(a.ath_change_percentage) === null ? 0 : Math.max(0, Math.min(100, 100 + a.ath_change_percentage));
   const ch = k => a["price_change_percentage_" + k + "_in_currency"];
-  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" onerror="this.remove()">` : ""}<div><b style="font-size:16px;color:var(--ink)">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
+  $("#analyst-box").innerHTML = `<div class="an-top">${a.image ? `<img src="${esc(a.image)}" alt="" data-onerr="remove">` : ""}<div><b style="font-size:16px;color:var(--ink)">${esc(a.name)}</b><br><small>${esc((a.symbol||"").toUpperCase())} · coingecko/${esc(a.id)}</small></div><span class="rank">#${a.market_cap_rank ?? "—"}</span></div>
   <div class="kv"><span class="k">Piyasa değeri</span><span class="v" id="an-mc">—</span><span class="k">FDV</span><span class="v">${fmtBig(a.fully_diluted_valuation)}</span>
   <span class="k">24s hacim</span><span class="v">${fmtBig(a.total_volume)} <small>(${a.market_cap ? (a.total_volume/a.market_cap*100).toFixed(1) : "—"}%)</small></span></div>
   <div class="supply"><div class="lab kv"><span class="k">Arz ${sp===null?"":"(%"+sp.toFixed(1)+")"}</span><span class="v">${fmtN(circ)} / ${mx ? fmtN(mx) : "∞"}</span></div><div class="bar"><div data-w="${sp ?? 0}"></div></div></div>

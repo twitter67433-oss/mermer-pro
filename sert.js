@@ -12,13 +12,16 @@ function top(tk, n = 50, now = Date.now()){ return (tk || []).filter(x => /^[A-Z
 /* cheap part of the rule (no OI/funding) — only coins passing this get the two extra requests */
 function pre(b){ const n = b.length; if (n < 101) return false; const x = b[n - 1], lo4 = Math.min(b[n - 5].l, b[n - 4].l, b[n - 3].l, b[n - 2].l);
   let s = 0; for (let i = n - 97; i < n - 1; i++) s += b[i].qv; const avg = s/96; return x.c < x.o && x.c < lo4 && avg > 0 && x.qv/avg >= 3 && x.qv > 0 && 1 - x.tb/x.qv >= 0.55; }
+/* v8.0 gap fill: the trailing stop is moved at a bar's CLOSE, so the next bar can OPEN already past it — then the fill is that open, not the stop
+   (the old code filled at the stop = too good). side −1 = SHORT (stop above), +1 = LONG (stop below). Bars without o (old caches) fall back to the stop. */
+const gapX = (side, s, k) => fin(k.o) ? (side < 0 ? Math.max(s, k.o) : Math.min(s, k.o)) : s;
 /* follow a SHORT on 1m bars from the signal close: stop-first, then trail = min(stop, low + atr); 60 bars → close */
 function simExit(e, stop, atr, bars, tmax = 60){ let s = stop; const B = (bars || []).slice(0, tmax);
-  for (let i = 0; i < B.length; i++){ const k = B[i]; if (k.h >= s){ const x = s; return { exit: x, net: (e - x)/e - FEE2, why: s < stop ? "iz" : "stop", bars: i + 1 }; } if (fin(atr) && atr > 0) s = Math.min(s, k.l + atr); }
+  for (let i = 0; i < B.length; i++){ const k = B[i]; if (k.h >= s){ const x = gapX(-1, s, k); return { exit: x, net: (e - x)/e - FEE2, why: s < stop ? "iz" : "stop", bars: i + 1, gap: x !== s ? 1 : undefined }; } if (fin(atr) && atr > 0) s = Math.min(s, k.l + atr); }
   if (B.length < tmax) return null; const x = B[B.length - 1].c; return { exit: x, net: (e - x)/e - FEE2, why: "60dk", bars: tmax }; }
 /* v7.29 TERSİ: the mirrored LONG at the same entry — stop = entry − (stop − entry), stop-first, trail = max(stop, high − atr), 60 bars, same fee */
 function simLong(e, stopS, atr, bars, tmax = 60){ const stop = 2*e - stopS; let s = stop; const B = (bars || []).slice(0, tmax);
-  for (let i = 0; i < B.length; i++){ const k = B[i]; if (k.l <= s){ const x = s; return { exit: x, net: (x - e)/e - FEE2, why: s > stop ? "iz" : "stop", bars: i + 1 }; } if (fin(atr) && atr > 0) s = Math.max(s, k.h - atr); }
+  for (let i = 0; i < B.length; i++){ const k = B[i]; if (k.l <= s){ const x = gapX(1, s, k); return { exit: x, net: (x - e)/e - FEE2, why: s > stop ? "iz" : "stop", bars: i + 1, gap: x !== s ? 1 : undefined }; } if (fin(atr) && atr > 0) s = Math.max(s, k.h - atr); }
   if (B.length < tmax) return null; const x = B[B.length - 1].c; return { exit: x, net: (x - e)/e - FEE2, why: "60dk", bars: tmax }; }
 /* v7.29 Önerilen SL / TP: SL = signal high +0.05 %, R = SL − entry, TP1 = entry − 1R, TP2 = entry − 2R (TERSİ LONG mirrored).
    tpTrack: which comes first within 60 one-minute bars — SL before TP1 → "SL"; TP2 → "TP2"; TP1 only → "TP1"; neither → null (caller uses iz/60dk).
@@ -64,15 +67,15 @@ function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || 
    All on closed 15m bars (last = signal bar). x = { oi1: OI change over the last hour, fr: last funding rate } (NaN when unknown).
    bt = 45-day backtest (109 alts, fee 0.10 %, next-bar entry, 60 min) — every rule is "kanıtlanmadı" (none is statistically significant). */
 const LISTS = [
-  { k: "sert", side: -1, tab: "short", name: "SHORT", sub: "SERT SHORT · 1s dip kırılımı · hacim≥3× · satış≥%55 · OI↑ / funding↑", maxR: 0.03, bt: "45g test: n=276 · stoplu %37 +0.04% · stopsuz %47 +0.04%" },
-  { k: "sqs", side: -1, tab: "short", name: "SQUEEZE SHORT", sub: "pompa sonrası söndürme · funding≥%0.05 ya da 72s +%30 & funding≥%0.03 · kırmızı kırılım", maxR: 0.05, bt: "45g test: n≈160 · stoplu %43 +0.35% · stopsuz %52 +0.23% (az coin, kanıtlanmadı)" },
+  { k: "sert", side: -1, tab: "short", name: "SHORT", sub: "SERT SHORT · 1s dip kırılımı · hacim≥3× · satış≥%55 · OI↑ / funding↑", maxR: 0.03, bt: "45g test: n=276 · stoplu %37 +0.04% · stopsuz %47 +0.04% · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=101 · stoplu %38 −0.04% · stopsuz %48 +0.03%" },
+  { k: "sqs", side: -1, tab: "short", name: "SQUEEZE SHORT", sub: "pompa sonrası söndürme · funding≥%0.05 ya da 72s +%30 & funding≥%0.03 · kırmızı kırılım", maxR: 0.05, bt: "45g test: n≈160 · stoplu %43 +0.35% · stopsuz %52 +0.23% (az coin, kanıtlanmadı) · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=259 · stoplu %36 +0.05% · stopsuz %56 +0.56%" },
   { k: "dag", side: -1, tab: "short", ext: 1, name: "DAĞITIM (SHORT)", sub: "çok borsa: fiyat 4s ≥+%3 · taker satış ≥%10 ağır · toplam OI 1s ≥+%1", maxR: 0.05, bt: "45g test: n=271 · stoplu %35 −0.03% · stopsuz %54 −0.15% — ZARARDA" },
-  { k: "dvs", side: -1, tab: "short", name: "SQUEEZE DEVAM (SHORT)", sub: "long tasfiyesi sürüyor · sert düşüş · OI↓ · funding≥0 · hacim≥3×", maxR: 0.05, bt: "45g test: n=99 · stoplu %27 −0.23% · stopsuz %32 −0.42% — ZARARDA" },
-  { k: "lng", side: 1, tab: "long", name: "LONG", sub: "1s tepe kırılımı · hacim≥3× · alış≥%55 · OI≥+%1", maxR: 0.03, bt: "45g test: n=299 · stoplu %32 −0.17% · stopsuz %36 −0.31% — ZARARDA" },
-  { k: "sql", side: 1, tab: "long", name: "SQUEEZE LONG", sub: "short kalabalık · funding≤−%0.03 · OI≥0 · 1s tepe kırılımı · hacim≥2×", maxR: 0.05, bt: "45g test: n=179 · stoplu %41 +0.42% · stopsuz %56 +1.06% (19 coin, kanıtlanmadı)" },
-  { k: "kap", side: 1, tab: "long", name: "KAPİTÜLASYON (LONG)", sub: "3 kırmızı sonrası · aralık≥2 ATR · hacim≥3× · alt fitil≥%50", maxR: 0.05, bt: "45g test: n=404 · stoplu %31 −0.06% · stopsuz %45 −0.09% — ZARARDA" },
+  { k: "dvs", side: -1, tab: "short", name: "SQUEEZE DEVAM (SHORT)", sub: "long tasfiyesi sürüyor · sert düşüş · OI↓ · funding≥0 · hacim≥3×", maxR: 0.05, bt: "45g test: n=99 · stoplu %27 −0.23% · stopsuz %32 −0.42% — ZARARDA · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=13 · stoplu %62 +0.57% · stopsuz %100 +1.07% (çok az örnek)" },
+  { k: "lng", side: 1, tab: "long", name: "LONG", sub: "1s tepe kırılımı · hacim≥3× · alış≥%55 · OI≥+%1", maxR: 0.03, bt: "45g test: n=299 · stoplu %32 −0.17% · stopsuz %36 −0.31% — ZARARDA · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=36 · stoplu %19 −0.31% · stopsuz %25 −0.57% (çok az örnek)" },
+  { k: "sql", side: 1, tab: "long", name: "SQUEEZE LONG", sub: "short kalabalık · funding≤−%0.03 · OI≥0 · 1s tepe kırılımı · hacim≥2×", maxR: 0.05, bt: "45g test: n=179 · stoplu %41 +0.42% · stopsuz %56 +1.06% (19 coin, kanıtlanmadı) · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=43 · stoplu %49 +0.75% · stopsuz %65 +1.45% (çok az örnek)" },
+  { k: "kap", side: 1, tab: "long", name: "KAPİTÜLASYON (LONG)", sub: "3 kırmızı sonrası · aralık≥2 ATR · hacim≥3× · alt fitil≥%50", maxR: 0.05, bt: "45g test: n=404 · stoplu %31 −0.06% · stopsuz %45 −0.09% — ZARARDA · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=301 · stoplu %29 −0.04% · stopsuz %44 +0.03%" },
   { k: "top", side: 1, tab: "long", ext: 1, name: "TOPLAMA (LONG)", sub: "çok borsa: fiyat 1s ±%1 / 4s ±%2 · hacim ≥1.5× · toplam OI 1s ≥+%3 · taker alış ≥%3", maxR: 0.05, bt: "45g test: n=102 · stoplu %41 +0.17% · stopsuz %53 +0.16% (kanıtlanmadı)" },
-  { k: "dvl", side: 1, tab: "long", name: "SQUEEZE DEVAM (LONG)", sub: "short squeeze sürüyor · sert yükseliş · OI↓ · funding≤%0.01 · hacim≥3×", maxR: 0.05, bt: "45g test: n=32 · stoplu %28 −0.14% · stopsuz %41 +0.12% (çok az örnek)" } ];
+  { k: "dvl", side: 1, tab: "long", name: "SQUEEZE DEVAM (LONG)", sub: "short squeeze sürüyor · sert yükseliş · OI↓ · funding≤%0.01 · hacim≥3×", maxR: 0.05, bt: "45g test: n=32 · stoplu %28 −0.14% · stopsuz %41 +0.12% (çok az örnek) · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=11 · stoplu %9 −0.72% · stopsuz %55 −1.45% (çok az örnek)" } ];
 const LK = Object.fromEntries(LISTS.map(l => [l.k, l]));
 function feat(b){ const n = (b || []).length; if (n < 101) return null; const x = b[n - 1], P = b.slice(Math.max(0, n - 289), n - 1);
   let s = 0; for (let i = n - 97; i < n - 1; i++) s += b[i].qv; const avg = s/96, rng = x.h - x.l;
@@ -185,9 +188,11 @@ function alertAll(L){ for (const side of [-1, 1]){ const A = L.filter(r => r.sid
 /* DEFTER follow-up on 1m bars (every minute, every tab while open; back-fills on reopen/resume) */
 let resBusy = false;
 async function resolve(){ if (resBusy) return; resBusy = true; let n = 0;
-  for (const j of J){ if ((j.res && j.rev && j.tp && j.tpr && j.ns && j.nsr) || Date.now() < j.t + 60000 || n >= 20) continue; n++;
-    try { const k = await fj(`/fapi/v1/klines?symbol=${j.sym}&interval=1m&startTime=${j.t}&limit=60`); const b = k.map(x => ({ t: +x[0], h: +x[2], l: +x[3], c: +x[4], T: +x[6] })).filter(x => x.t >= j.t && x.T < Date.now());
-      const o = X.follow(j, b); for (const key of ["res", "rev", "ns", "nsr", "tp", "tpr"]) if (!j[key] && o[key]) j[key] = o[key];
+  for (const j of J){ /* v8.0: records resolved before the gap-fill fix (no gf) get their trailing results (res / rev) recomputed once — they may get worse */
+    const re = !j.gf && !!(j.res || j.rev); if ((!re && j.res && j.rev && j.tp && j.tpr && j.ns && j.nsr) || Date.now() < j.t + 60000 || n >= 20) continue; n++;
+    if (re){ delete j.res; delete j.rev; }
+    try { const k = await fj(`/fapi/v1/klines?symbol=${j.sym}&interval=1m&startTime=${j.t}&limit=60`); const b = k.map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], T: +x[6] })).filter(x => x.t >= j.t && x.T < Date.now());
+      const o = X.follow(j, b); for (const key of ["res", "rev", "ns", "nsr", "tp", "tpr"]) if (!j[key] && o[key]) j[key] = o[key]; if (j.res || j.rev) j.gf = 1;
       if (!b.length && Date.now() > j.t + 3*86400000) j.skip = 1; } catch(e){} await sleep(80); }
   J = J.filter(j => !j.skip); jSave(); resBusy = false; if (n) paint(); }
 function liveLine(){ const s = X.stats(J.filter(j => j.k === "sert")), pc = x => x === null ? "—" : "%" + Math.round(x*100);

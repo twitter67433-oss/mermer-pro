@@ -2,3 +2,7 @@ server/node_modules/
 server/package-lock.json
 neon-bot-data/
 *.log
+*.jks
+*.keystore
+keystore.properties
+*.apk

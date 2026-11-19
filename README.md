@@ -1,4 +1,16 @@
-# NEON//TERMINAL — mobil
+# MERMER TERMİNAL (eski adı NEON//TERMINAL) — mobil · v8.0
+
+## v8.0 özeti
+- **Ana ekran sade kaldı:** SHORT · LONG · VADELİ · MEME · AI · CÜZDAN sekmeleri; ayrıntılar katlanır panellerde.
+- **SERT defteri** boşlukta açılan mumda artık açılıştan dolar (daha dürüst kazanç/ortalama). **SİNYAL 8** deneysel, KANITLANMADI.
+- **SİM** vadeli işlemler emir defteri derinliği, spread, kayma, gecikme ve kısmi dolumla; meme SİM pump.fun/PumpPortal ücreti + kira + Jito ile. SİM gerçek parayı hiç kullanmaz.
+- **GERÇEK** taraf: onay penceresi, stop zorunluluğu, zarar sınırları, BELİRSİZ işlem defteri (yeniden gönderim yok) — bot cüzdanı ve Phantom yolları dahil. OTO varsayılan KAPALI; sinyaller asla otomatik alım yapmaz.
+- **Güvenlik:** API Secret PIN ile şifreli (APK 8.0'da ek olarak Android Keystore), sıkı CSP (satır içi betik yok).
+- Belgeler: [CHANGELOG](CHANGELOG.md) · [Hata raporu](docs/BUG_REPORT.md) · [Güvenlik](docs/SECURITY_AUDIT.md) · [Sinyal motoru](docs/SIGNAL_ENGINE_REPORT.md) · [Backtest](docs/BACKTEST_REPORT.md) · [Testler](docs/TEST_REPORT.md) · [Android](docs/ANDROID.md)
+- Android APK: GitHub Releases → `MermerTerminal-v8.0.apk`.
+
+> Aşağıdaki bölümler önceki sürümlerin tarihçesidir; bazı ekran adları değişmiş olabilir.
+
 
 Telefonda çalışan, neon/"2100" görünümlü kripto analiz ve işlem terminali (v6). Ana sayfa artık **MEME** — otomatik al-sat yapan bir pump.fun meme coin platformu (SIM varsayılan); Binance vadeli analizi **VADELİ** sekmesinde. Bir coin yaz (`btc`, `solana`, `init`, `INITUSDT`, `ETH-USD`), Enter'a bas; 11 adımlık day-trader analizi tarayıcının içinde çalışır ve sonuç panoya dökülür.
 

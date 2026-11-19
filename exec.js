@@ -158,6 +158,16 @@ async function probe(mint){ const out = [];
   return out; }
 const stats = () => { const ok = ST.lat.filter(x => x.ok), avg = k => { const v = ok.map(x => x[k]).filter(x => isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0)/v.length : null; };
   return { n: ST.lat.length, ok: ok.length, ev2sent: avg("ev2sent"), sent2conf: avg("sent2conf"), build: avg("build"), pend: ST.pend, sent: ST.sent, conf: ST.conf, fail: ST.fail, bhAge: bhAge(), bhRtt: ST.bhRtt, bhVia: ST.bhVia, rtt: [...ST.rtt].map(([u, e]) => [host(u), e.ms, e.ok, e.bad]) }; };
-return { get C(){ return C; }, set, real, sim, settle, SETTLE, pending, get PEND(){ return PEND; }, txDelta, prebuild, takePre, keepWarm, refreshBh, probe, stats, confirm, buyOut, sellOut, get lat(){ return ST.lat; }, rpcs, wsUrl, PUMP_FEE, PP_FEE, RENT, BASE_FEE, _ST: ST };
+/* v8.0 shared guard for every other GERÇEK Solana path (bot-wallet pump.fun / Jupiter / withdraw, Phantom signAndSend): same ledger + same settle → never resent while BELİRSİZ */
+function guard(key){ const pe = pending(key); if (pe) throw Object.assign(new Error(`önceki işlem BELİRSİZ (${String(pe.sig).slice(0, 10)}…) — sonuç netleşmeden tekrar gönderilmez`), { pendingBlock: true, sig: pe.sig }); }
+function hold(key, sig, bh){ PEND[key] = { sig: sig || "(gönderiliyor)", bh: bh || null, t: Date.now() }; pendSave(); }
+function release(key, sig){ const e = PEND[key]; if (e && (!sig || e.sig === sig || e.sig === "(gönderiliyor)")){ delete PEND[key]; pendSave(); } }
+/* never throws: CONFIRMED | FAILED | EXPIRED (both definitive → ledger released) | BELİRSİZ (ledger kept, background settle → "exec:settled") */
+async function watch(key, sig, bh, ms = 40000){ try { const via = await confirm(sig, ms, bh); release(key, sig); return { state: "CONFIRMED", via }; }
+  catch(e){ if (e.uncertain){ bgSettle(key, sig, bh); return { state: "BELİRSİZ", err: e.message }; } release(key, sig); return { state: e.expired ? "EXPIRED" : "FAILED", err: e.message }; } }
+/* Phantom signs AND sends (we never see the bytes go out): ledger entry before the popup, released if Phantom refuses; then the same settle. Returns { sig, state, err }. */
+async function phSend(key, prov, tx, bh){ guard(key); hold(key, null, bh); let sig; try { const r = await prov.signAndSendTransaction(tx); sig = String((r && r.signature) || r); } catch(e){ release(key); throw e; }
+  hold(key, sig, bh); window.BUS && BUS.emit("order", { to: "ph" }); const w = await watch(key, sig, bh); return Object.assign({ sig }, w); }
+return { phSend, guard, hold, release, watch, bgSettle, get C(){ return C; }, set, real, sim, settle, SETTLE, pending, get PEND(){ return PEND; }, txDelta, prebuild, takePre, keepWarm, refreshBh, probe, stats, confirm, buyOut, sellOut, get lat(){ return ST.lat; }, rpcs, wsUrl, PUMP_FEE, PP_FEE, RENT, BASE_FEE, _ST: ST };
 })();
 window.EXEC = EXEC;

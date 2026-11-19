@@ -259,7 +259,7 @@ function bfxHTML(){
   return `<div class="mode-row"><span class="mode-badge ${c.testnet ? "test" : "real"}">${c.testnet ? "TESTNET" : "⚠ GERÇEK PARA"}</span><span class="dim">Binance USDⓈ-M vadeli · LONG ve SHORT</span></div>
   <div class="sub-h">HESAP <button type="button" id="bfx-refresh" class="mini">YENİLE</button></div><div id="bfx-acct"></div>
   <div class="sub-h">YENİ EMİR · ${esc(D ? D.base : "")}</div>
-  <form id="bfx-form" data-side="${side}" onsubmit="return false">
+  <form id="bfx-form" data-side="${side}" data-nosubmit>
     <div class="side-btns"><button type="button" data-side="long" class="${side === "long" ? "on" : ""} l">▲ LONG</button><button type="button" data-side="short" class="${side === "short" ? "on" : ""} s">▼ SHORT</button></div>
     <div class="f2"><label>Kaldıraç<select id="bfx-lev">${Array.from({ length: 20 }, (_, i) => `<option value="${i + 1}" ${i + 1 === (+c.lev || 1) ? "selected" : ""}>${i + 1}x</option>`).join("")}</select></label>
     <label>Miktar (boş = otomatik)<input id="bfx-qty" inputmode="decimal" placeholder="otomatik"></label></div>
@@ -271,7 +271,7 @@ function bfxHTML(){
     <div class="f2"><button type="button" id="bfx-close" class="mini wide">POZİSYONU KAPAT</button><button type="button" id="bfx-cancel" class="mini wide">AÇIK EMİRLERİ İPTAL</button></div>
   </form>
   <div class="sub-h">KAYIT</div><div id="bfx-log" class="tlog"></div>
-  <div class="keys-link"><span>API anahtarları: <b class="${c.testnet ? "" : "dn"}">${c.testnet ? "TEST API (Testnet)" : "⚠ GERÇEK API"}</b> aktif ${c.key ? "· " + esc(c.key.slice(0, 4)) + "…" + esc(c.key.slice(-4)) : "· anahtar yok"}</span><button type="button" class="mini" onclick="window.CONN && CONN.open('bn')">BAĞLANTILAR →</button></div>
+  <div class="keys-link"><span>API anahtarları: <b class="${c.testnet ? "" : "dn"}">${c.testnet ? "TEST API (Testnet)" : "⚠ GERÇEK API"}</b> aktif ${c.key ? "· " + esc(c.key.slice(0, 4)) + "…" + esc(c.key.slice(-4)) : "· anahtar yok"}</span><button type="button" class="mini" data-act="conn-open" data-arg="bn">BAĞLANTILAR →</button></div>
   <div class="plan-foot">Analiz hiçbir emri kendisi göndermez. Her emir onay penceresi ve ONAYLA dokunuşu ister. Vadeli işlemler kaldıraçlıdır; kaybın teminatı aşabilir.</div>`;
 }
 function bindBfx(){
@@ -307,7 +307,7 @@ async function rpc(method, params){
     for (const u of L){
       try { const r = await fetch(u, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
         if (r.status === 429 || r.status === 403){ rpcCool.set(u, Date.now() + 30000); last = new Error("RPC sınırı (" + r.status + ")"); continue; }
-        const j = await r.json(); if (j.error){ last = new Error(j.error.message); if (j.error.code === -32005 || /rate limit/i.test(j.error.message)){ rpcCool.set(u, Date.now() + 30000); continue; } if (method === "sendTransaction") throw last; continue; } return j.result; }
+        const j = await r.json(); if (j.error){ last = Object.assign(new Error(j.error.message), { rpc: j.error }); /* v8.0: JSON-RPC answer = definitive (e.g. preflight failed) */ if (j.error.code === -32005 || /rate limit/i.test(j.error.message)){ rpcCool.set(u, Date.now() + 30000); continue; } if (method === "sendTransaction") throw last; continue; } return j.result; }
       catch(e){ if (method === "sendTransaction" && last === e) throw e; last = e; }
     }
     await new Promise(r => setTimeout(r, 700));
@@ -373,9 +373,13 @@ async function doSwap(){
       prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 1000000, priorityLevel: "medium" } } }) });
     const j = await r.json(); if (!r.ok || !j.swapTransaction) throw new Error(j.error || ("Jupiter swap HTTP " + r.status));
     const W = await web3(); const bytes = Uint8Array.from(atob(j.swapTransaction), c => c.charCodeAt(0)); const tx = W.VersionedTransaction.deserialize(bytes);
-    const res = await p.signAndSendTransaction(tx); const sig = res.signature || res;
-    window.BUS && BUS.emit("order", { to: "ph" });
-    log("#ph-log", `✔ Gönderildi: <a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${esc(String(sig).slice(0, 10))}… (Solscan)</a>`, "up");
+    /* v8.0: idempotency ledger + settle — no second swap for the same pair while one is BELİRSİZ; FAILED / EXPIRED reported, not hidden */
+    const X = window.EXEC && EXEC.phSend ? EXEC : null; let sig, st = null;
+    if (X){ const r = await X.phSend("ph:swap:" + Q.fi.mint + ">" + Q.to.mint, p, tx, tx.message.recentBlockhash); sig = r.sig; st = r; } else { const res = await p.signAndSendTransaction(tx); sig = res.signature || res; }
+    window.BUS && BUS.emit("order", { to: "ph" }); const link = `<a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${esc(String(sig).slice(0, 10))}… (Solscan)</a>`;
+    if (!st || st.state === "CONFIRMED") log("#ph-log", `✔ ${st ? "Onaylandı" : "Gönderildi"}: ${link}`, "up");
+    else if (st.state === "BELİRSİZ") log("#ph-log", `⏳ Gönderildi, onay BELİRSİZ — tekrar gönderilmedi, arka planda kontrol ediliyor: ${link}`, "dn");
+    else log("#ph-log", `✖ Swap ${st.state === "EXPIRED" ? "zincire girmedi (gönderilmemiş sayılır)" : "zincirde başarısız"}: ${esc(st.err || "")} · ${link}`, "dn");
     ph.quote = null; setTimeout(refreshBal, 6000);
   } catch(e){ log("#ph-log", "✖ Swap başarısız: " + esc(e.code === 4001 ? "Phantom'da reddedildi" : (e.message || String(e))), "dn"); }
 }

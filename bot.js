@@ -75,17 +75,30 @@ function lock(){ if ((window.AUTO && AUTO.pumpOn()) || (window.MEME && MEME.on &
 async function exportSecret(pin){ const o = rec(); const sk = await decrypt(o, pin); return b58enc(sk); }
 const pub = () => (rec() || {}).pub || null;
 /* --- solana send helpers --- */
-async function confirm(sig, ms = 45000){ const t0 = Date.now();
+/* v8.0: confirmation = EXEC.confirm (WS + polling + blockhash expiry → CONFIRMED / FAILED / EXPIRED / BELİRSİZ). The old poll below is only a fallback when exec.js is absent. */
+async function confirm(sig, ms = 45000, bh){ if (window.EXEC && EXEC.confirm) return EXEC.confirm(sig, ms, bh); return confirmLegacy(sig, ms); }
+async function confirmLegacy(sig, ms = 45000){ const t0 = Date.now();
   while (Date.now() - t0 < ms){ await new Promise(r => setTimeout(r, 1200));
     try { const r = await rpc("getSignatureStatuses", [[sig], { searchTransactionHistory: false }]); const s = r && r.value && r.value[0];
       if (s){ if (s.err) throw Object.assign(new Error("işlem zincirde başarısız: " + JSON.stringify(s.err)), { chain: true }); if (s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized") return s; } }
     catch(e){ if (e.chain) throw e; } }
-  throw new Error("onay zaman aşımı (işlem yine de gerçekleşmiş olabilir: Solscan'de kontrol et)"); }
+  throw Object.assign(new Error("onay BELİRSİZ (zaman aşımı) — işlem gerçekleşmiş olabilir, tekrar GÖNDERİLMEDİ: Solscan'de kontrol et"), { uncertain: true, sig }); }
 async function sendRaw(bytes){ const sig = await rpc("sendTransaction", [b64(bytes), { encoding: "base64", skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 5 }]); return sig; }
-/* sign a server-built (unsigned) VersionedTransaction with the bot key and send it */
-async function signSendVersioned(bytes){ if (!kp) throw new Error("bot cüzdanı kilitli (PIN ile aç)"); const W = await W3(); const tx = W.VersionedTransaction.deserialize(bytes);
+/* v8.0 every bot-wallet send: ledger guard (no second tx for the same key while one is BELİRSİZ) → entry written BEFORE the send → send → settle.
+   JSON-RPC rejection (e.g. preflight) = definitively not sent → released. Network error = maybe sent → settle decides (blockhash expiry = EXPIRED = never landed).
+   Throws: { final } on FAILED / EXPIRED / rejected, { uncertain, sig } on BELİRSİZ (never resent; "exec:settled" fires later). */
+const XG = () => (window.EXEC && EXEC.guard) ? EXEC : null;
+function outcome(r, sig){ if (r.state === "CONFIRMED") return sig; if (r.state === "BELİRSİZ") throw Object.assign(new Error(r.err || "onay BELİRSİZ"), { uncertain: true, sig });
+  throw Object.assign(new Error(r.err || "işlem başarısız"), { final: true, chain: r.state === "FAILED", expired: r.state === "EXPIRED", sig }); }
+async function sendGuarded(key, raw, sig, bh){ const X = XG(); if (!X){ const s = await sendRaw(raw); await confirmLegacy(s); return s; }
+  X.guard(key); X.hold(key, sig, bh);
+  try { await sendRaw(raw); } catch(e){ if (e.rpc){ X.release(key, sig); throw Object.assign(new Error("gönderilemedi (RPC reddetti): " + e.message), { final: true }); } }
+  return outcome(await X.watch(key, sig, bh, 45000), sig); }
+/* sign a server-built (unsigned) VersionedTransaction with the bot key and send it (key = idempotency key, e.g. "pf:buy:<mint>") */
+async function signSendVersioned(bytes, key){ if (!kp) throw new Error("bot cüzdanı kilitli (PIN ile aç)"); const W = await W3(); const tx = W.VersionedTransaction.deserialize(bytes);
   const payer = tx.message.staticAccountKeys[0].toBase58(); if (payer !== kp.publicKey.toBase58()) throw new Error("işlem bot cüzdanı için hazırlanmamış (" + short(payer) + ")");
-  tx.sign([kp]); const sig = await sendRaw(tx.serialize()); await confirm(sig); return sig; }
+  key = key || ("bt:" + payer); const X = XG(); if (X) X.guard(key); /* before signing: a pending key never produces a second tx */
+  tx.sign([kp]); const sig = b58enc(tx.signatures[0]); return sendGuarded(key, tx.serialize(), sig, tx.message.recentBlockhash); }
 async function solBal(a){ const r = await rpc("getBalance", [a || pub(), { commitment: "confirmed" }]); return r.value/1e9; }
 async function tokenBal(mint, owner){ const r = await rpc("getTokenAccountsByOwner", [owner || pub(), { mint }, { encoding: "jsonParsed", commitment: "confirmed" }]);
   return (r.value || []).reduce((a, x) => a + (+x.account.data.parsed.info.tokenAmount.uiAmount || 0), 0); }
@@ -99,19 +112,21 @@ const pos = { list(){ try { return JSON.parse(localStorage.getItem(PK) || "[]");
 async function fund(amount){ const P = T().ph, p = P.prov(); if (!p) throw new Error("Phantom yok: siteyi Phantom uygulamasının tarayıcısında aç"); if (!P.pk){ const r = await p.connect(); P.pk = (r.publicKey || p.publicKey).toString(); }
   const W = await W3(), bh = await rpc("getLatestBlockhash", [{ commitment: "confirmed" }]);
   const tx = new W.Transaction({ feePayer: new W.PublicKey(P.pk), recentBlockhash: bh.value.blockhash }).add(W.SystemProgram.transfer({ fromPubkey: new W.PublicKey(P.pk), toPubkey: new W.PublicKey(pub()), lamports: Math.round(amount*1e9) }));
-  const r = await p.signAndSendTransaction(tx); const sig = r.signature || r; await confirm(sig).catch(() => {}); return sig; }
+  /* v8.0 (was: confirm errors ignored → a failed / never-landed transfer looked "Yüklendi"): ledger + settle; FAILED / EXPIRED throw, BELİRSİZ throws { uncertain } */
+  const key = "fund:" + pub(), X = XG(); if (!X){ const r = await p.signAndSendTransaction(tx); const sig = String(r.signature || r); await confirmLegacy(sig); return sig; }
+  const r = await X.phSend(key, p, tx, bh.value.blockhash); return outcome(r, r.sig); }
 async function withdraw(to, amount){ if (!kp) throw new Error("bot cüzdanı kilitli"); const W = await W3(), dest = new W.PublicKey(to);
   const lam = (await rpc("getBalance", [pub(), { commitment: "confirmed" }])).value, fee = 5000, send = amount === "all" ? lam - fee : Math.round(amount*1e9);
   if (send <= 0 || send + fee > lam) throw new Error("yetersiz SOL (bakiye " + (lam/1e9).toFixed(6) + ")");
   const bh = await rpc("getLatestBlockhash", [{ commitment: "confirmed" }]);
   const tx = new W.Transaction({ feePayer: kp.publicKey, recentBlockhash: bh.value.blockhash }).add(W.SystemProgram.transfer({ fromPubkey: kp.publicKey, toPubkey: dest, lamports: send }));
-  tx.sign(kp); const sig = await sendRaw(tx.serialize()); await confirm(sig); return { sig, sol: send/1e9 }; }
+  const key = "wd:" + pub(), X = XG(); if (X) X.guard(key); tx.sign(kp); const sig = b58enc(tx.signature); await sendGuarded(key, tx.serialize(), sig, bh.value.blockhash); return { sig, sol: send/1e9 }; }
 /* --- Jupiter swap signed by the bot key --- */
 const SOLM = "So11111111111111111111111111111111111111112", JUP = "https://lite-api.jup.ag";
 async function jupSwap({ inMint, outMint, rawAmount, slipBps }){ const q = await (await fetch(`${JUP}/swap/v1/quote?inputMint=${inMint}&outputMint=${outMint}&amount=${rawAmount}&slippageBps=${slipBps}&restrictIntermediateTokens=true`, { cache: "no-store" })).json();
   if (q.error || !q.outAmount) throw new Error("Jupiter teklif: " + (q.error || "rota yok"));
   const r = await fetch(JUP + "/swap/v1/swap", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ quoteResponse: q, userPublicKey: pub(), wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true, prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 1000000, priorityLevel: "medium" } } }) });
-  const j = await r.json(); if (!j.swapTransaction) throw new Error("Jupiter swap: " + (j.error || r.status)); const sig = await signSendVersioned(unb64(j.swapTransaction)); return { sig, q }; }
+  const j = await r.json(); if (!j.swapTransaction) throw new Error("Jupiter swap: " + (j.error || r.status)); const sig = await signSendVersioned(unb64(j.swapTransaction), "jup:" + inMint + ">" + outMint); return { sig, q }; }
 async function tokInfo(mint){ const a = await (await fetch(JUP + "/tokens/v2/search?query=" + mint, { cache: "no-store" })).json(); return (a || []).find(x => x.id === mint) || null; }
 async function solPrice(){ try { const j = await (await fetch(JUP + "/price/v3?ids=" + SOLM, { cache: "no-store" })).json(); solUsd = +(j[SOLM] || {}).usdPrice || solUsd; } catch(e){} return solUsd; }
 let qrp = null; const qrLib = () => window.qrcode ? Promise.resolve() : (qrp = qrp || new Promise((ok, no) => { const s = document.createElement("script"); s.src = "vendor/qrcode.js?v=7.30.1"; s.onload = ok; s.onerror = () => { qrp = null; no(); }; document.head.appendChild(s); }));
@@ -148,10 +163,13 @@ async function paintBal(){ const el = $("#bw-bal"); if (!el || !pub()) return;
   try { const [s, px, toks] = await Promise.all([solBal(), solPrice().catch(() => null), allTokens().catch(() => null)]); bal = s; if (toks) tokList = toks; const P = pos.list();
     el.innerHTML = `<div class="bw-sol"><small>SOL</small><b>${fmt(s, 6)}</b><span>${px ? "≈ $" + (s*px).toFixed(2) : ""}</span>${window.SGB ? SGB.tag({ perp: "SOLUSDT" }) : ""}</div>
       <div class="bw-toks">${!toks ? `<div class="empty">token listesi okunamadı (RPC sınırı) — sonra yenilenir</div>` : toks.length ? toks.map(t => { const p = P.find(x => x.mint === t.mint); return `<div><span>${esc(p ? p.sym : short(t.mint))}${p && p.auto ? ` <span class="pill y">OTO</span>` : ""} ${window.SGB ? SGB.tag({ mint: t.mint, sym: p ? p.sym : "" }) : ""}</span><b>${fmt(t.amt, 2)}</b><a href="https://pump.fun/coin/${esc(t.mint)}" target="_blank" rel="noopener">↗</a></div>`; }).join("") : `<div class="empty">token yok</div>`}</div>`; }
-  catch(e){ el.innerHTML = `<div class="err-line">✖ bakiye: ${esc(e.message)} <button class="mini" onclick="WALLET.render()">↻</button></div>`; } }
+  catch(e){ el.innerHTML = `<div class="err-line">✖ bakiye: ${esc(e.message)} <button class="mini" data-act="wallet-render">↻</button></div>`; } }
 const sheet = (o) => T().confirmSheet(o);
 function bind(){ const box = $("#bot-box"); if (!box) return;
-  const on = (id, f) => { const e = $(id); if (e) e.onclick = async () => { if (busy) return; busy = true; e.disabled = true; try { await f(); } catch(err){ log("✖ " + esc(err.message || err), "dn"); } busy = false; e.disabled = false; }; };
+  const on = (id, f) => { const e = $(id); if (e) e.onclick = async () => { if (busy) return; busy = true; e.disabled = true; try { await f(); } catch(err){ if (err && err.uncertain) log(`⏳ BELİRSİZ: ${esc(err.message)}${err.sig ? ` · <a href="https://solscan.io/tx/${esc(err.sig)}" target="_blank" rel="noopener">Solscan</a>` : ""}`, "warn"); else log("✖ " + esc(err.message || err), "dn"); } busy = false; e.disabled = false; }; };
+  /* v8.0: a BELİRSİZ bot / Phantom transfer or swap settles in the background → say how it ended (nothing is resent) */
+  if (!bind.st){ bind.st = 1; window.addEventListener("exec:settled", ev => { const d = ev.detail || {}; if (!/^(fund|wd|jup|bt):/.test(d.key || "")) return;
+    const ok = d.state === "CONFIRMED"; log(`${ok ? "✔" : "✖"} BELİRSİZ işlem netleşti: ${ok ? "ZİNCİRDE ONAYLANDI" : d.state === "EXPIRED" ? "zincire GİRMEDİ (gönderilmemiş sayılır)" : "zincirde BAŞARISIZ"} · <a href="https://solscan.io/tx/${esc(d.sig)}" target="_blank" rel="noopener">${esc(String(d.sig).slice(0, 10))}…</a>${ok && /^jup:/.test(d.key) ? " · bakiyeyi kontrol et (defter kaydı otomatik eklenmedi)" : ""}`, ok ? "up" : "dn"); try { paintBal(); } catch(e){} }); }
   on("#bw-create", async () => { const a = $("#bw-pin1").value, b = $("#bw-pin2").value; if (!pinOk(a)) throw new Error("PIN en az 6 karakter olmalı"); if (a !== b) throw new Error("PIN'ler eşleşmiyor");
     const p = await create(a); render(); log(`✔ Bot cüzdanı oluşturuldu: ${esc(short(p))} — şimdi YEDEK al.`, "up"); window.BUS && BUS.emit("bot"); });
   on("#bw-restore", async () => { const a = $("#bw-rp1").value, b = $("#bw-rp2").value; if (!pinOk(a) || a !== b) throw new Error("PIN en az 6 karakter ve eşleşmeli"); const p = await restore($("#bw-rs").value, a); render(); log("✔ Geri yüklendi: " + esc(short(p)), "up"); });
@@ -188,7 +206,11 @@ function bind(){ const box = $("#bot-box"); if (!box) return;
   const qe = $("#bw-qr"); if (qe) qr(qe, pub()); if (pub()) paintBal();
 }
 /* record a bot-wallet trade in the journal and keep positions in sync (used by manual bot trades and OTO AL-SAT) */
-function recordTrade({ venue, mint, sym, side, solDelta, sig, auto, reason, tokens, mcapSol, curve }){
+function recordTrade({ venue, mint, sym, side, solDelta, sig, auto, reason, tokens, mcapSol, curve, unc }){
+  if (unc){ /* v8.0 BELİRSİZ: buy → tracked as an unconfirmed position (OTO watches it, never sells it before it settles); sell → position kept, flagged */
+    if (side === "buy"){ if (pos.get(mint)) return; const jid = JOURNAL.add({ venue, mode: auto ? "OTO" : "MANUEL", wallet: "BOT", sym, mint, side: "AL→SAT", in: +(-solDelta).toFixed(9), unit: "SOL", sigIn: sig, reason: reason || "", note: "BELİRSİZ alım — onay bekleniyor" });
+      pos.add({ mint, sym, venue, solIn: -solDelta, tokens: null, t: Date.now(), auto: !!auto, jid, entryMcap: mcapSol || null, curve: curve || null, unc: sig }); }
+    else { const a = pos.list(), p = a.find(x => x.mint === mint); if (p){ p.sellUnc = sig; pos.save(a); } } return; }
   if (side === "buy"){ const ex = pos.get(mint); const spent = -solDelta;
     if (ex){ const a = pos.list(); const p = a.find(x => x.mint === mint); p.solIn += spent; if (tokens) p.tokens = tokens; pos.save(a); if (p.jid) JOURNAL.upd(p.jid, { in: +p.solIn.toFixed(9) }); }
     else { const jid = JOURNAL.add({ venue, mode: auto ? "OTO" : "MANUEL", wallet: "BOT", sym, mint, side: "AL→SAT", in: +spent.toFixed(9), unit: "SOL", sigIn: sig, reason: reason || "", note: mcapSol ? "giriş mcap " + mcapSol.toFixed(1) + " SOL" : "" });

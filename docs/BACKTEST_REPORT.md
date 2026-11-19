@@ -268,3 +268,24 @@ Betikler `tools/bt8/tf/` altında. Kutuda `/workspace/r750` yolu ile çalıştı
    - `node diag8.js 70` (yön / bootstrap)
    - `node ctrl.js 70 trend:-1` (rastgele zamanlı kontrol)
 4. `node oldtrend1h.js`: 120 günlük veride 1s TREND GİR.
+
+
+---
+
+# v8.0 — SERT defteri: boşluk (gap) dolumu düzeltmesi ve yeniden hesap
+
+**Ne değişti:** `sert.js` `simExit` / `simLong` iz süren stop mum kapanışında güncelleniyordu ve çıkışı her zaman stop fiyatından sayıyordu. Mum stopun ötesinde **açılırsa** gerçek dolum açılıştır. v8.0'da `gapX`: SHORT için `max(stop, open)`, LONG için `min(stop, open)`. Canlı defter 1dk mumların açılışını artık saklıyor; eski sonuçlar bir kez yeniden hesaplanıyor (`gf` bayrağı).
+
+**Tekrar:** 2026-10-22 → 2026-11-19 (28 gün), Binance USDT-M en yüksek 24s hacimli 120 perp (bugünkü listeden → hayatta kalma yanlılığı), gerçek 15dk OI geçmişi + funding, 764 tetik, her tetik 60 adet 1dk mumla takip, ücret %0.10 gidiş-dönüş. Kod: `tools/sert8/sertbt.js`, ham sonuç `tools/sert8/sertbt.json`.
+
+| Liste | n | boşluk dolumu etkilenen | ESKİ stoplu kaz. / ort. | YENİ stoplu kaz. / ort. | fark (puan/işlem) | stopsuz kaz. / ort. |
+|---|---|---|---|---|---|---|
+| kap | 301 | 14 | 30% / −0.03% | 29% / −0.04% | −0.004 | 44% / +0.03% |
+| sqs | 259 | 6 | 36% / +0.06% | 36% / +0.05% | −0.009 | 56% / +0.56% |
+| sql | 43 | 2 | 49% / +0.77% | 49% / +0.75% | −0.018 | 65% / +1.45% |
+| lng | 36 | 3 | 22% / −0.31% | 19% / −0.31% | −0.002 | 25% / −0.57% |
+| sert | 101 | 8 | 39% / −0.04% | 38% / −0.04% | −0.009 | 48% / +0.03% |
+| dvl | 11 | 1 | 9% / −0.70% | 9% / −0.72% | −0.019 | 55% / −1.45% |
+| dvs | 13 | 0 | 62% / +0.57% | 62% / +0.57% | 0.000 | 100% / +1.07% |
+
+**Yorum (dürüst):** 1dk mumlarda boşluk nadir (liste başına 0–14 işlem), etki küçük ve her listede aynı yönde (biraz daha kötü). Rakamlar beklendiği gibi düştü ama hiçbir listenin işareti değişmedi. Örneklemler küçük (sql 43, lng 36, dvl 11, dvs 13) — pozitif görünen listeler (sql, dvs, stopsuz sqs) **kanıt değildir**, 28 gün tek rejimdir. Uygulamadaki liste açıklamaları bu satırla güncellendi.

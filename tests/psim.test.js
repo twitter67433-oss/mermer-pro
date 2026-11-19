@@ -2,6 +2,7 @@
 const fs = require("fs"), path = require("path"), P = require("../psim.js"); let f = 0;
 const ok = (n, c, i) => { console.log((c ? "PASS " : "FAIL ") + n + (i !== undefined ? "  · " + i : "")); if (!c) f++; };
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
+const COST0 = Object.assign({}, P.COST); P.setCost({ spread: 0, slip: 0, lat: 0 }); /* v8.0: legacy exact-price tests run with the cost model off; realistic fills are tested at the end */
 { const st = P.create(); ok("default virtual balance 1000 USDT", st.bal === 1000 && st.start === 1000 && !st.pos.length); }
 { const st = P.create(1000), p = P.open(st, { sym: "BTCUSDT", side: 1, margin: 100, lev: 10, px: 50000 });
   ok("open LONG: notional 1000, fee 0.05 % taken at entry", near(p.qty, 0.02) && near(st.bal, 1000 - 0.5) && near(P.free(st), 1000 - 0.5 - 100));
@@ -51,4 +52,24 @@ const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;
   const e = P.expire(st, { Y: 49.9 }, 3600000); ok("time stop: closed at 60 min at the live price", e.length === 1 && e[0].why === "süre" && e[0].exit === 49.9);
   const q = P.open(st, { sym: "Z", side: 1, margin: 10, lev: 1, px: 10 }); P.close(st, q.id, 9, "elle");
   const S = P.stats(st, "sert"), A = P.stats(st); ok("rule stats only count SERT trades", S.n === 2 && A.n === 3 && S.wins === 2, JSON.stringify(S)); }
+/* v8.0 F — realistic paper fills */
+{ P.setCost(COST0); ok("default cost model on: spread 0.01 %, slip 0.02 %, stop ×2, latency 0.01 %", near(P.COST.spread, 0.0001) && near(P.COST.slip, 0.0002) && P.COST.stopSlipX === 2 && near(P.COST.lat, 0.0001));
+  const st = P.create(1000), p = P.open(st, { sym: "A", side: 1, margin: 100, lev: 10, px: 100 });
+  ok("model LONG entry pays half spread + slip + latency", near(p.entry, 100*(1 + 0.00005 + 0.0002 + 0.0001)) && p.fillVia === "model" && p.filled === 1, p.entry);
+  const r = P.close(st, p.id, 100, "elle"); ok("round trip at an unchanged price loses fees + spread + slippage", r.net < -(1000*0.0005*2) && r.slip > 0, r.net);
+  const s2 = P.open(st, { sym: "A", side: -1, margin: 100, lev: 10, px: 100, stop: 101 }); const c = P.mark(st, "A", 101, 0, 101, 100);
+  ok("SHORT stop exit fills ABOVE the stop (buy) with 2× slip", c.length === 1 && c[0].why === "stop" && near(c[0].exit, 101*(1 + 0.00005 + 0.0004 + 0.0001)) && c[0].trig === 101, c[0] && c[0].exit);
+  const st3 = P.create(1000), tp = P.open(st3, { sym: "A", side: 1, margin: 10, lev: 1, px: 100, tp: 102 }); const h = P.mark(st3, "A", 102, 0, 102, 100);
+  ok("target (TAKE_PROFIT_MARKET) is a taker exit: below the target for a LONG", h[0].why === "hedef" && h[0].exit < 102 && h[0].exit > 101.9, h[0].exit); }
+{ const st = P.create(10000), book = { t: 1000, asks: [[100, 2], [100.5, 3]], bids: [[99.9, 50]] };
+  const p = P.open(st, { sym: "B", side: 1, margin: 100, lev: 10, px: 99.95, book, t: 1500 }); /* 10 units: 2 @100 + 3 @100.5 visible = 5 → half filled */
+  ok("book walk: partial entry when visible depth is thinner than the order", near(p.filled, (2 + 3)/(1000/99.95), 1e-9) && near(p.margin, 100*p.filled, 1e-9) && p.fillVia === "defter", p.filled);
+  ok("book VWAP + latency", near(p.entry, ((2*100 + 3*100.5)/5)*(1 + 0.0001), 1e-9), p.entry);
+  const big = { t: 1000, asks: [[100, 1000]], bids: [[99.9, 1], [99.8, 1]] }, q = P.open(st, { sym: "C", side: 1, margin: 100, lev: 10, px: 99.95, book: big, t: 1000 });
+  ok("deep book → full fill", q.filled === 1);
+  const r = P.close(st, q.id, 99.85, "elle", 1200, { book: big }); ok("exit through a thin book always fills fully; rest priced past the last level", r.exit < 99.8 && r.exit > 99.8*(1 - 0.001), r.exit);
+  const stale = P.open(st, { sym: "D", side: 1, margin: 10, lev: 1, px: 100, book: { t: 0, asks: [[50, 1]], bids: [[49, 1]] }, t: 10000 }); ok("stale book (> 3 s) ignored → model fill", stale.fillVia === "model" && stale.entry > 100); }
+{ const st = P.create(1000), p = P.open(st, { sym: "E", side: -1, margin: 10, lev: 10, px: 100, book: { t: 0, bids: [[99, 100]], asks: [[101, 100]] }, t: 0 });
+  ok("liquidation estimate from the actual fill price", near(p.liq, P.liqPx(-1, p.entry, 10)) && p.entry < 99, p.entry);
+  const src = require("fs").readFileSync(require("path").join(__dirname, "../psim.js"), "utf8"); ok("SIM only: no order endpoints / keys in psim.js", !/fapi\/v1\/order|X-MBX-APIKEY|signature=/.test(src)); }
 console.log(f ? `${f} FAILED` : "ALL PASS"); process.exit(f ? 1 : 0);

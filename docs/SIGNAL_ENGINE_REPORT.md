@@ -49,3 +49,10 @@
 - Türev verisi (funding / OI) için tarihçe toplanıp bu katman ölçülmeli. Şu an test edilmedi.
 - Daha uzun ve farklı piyasa dönemleri ile delist edilmiş coinler eklenmeli.
 - Herhangi bir iyileşme ancak bu rapordaki aynı karşılaştırma tekrarlanıp ölçülürse iddia edilecek.
+
+
+## v8.0 notu
+- Sinyal motorunda karar mantığı değişmedi. SİNYAL 8 hâlâ **deneysel / KANITLANMADI** (15dk, 1s, 4s testlerinde kanıtlanmış avantaj yok — BACKTEST_REPORT.md).
+- SERT defterindeki iyimser stop dolumu düzeltildi (boşlukta açılıştan dolum); yeniden hesap BACKTEST_REPORT.md §v8.0.
+- Vadeli SİM (PSIM) dolumu artık emir defteri derinliği + spread + kayma + gecikme ile; sinyal istatistikleri ile SİM sonuçları bu yüzden doğrudan karşılaştırılmamalı (SİM daha gerçekçi/kötümser).
+- Hiçbir sinyal otomatik alım tetiklemez.

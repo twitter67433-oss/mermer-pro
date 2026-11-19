@@ -4,6 +4,22 @@
 "use strict";
 (function (root, factory){ const M = factory(); if (typeof module === "object" && module.exports) module.exports = M; else root.PSIM = M; })(typeof self !== "undefined" ? self : this, function (){
 const FEE = 0.0005, MMR = 0.004, fin = x => typeof x === "number" && isFinite(x);
+/* v8.0 F — realistic paper fills (SIM only; nothing is sent). Fractions of price:
+   spread = full bid/ask spread (taker pays half), slip = market-order slippage per side, stopSlipX = slippage multiplier on stop / liquidation-side exits,
+   lat = adverse move during the decision→fill latency, bookMs = max age of an order-book snapshot to be used.
+   With a fresh order book (top levels, public depth stream) the fill walks the book: VWAP for the size, partial entry when the shown depth is too thin
+   (the rest is NOT filled — like an IOC market order capped at the visible book); exits always fill fully, the remainder past the visible book at the last level + 2×slip.
+   Target exits are TAKE_PROFIT_MARKET on Binance → taker: same slip as a market exit. Stop exits pay stopSlipX × slip (gap / fast-market allowance). */
+const COST = { spread: 0.0001, slip: 0.0002, stopSlipX: 2, lat: 0.0001, bookMs: 3000 };
+function setCost(o){ for (const k of Object.keys(COST)) if (o && fin(+o[k]) && +o[k] >= 0) COST[k] = +o[k]; return Object.assign({}, COST); }
+const bookOk = (b, t) => !!(b && Array.isArray(b.bids) && Array.isArray(b.asks) && b.bids.length && b.asks.length && (!fin(b.t) || !fin(t) || t - b.t <= COST.bookMs));
+/* take = +1 buys (lifts asks), −1 sells (hits bids). qty in base units. Returns { px, filled (0..1), via } */
+function fillPx(take, px, qty, book, o = {}){ const C = COST, k = o.stop ? C.stopSlipX : 1, adv = C.slip*k + C.lat;
+  if (bookOk(book, o.t) && qty > 0){ const L = take > 0 ? book.asks : book.bids; let q = 0, c = 0, last = null;
+    for (const [lp, ls] of L){ const p = +lp, z = +ls; if (!(p > 0 && z > 0)) continue; const tk = Math.min(z, qty - q); q += tk; c += tk*p; last = p; if (q >= qty - 1e-12) break; }
+    if (q > 0){ if (q < qty - 1e-12 && o.full){ const rest = qty - q, rp = last*(1 + take*2*C.slip); c += rest*rp; q = qty; }
+      return { px: (c/q)*(1 + take*(adv - C.slip)), filled: Math.min(1, q/qty), via: "defter" }; } } /* book VWAP already contains spread + slippage → only latency (+ extra stop slip) on top */
+  return { px: px*(1 + take*(C.spread/2 + adv)), filled: 1, via: "model" }; }
 const create = (bal = 1000) => ({ v: 1, bal: +bal, start: +bal, pos: [], hist: [], id: 0 });
 const used = st => st.pos.reduce((s, p) => s + p.margin, 0);
 const free = st => st.bal - used(st);
@@ -14,20 +30,25 @@ function open(st, o){ const side = o.side > 0 ? 1 : -1, margin = +o.margin, lev 
   const stop = o.stop === "" || o.stop == null || !(+o.stop > 0) ? null : +o.stop, tp = o.tp === "" || o.tp == null || !(+o.tp > 0) ? null : +o.tp;
   if (stop !== null && (stop - px)*side >= 0) throw new Error(side > 0 ? "LONG stop fiyatın altında olmalı" : "SHORT stop fiyatın üstünde olmalı");
   if (tp !== null && (tp - px)*side <= 0) throw new Error(side > 0 ? "LONG hedef fiyatın üstünde olmalı" : "SHORT hedef fiyatın altında olmalı");
-  const notional = margin*lev, fee = notional*FEE; if (margin + fee > free(st) + 1e-9) throw new Error(`serbest bakiye yetmiyor (${free(st).toFixed(2)} USDT)`);
-  const liq = liqPx(side, px, lev); if (stop !== null && (stop - liq)*side <= 0) throw new Error("stop likidasyon fiyatının ötesinde — kaldıracı düşür");
+  const f = fillPx(side, px, margin*lev/px, o.book, { t: o.t }), entry = f.px, fm = margin*f.filled; /* partial fill → only the filled part becomes margin */
+  if (f.filled < 0.999 && !(o.partialOk ?? true)) throw new Error("defter derinliği yetmiyor");
+  const notional = fm*lev, fee = notional*FEE; if (fm + fee > free(st) + 1e-9) throw new Error(`serbest bakiye yetmiyor (${free(st).toFixed(2)} USDT)`);
+  const liq = liqPx(side, entry, lev); if (stop !== null && (stop - liq)*side <= 0) throw new Error("stop likidasyon fiyatının ötesinde — kaldıracı düşür");
   const trail = +o.trail > 0 ? +o.trail : 0, tmax = +o.tmax > 0 ? +o.tmax : 0;
-  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin, lev, entry: px, qty: notional/px, stop, tp, liq, feeIn: fee, t: fin(o.t) ? o.t : Date.now(), sig: o.sig || null, rule: o.rule || null, trail, tmax, best: px }; st.pos.push(p); return p; }
-function close(st, id, px, why, t){ const i = st.pos.findIndex(p => p.id === id); if (i < 0) return null; const p = st.pos[i]; st.pos.splice(i, 1);
+  if ((stop !== null && (stop - entry)*side >= 0)) throw new Error("dolum fiyatı stopu geçti (kayma) — açılmadı");
+  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin: fm, lev, entry, px0: px, fillVia: f.via, filled: f.filled, slipIn: Math.abs(entry - px)*notional/entry, qty: notional/entry, stop, tp, liq, feeIn: fee, t: fin(o.t) ? o.t : Date.now(), sig: o.sig || null, rule: o.rule || null, trail, tmax, best: px }; st.pos.push(p); return p; }
+/* px = trigger / decision price; o.book = fresh order book (manual close), o.raw = true → fill exactly at px (legacy / tests) */
+function close(st, id, px, why, t, o = {}){ const i = st.pos.findIndex(p => p.id === id); if (i < 0) return null; const p = st.pos[i]; st.pos.splice(i, 1); const px0 = px;
+  if (why !== "likidasyon" && !o.raw) px = fillPx(-p.side, px, p.qty, o.book, { stop: why === "stop", full: true, t }).px;
   let gross, feeOut; if (why === "likidasyon"){ gross = -p.margin; feeOut = 0; } else { gross = upnl(p, px); feeOut = p.qty*px*FEE; }
   st.bal += gross - feeOut; const net = gross - feeOut - p.feeIn;
-  const r = { id: p.id, sym: p.sym, side: p.side, lev: p.lev, margin: p.margin, entry: p.entry, exit: px, why, net, roe: net/p.margin, fee: feeOut + p.feeIn, t0: p.t, t1: t || Date.now(), sig: p.sig, rule: p.rule || null }; st.hist.unshift(r); if (st.hist.length > 300) st.hist.length = 300; return r; }
+  const r = { id: p.id, sym: p.sym, side: p.side, lev: p.lev, margin: p.margin, entry: p.entry, exit: px, trig: px0, slip: (p.slipIn || 0) + Math.abs(px - px0)*p.qty, filled: p.filled ?? 1, why, net, roe: net/p.margin, fee: feeOut + p.feeIn, t0: p.t, t1: t || Date.now(), sig: p.sig, rule: p.rule || null }; st.hist.unshift(r); if (st.hist.length > 300) st.hist.length = 300; return r; }
 /* hi/lo = extremes seen since the last check (default px). Adverse level first (stop or liquidation, whichever is nearer), then target —
    if both are touched inside one check the stop is assumed (conservative). */
 function mark(st, sym, px, t, hi, lo){ hi = fin(hi) ? Math.max(hi, px) : px; lo = fin(lo) ? Math.min(lo, px) : px; const out = [];
   for (const p of st.pos.slice()){ if (p.sym !== sym) continue; const s = p.side, adv = s > 0 ? lo : hi, fav = s > 0 ? hi : lo;
     const stopFirst = p.stop !== null && (p.stop - p.liq)*s > 0;
-    if (stopFirst && (adv - p.stop)*s <= 0){ out.push(close(st, p.id, p.stop, "stop", t)); continue; }
+    if (stopFirst && (adv - p.stop)*s <= 0){ out.push(close(st, p.id, p.stop, "stop", t)); continue; } /* trades are seen tick by tick (aggTrade hi/lo) → the stop-market triggers at the stop; gaps are covered by stopSlipX */
     if ((adv - p.liq)*s <= 0){ out.push(close(st, p.id, p.liq, "likidasyon", t)); continue; }
     if (p.tp !== null && (fav - p.tp)*s >= 0){ out.push(close(st, p.id, p.tp, "hedef", t)); continue; }
     /* trailing stop (abs distance) follows the best price seen — checked from the next update on, like the backtest */
@@ -52,7 +73,7 @@ function sertShort(b, oi1, fr){ const n = b.length; if (n < 101) return { sig: f
   return { sig, stop: x.h*(1 + SERT.buf), atr: atr14(b), vr, sell, oi1, fr, lo4, t: x.t,
     why: `${red && brk ? "kırmızı 15dk < 1s dip" : "kırılım yok"} · hacim ${vr.toFixed(1)}× · satış %${Math.round(sell*100)} · OI 1s ${fin(oi1) ? (oi1*100).toFixed(1) + "%" : "—"} · funding ${fin(fr) ? (fr*100).toFixed(3) + "%" : "—"}` }; }
 function equity(st, prices){ return st.bal + st.pos.reduce((s, p) => s + (fin(prices[p.sym]) ? upnl(p, prices[p.sym]) - p.qty*prices[p.sym]*FEE : 0), 0); }
-return { FEE, MMR, SERT, sertShort, atr14, expire, create, open, close, mark, addBal, reset, stats, equity, free, used, liqPx, upnl };
+return { COST, setCost, fillPx, FEE, MMR, SERT, sertShort, atr14, expire, create, open, close, mark, addBal, reset, stats, equity, free, used, liqPx, upnl };
 });
 
 /* ------------------------------ UI (browser only) ------------------------------ */
@@ -60,17 +81,18 @@ if (typeof window !== "undefined" && typeof document !== "undefined") window.PSI
 const K = "mermer.psim", P = window.PSIM, $ = s => document.querySelector(s), esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let st = (() => { try { const s = JSON.parse(localStorage.getItem(K) || "null"); if (s && s.v === 1 && isFinite(s.bal)) return s; } catch(e){} return P.create(1000); })();
 const save = () => { try { localStorage.setItem(K, JSON.stringify(st)); } catch(e){} try { window.dispatchEvent(new Event("psim:change")); } catch(e){} }; /* v7.33.2: SHORT/LONG tabs show open sim positions too */
-const px = {}, ext = {}; let ws = null, wsKey = "", side = 1, sel = "", lastPaint = 0, pollT = null;
+const px = {}, ext = {}, book = {}; let ws = null, wsKey = "", side = 1, sel = "", lastPaint = 0, pollT = null;
 const fp = v => !isFinite(v) ? "—" : v >= 1000 ? v.toFixed(1) : v >= 10 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v >= 0.01 ? v.toFixed(5) : v.toPrecision(4);
 const us = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+const fillNote = q => ` · dolum ${q.fillVia === "defter" ? "emir defterinden" : "model (spread+kayma)"}${q.filled < 0.999 ? ` · KISMİ %${Math.round(q.filled*100)} (derinlik yetmedi)` : ""}`;
 const curSym = () => { const v = String(($("#ps-sym") || {}).value || sel || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); return !v ? "" : v.endsWith("USDT") ? v : v + "USDT"; };
 function sigFor(sym){ const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.dec) return { word: S.dec.word, d: S.G ? Math.sign(S.G.dir || 0) : 0, tf: S.tf, plan: /^GİR/.test(S.dec.word) && S.A ? { stop: S.A.stop, tp: S.A.tp } : null };
   try { const c = window.SGB && SGB._c; if (c) for (const [k, r] of c) if (k.startsWith("p:" + sym + "@") && r && r.word && !r.none) return { word: r.word, d: Math.sign(r.d || 0), tf: k.split("@")[1], plan: null }; } catch(e){} return null; }
 /* live prices: public aggTrade stream for the open + selected symbols; REST fallback every 3 s */
 function syms(){ const s = new Set(st.pos.map(p => p.sym)); for (const k of SR.sig.keys()) s.add(k); const c = curSym(); if (c && document.body.dataset.pg === "fut") s.add(c); return [...s].slice(0, 8); }
 function stream(){ const L = syms(), key = L.join(","); if (key === wsKey && ws && ws.readyState <= 1) return; wsKey = key; try { ws && ws.close(); } catch(e){} ws = null; if (!L.length) return;
-  try { const w = new WebSocket("wss://fstream.binance.com/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade").join("/")); ws = w;
-    w.onmessage = ev => { try { const d = JSON.parse(ev.data).data; if (!d) return; const s = d.s, p = +d.p; px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); if (p > e.hi) e.hi = p; if (p < e.lo) e.lo = p; } catch(e){} };
+  try { const w = new WebSocket("wss://fstream.binance.com/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade/" + s.toLowerCase() + "@depth20@500ms").join("/")); ws = w; /* v8.0: public top-20 book for SIM fills */
+    w.onmessage = ev => { try { const m = JSON.parse(ev.data), d = m.data; if (!d) return; if (/@depth/.test(m.stream || "")){ book[d.s] = { t: Date.now(), bids: d.b, asks: d.a }; return; } const s = d.s, p = +d.p; px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); if (p > e.hi) e.hi = p; if (p < e.lo) e.lo = p; } catch(e){} };
     w.onclose = () => { if (ws === w){ ws = null; wsKey = ""; } }; } catch(e){} }
 async function poll(){ for (const s of syms()){ if (ws && ws.readyState === 1 && px[s]) continue; try { const r = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + s); if (r.ok){ const j = await r.json(); const p = +j.price; if (p > 0){ px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); e.hi = Math.max(e.hi, p); e.lo = Math.min(e.lo, p); } } } catch(e){} } }
 function tick(){ let changed = false;
@@ -89,7 +111,7 @@ function html(){ return `<div class="ps-bal" id="ps-bal"></div>
   <div class="ps-sum" id="ps-sum"></div>
   <details class="keys ps-h"><summary>📜 Geçmiş</summary><div id="ps-hist"></div></details>
   <div class="ps-tools"><input id="ps-add" inputmode="decimal" value="1000" aria-label="eklenecek sanal USDT"><button type="button" id="ps-addb" class="mini">+ BAKİYE</button><button type="button" id="ps-reset" class="mini">SIFIRLA</button></div>
-  <div class="plan-foot">Kağıt işlem: <b>gerçek emir yok</b>, API anahtarı yok — yalnızca Binance'in herkese açık canlı fiyatı okunur. Ücret işlem başı %${(P.FEE*100).toFixed(2)} (giriş + çıkış), likidasyon tahmini (bakım %${(P.MMR*100).toFixed(1)}); stop/hedef son işlem fiyatıyla kontrol edilir. Sonuçlar gerçek işlemde kayma/fonlama yüzünden farklı olur.</div>`; }
+  <div class="plan-foot">Kağıt işlem: <b>gerçek emir yok</b>, API anahtarı yok — yalnızca Binance'in herkese açık canlı fiyatı okunur. Ücret işlem başı %${(P.FEE*100).toFixed(2)} (giriş + çıkış), likidasyon tahmini (bakım %${(P.MMR*100).toFixed(1)}); stop/hedef son işlem fiyatıyla kontrol edilir. v8.0 dolum modeli: canlı emir defteri (ilk 20 kademe) varsa ortalama dolum fiyatı + gecikme %${(P.COST.lat*100).toFixed(2)}; ince defterde giriş KISMİ dolar. Defter yoksa spread %${(P.COST.spread*100).toFixed(2)} + kayma %${(P.COST.slip*100).toFixed(2)} (stopta ×${P.COST.stopSlipX}). Fonlama (funding) dahil değil. Gerçek sonuçlar yine de farklı olabilir.</div>`; }
 function paint(){ const box = $("#psim-box"); if (!box || !box.firstChild) return; lastPaint = Date.now(); if (st.hist.length !== paint.h){ paint.h = st.hist.length; paintSert(); } const sym = curSym(), p = px[sym];
   const eq = P.equity(st, px), upl = st.pos.reduce((s, q) => s + (px[q.sym] ? P.upnl(q, px[q.sym]) : 0), 0);
   $("#ps-bal").innerHTML = `<div><small>bakiye</small><b>${st.bal.toFixed(2)}</b></div><div><small>serbest</small><b>${P.free(st).toFixed(2)}</b></div><div><small>açık K/Z</small><b class="${upl >= 0 ? "up" : "dn"}">${us(upl)}</b></div><div><small>özsermaye</small><b>${eq.toFixed(2)}</b></div>`;
@@ -111,30 +133,30 @@ function paintSert(){ const el = $("#ps-sert"); if (!el) return; const now = Dat
     + `<div class="dim">kural geçmişi: ${S.n} işlem · kazanma ${pc(S.winRate)} · net ${us(S.total)} USDT</div>`; }
 function sertOpen(sym){ const r = SR.sig.get(sym), p = px[sym]; if (!r){ NOTIFY.toast("tetik süresi doldu", "bad"); return; }
   try { const risk = (r.stop - p)/p; if (!(p > 0) || !(risk > 0) || risk > P.SERT.maxRisk) throw new Error("stop %3'ten uzak ya da fiyat stopu geçti — atlandı");
-    const q = P.open(st, { sym, side: -1, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: "sert", sig: { word: "SERT SHORT", d: -1, tf: "15m" } });
-    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); return q; } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
+    const q = P.open(st, { sym, side: -1, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, book: book[sym], t: Date.now(), stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: "sert", sig: { word: "SERT SHORT", d: -1, tf: "15m" } });
+    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)${fillNote(q)}`, "good"); return q; } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 /* v7.32 any SHORT/LONG list trigger → simulator (paper only): side from the rule, stop = önerilen SL, 1×ATR trail, 60 min */
 function ruleOpen(r){ const sym = r.sym, p = px[sym]; try { const risk = r.side < 0 ? (r.stop - p)/p : (p - r.stop)/p, mx = (window.SERTX && SERTX.LK[r.k] && SERTX.LK[r.k].maxR) || P.SERT.maxRisk;
     if (!(p > 0) || !(risk > 0) || risk > mx) throw new Error(`stop %${(mx*100).toFixed(0)}'ten uzak ya da fiyat stopu geçti — atlandı`);
     const nm = (window.SERTX && SERTX.LK[r.k] ? SERTX.LK[r.k].name : r.k);
-    const q = P.open(st, { sym, side: r.side, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: r.k, sig: { word: nm, d: r.side, tf: "15m" } });
-    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close + "@" + r.k); save(); stream(); paint(); NOTIFY.toast(`SİM: ${nm} ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); return q; } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
+    const q = P.open(st, { sym, side: r.side, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, book: book[sym], t: Date.now(), stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: r.k, sig: { word: nm, d: r.side, tf: "15m" } });
+    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close + "@" + r.k); save(); stream(); paint(); NOTIFY.toast(`SİM: ${nm} ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)${fillNote(q)}`, "good"); return q; } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 /* v7.33.2 close one paper position from any tab (same engine/state as VADELİ) */
 function closePos(id){ const q = st.pos.find(x => x.id === +id); if (!q) return null; const c = px[q.sym]; if (!c){ NOTIFY.toast("canlı fiyat yok", "bad"); return null; }
-  const r = P.close(st, q.id, c, "elle", Date.now()); save(); stream(); paint(); NOTIFY.toast(`SİM kapandı ${us(r.net)} USDT`, r.net >= 0 ? "good" : "bad"); return r; }
+  const r = P.close(st, q.id, c, "elle", Date.now(), { book: book[q.sym] }); save(); stream(); paint(); NOTIFY.toast(`SİM kapandı ${us(r.net)} USDT`, r.net >= 0 ? "good" : "bad"); return r; }
 function setSide(s){ side = s; document.querySelectorAll("[data-ps]").forEach(b => b.classList.toggle("on", +b.dataset.ps === s)); paint(); }
 function fill(){ const sym = curSym(); if (!sym) return; const g = sigFor(sym); if (!g){ NOTIFY.toast("Bu coin için sinyal yok — önce ANALİZ/SİNYAL'de aç", "bad"); return; }
   if (g.d) setSide(g.d); const P2 = g.plan; $("#ps-stop").value = P2 && P2.stop ? +P2.stop : ""; $("#ps-tp").value = P2 && P2.tp ? +P2.tp : "";
   NOTIFY.toast(P2 ? `Sinyal: ${g.word} → yön, stop, hedef dolduruldu` : `Sinyal: ${g.word}${g.d ? " · yalnızca yön dolduruldu (plan yok)" : " · yön yok"}`, P2 ? "good" : "info"); }
-function doOpen(){ const sym = curSym(), p = px[sym]; try { const g = sigFor(sym); const q = P.open(st, { sym, side, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: $("#ps-stop").value.replace(",", "."), tp: $("#ps-tp").value.replace(",", "."), sig: g ? { word: g.word, d: g.d, tf: g.tf } : null });
-    ext[sym] = { hi: p, lo: p }; save(); stream(); paint(); NOTIFY.toast(`SİM: ${sym.replace("USDT", "")} ${q.side > 0 ? "LONG" : "SHORT"} ${q.lev}x @ ${fp(q.entry)} açıldı (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
+function doOpen(){ const sym = curSym(), p = px[sym]; try { const g = sigFor(sym); const q = P.open(st, { sym, side, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, book: book[sym], t: Date.now(), stop: $("#ps-stop").value.replace(",", "."), tp: $("#ps-tp").value.replace(",", "."), sig: g ? { word: g.word, d: g.d, tf: g.tf } : null });
+    ext[sym] = { hi: p, lo: p }; save(); stream(); paint(); NOTIFY.toast(`SİM: ${sym.replace("USDT", "")} ${q.side > 0 ? "LONG" : "SHORT"} ${q.lev}x @ ${fp(q.entry)} açıldı (sanal)${fillNote(q)}`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 function init(){ const box = $("#psim-box"); if (!box || box.dataset.on) return; box.dataset.on = "1"; box.innerHTML = html();
   sel = (window.SCALP && SCALP.S && SCALP.S.sym) || localStorage.getItem("neon.can.sym") || "BTCUSDT"; $("#ps-sym").value = sel.replace("USDT", "");
   $("#ps-sym").onchange = () => { sel = curSym(); stream(); poll(); paint(); };
   box.querySelector(".ps-side").onclick = e => { const b = e.target.closest("[data-ps]"); if (b) setSide(+b.dataset.ps); };
   $("#ps-m").oninput = $("#ps-lev").onchange = () => paint(); $("#ps-fill").onclick = fill; $("#ps-open").onclick = doOpen;
   $("#ps-pos").onclick = e => { const b = e.target.closest("[data-psc]"); if (!b) return; const q = st.pos.find(x => x.id === +b.dataset.psc); if (!q) return; const c = px[q.sym]; if (!c){ NOTIFY.toast("canlı fiyat yok", "bad"); return; }
-    const r = P.close(st, q.id, c, "elle", Date.now()); save(); stream(); paint(); NOTIFY.toast(`SİM kapandı ${us(r.net)} USDT`, r.net >= 0 ? "good" : "bad"); };
+    const r = P.close(st, q.id, c, "elle", Date.now(), { book: book[q.sym] }); save(); stream(); paint(); NOTIFY.toast(`SİM kapandı ${us(r.net)} USDT`, r.net >= 0 ? "good" : "bad"); };
   box.querySelector(".ps-h").ontoggle = () => paint();
   $("#ps-addb").onclick = () => { try { P.addBal(st, $("#ps-add").value.replace(",", ".")); save(); paint(); NOTIFY.toast("✔ sanal bakiye eklendi", "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } };
   $("#ps-reset").onclick = async () => { const ok = window.CONN && CONN.typedConfirm ? await CONN.typedConfirm("SİMÜLATÖRÜ SIFIRLA", "Sanal bakiye <b>1000 USDT</b> olur; açık sanal pozisyonlar ve geçmiş silinir. Gerçek hesap etkilenmez.", "SIFIRLA") : confirm("Simülatör sıfırlansın mı?"); if (!ok) return; P.reset(st, 1000); save(); stream(); paint(); };

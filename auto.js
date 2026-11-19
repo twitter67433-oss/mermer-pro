@@ -54,14 +54,15 @@ async function decide(mint){ const c = ST.cands.get(mint); if (!c) return; const
     alog(`▲ OTO AL: <b>${esc(t.symbol)}</b> ${p.perTrade} SOL · momentum +%${mom.toFixed(1)} · risk ${t.risk}`, "up");
     const r = await PUMP.botTrade({ action: "buy", mint, sym: t.symbol, amount: p.perTrade, denominatedInSol: "true", slip: p.slip, prio: p.prio, pool: "pump", auto: true, reason: `oto giriş: momentum +%${mom.toFixed(1)}, risk ${t.risk}`, mcap: c.last, curve: t.curve });
     alog(`✔ alındı ${esc(t.symbol)}: ${fmt(r.tokens, 0)} adet · <a href="https://solscan.io/tx/${esc(r.sig)}" target="_blank" rel="noopener">tx</a>`, "up"); NOTIFY.ping("good", `OTO AL: ${t.symbol} ${p.perTrade} SOL`); monitor(mint);
-  } catch(e){ alog(`✖ ${esc(t.symbol)} alım başarısız: ${esc(e.message)}`, "dn"); NOTIFY.ping("bad", `OTO alım başarısız: ${t.symbol}`); }
+  } catch(e){ if (e.uncertain){ alog(`⏳ ${esc(t.symbol)} alım BELİRSİZ — tekrar gönderilmedi; pozisyon "onay bekliyor" olarak izleniyor, netleşmeden satılmaz`, "dn"); NOTIFY.ping("bad", `OTO alım BELİRSİZ: ${t.symbol}`); monitor(mint); }
+    else { alog(`✖ ${esc(t.symbol)} alım başarısız: ${esc(e.message)}`, "dn"); NOTIFY.ping("bad", `OTO alım başarısız: ${t.symbol}`); } }
   ST.buying = false; done(); }
 function monitor(mint){ if (ST.mons.has(mint)) return; const p0 = WALLET.pos.get(mint); if (!p0) return; const m = { unsub: null, c: null, pnl: null };
   ST.mons.set(mint, m); const key = p0.curve || (PUMP.get(mint) || {}).curve;
   const check = async cv => { m.c = cv; const p = WALLET.pos.get(mint); if (!p){ stopMon(mint); return; }
     if (!p.tokens){ try { p.tokens = await WALLET.tokenBal(mint); const a = WALLET.pos.list(); const x = a.find(y => y.mint === mint); if (x){ x.tokens = p.tokens; WALLET.pos.save(a); } } catch(e){} }
     const v = p.tokens ? PUMP.sellQuote(cv, p.tokens) : null; m.pnl = v !== null ? (v/p.solIn - 1)*100 : null; m.val = v; paintPos();
-    if (!ST.pump || ST.selling.has(mint)) return; const held = (Date.now() - p.t)/60000;
+    if (!ST.pump || ST.selling.has(mint) || p.unc || p.sellUnc) return; /* v8.0: BELİRSİZ buy / sell → no automatic action until it settles */ const held = (Date.now() - p.t)/60000;
     const why = m.pnl !== null && m.pnl >= C.pump.tp ? `KÂR AL +%${m.pnl.toFixed(1)}` : m.pnl !== null && m.pnl <= -C.pump.sl ? `ZARAR KES %${m.pnl.toFixed(1)}` : held >= C.pump.holdMin ? `SÜRE DOLDU (${C.pump.holdMin} dk)` : cv.complete ? "curve tamamlandı (mezun)" : null;
     if (why) sell(mint, why); };
   if (key){ m.unsub = PUMP.curveSub(key, check); PUMP.curveNow(key).then(cv => cv && check(cv)).catch(() => {}); }
@@ -72,8 +73,11 @@ async function sell(mint, why, tries = 0){ if (ST.selling.has(mint) && !tries) r
   try { const r = await PUMP.botTrade({ action: "sell", mint, sym: p.sym, amount: "100%", denominatedInSol: "false", slip: C.pump.slip, prio: C.pump.prio, pool: "auto", auto: true, reason: why });
     alog(`✔ satıldı ${esc(p.sym)}: SOL ${r.solDelta >= 0 ? "+" : ""}${r.solDelta.toFixed(5)} · <a href="https://solscan.io/tx/${esc(r.sig)}" target="_blank" rel="noopener">tx</a>`, "up"); stopMon(mint); ST.selling.delete(mint);
     if (todayLoss() <= -C.pump.dailyLoss) stopPump(`günlük max zarar (${C.pump.dailyLoss} SOL) aşıldı`);
-  } catch(e){ alog(`✖ ${esc(p.sym)} satış başarısız (${tries + 1}/3): ${esc(e.message)}`, "dn");
+  } catch(e){ /* v8.0: a BELİRSİZ / still-pending sell is NEVER retried (it may have landed) — it settles in the background ("pump:settled") */
+    if (e.uncertain || e.pendingBlock){ alog(`⏳ ${esc(p.sym)} satış BELİRSİZ — tekrar gönderilmedi, sonuç bekleniyor`, "dn"); NOTIFY.ping("bad", `${p.sym} satış BELİRSİZ — Solscan'de kontrol et`); return; }
+    alog(`✖ ${esc(p.sym)} satış başarısız (${tries + 1}/3): ${esc(e.message)}`, "dn");
     if (tries < 2) setTimeout(() => sell(mint, why, tries + 1), 8000); else { ST.selling.delete(mint); NOTIFY.ping("bad", `${p.sym} SATILAMADI — elle kontrol et!`); } } }
+if (typeof window !== "undefined") window.addEventListener("pump:settled", ev => { const d = ev.detail || {}; if (d.side === "sell"){ ST.selling.delete(d.mint); if (d.ok) stopMon(d.mint); } else if (!d.ok) stopMon(d.mint); });
 function stopPump(reason){ if (!ST.pump) return; ST.pump = false; for (const c of ST.cands.values()) c.unsub && c.unsub(); ST.cands.clear();
   alog(`■ pump.fun OTO durdu: ${esc(reason)}`, "dn"); NOTIFY.ping("bad", "OTO AL-SAT durdu: " + reason); afterToggle(); }
 /* ---------------- Binance auto ---------------- */
@@ -158,7 +162,7 @@ function autoHTML(){ const p = C.pump, b = C.bn, c = T().keys.bget();
   return `<div class="cf-warn fg-note">⏻ OTO yalnızca bu sayfa <b>açık ve ön plandayken</b> çalışır (tarayıcı sınırı). Ekran açık tutulur (Wake Lock); telefonu kilitlersen ya da başka uygulamaya geçersen durabilir. Sayfa yenilenince OTO <b>kapalı</b> başlar.</div>
     <div id="au-st" class="au-st"></div>
     <button type="button" id="au-kill" class="kill">■ HEPSİNİ DURDUR</button>
-    <div class="sub-h">PUMP.FUN</div><div class="cf-warn fg-note">⚡ pump.fun tam otomatik al-sat (SIM / GERÇEK, izleyici + kopyacı + risk ajanları) artık <a href="#meme" onclick="NAV.go('meme');return false">⚡ MEME</a> sekmesinde. Aşağıda BOT CÜZDANI'ndaki tüm pozisyonlar görünür.</div>
+    <div class="sub-h">PUMP.FUN</div><div class="cf-warn fg-note">⚡ pump.fun tam otomatik al-sat (SIM / GERÇEK, izleyici + kopyacı + risk ajanları) artık <a href="#meme" data-act="nav" data-arg="meme">⚡ MEME</a> sekmesinde. Aşağıda BOT CÜZDANI'ndaki tüm pozisyonlar görünür.</div>
     <div class="sub-h">AÇIK BOT POZİSYONLARI</div><div id="au-pos" class="pos-list"></div>
     <div class="sub-h">BINANCE VADELİ · SİNYAL</div>
     <label class="chk big"><input type="checkbox" id="au-bn" ${ST.bn ? "checked" : ""}> <b>Binance oto</b> <small>aktif: <b class="${c.testnet ? "" : "dn"}">${c.testnet ? "TEST API (Testnet) — serbest" : "⚠ GERÇEK API"}</b></small></label>
