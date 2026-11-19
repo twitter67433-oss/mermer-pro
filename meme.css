@@ -1,5 +1,5 @@
 /* NEON//TERMINAL v6 — MEME platform, agents, orb, GROK chat, page tabs */
-body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]),body[data-pg="analiz"] [data-pgs]:not([data-pgs~="analiz"]),body[data-pg="short"] [data-pgs]:not([data-pgs~="short"]),body[data-pg="analiz"] #adv-bus{display:none!important}
+body[data-pg="meme"] [data-pgs]:not([data-pgs~="meme"]),body[data-pg="grok"] [data-pgs]:not([data-pgs~="grok"]),body[data-pg="fut"] [data-pgs]:not([data-pgs~="fut"]),body[data-pg="wal"] [data-pgs]:not([data-pgs~="wal"]),body[data-pg="scalp"] [data-pgs]:not([data-pgs~="scalp"]),body[data-pg="analiz"] [data-pgs]:not([data-pgs~="analiz"]),body[data-pg="short"] [data-pgs]:not([data-pgs~="short"]),body[data-pg="long"] [data-pgs]:not([data-pgs~="long"]),body[data-pg="short"] #adv-bus,body[data-pg="long"] #adv-bus{display:none!important}
 #nav{position:sticky;top:0;z-index:60;display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:8px 14px 0;padding:6px;border-radius:14px;background:rgba(244,242,237,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ded7c8;box-shadow:0 6px 24px rgba(40,30,15,0.2)}
 #nav button{font-family:var(--disp);font-size:10px;letter-spacing:1px;padding:10px 2px;border-radius:10px;border:1px solid #ddd6c8;background:transparent;color:#2c3a4e;cursor:pointer;white-space:nowrap;min-width:0}
 #nav button.on{color:#f3f0eb;background:linear-gradient(90deg,#1e3a5f,#0f6b45);border-color:transparent;box-shadow:none;font-weight:900}
@@ -522,3 +522,16 @@ section.sec-off > div{opacity:.55}
 /* v7.31 Defter modu seçici */
 .sert-mode{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12px;font-weight:600}
 .sert-mode .mini.on{background:#1e3a5f!important;color:#fff!important;border-color:#1e3a5f!important;-webkit-text-fill-color:#fff}
+/* v7.32 SHORT / LONG tabs: list blocks */
+.hx-st{font-size:11px;margin:0 0 6px}
+.hx-l{border-top:1px solid #e3d8c4;padding:8px 0 4px}
+.hx-l.off{opacity:.6}
+.hx-lh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;letter-spacing:.04em}
+.hx-lh .hx-tg{margin-left:auto}
+.hx-sub{font-size:10.5px;line-height:1.35;margin:2px 0 4px}
+.hx-none{font-size:11px}
+.hx-why{font-size:11px;margin:4px 0}
+.hx-jl{flex-wrap:wrap}
+.hx-jl .mini small{opacity:.7}
+.hx~.sert-j,#hx-j-short,#hx-j-long{margin-top:12px}
+.hx-jl .mini{font-size:11px!important;padding:4px 8px!important;min-height:0!important}

@@ -113,6 +113,12 @@ function sertOpen(sym){ const r = SR.sig.get(sym), p = px[sym]; if (!r){ NOTIFY.
   try { const risk = (r.stop - p)/p; if (!(p > 0) || !(risk > 0) || risk > P.SERT.maxRisk) throw new Error("stop %3'ten uzak ya da fiyat stopu geçti — atlandı");
     const q = P.open(st, { sym, side: -1, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: "sert", sig: { word: "SERT SHORT", d: -1, tf: "15m" } });
     ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close); save(); stream(); paint(); paintSert(); NOTIFY.toast(`SİM: SERT SHORT ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
+/* v7.32 any SHORT/LONG list trigger → simulator (paper only): side from the rule, stop = önerilen SL, 1×ATR trail, 60 min */
+function ruleOpen(r){ const sym = r.sym, p = px[sym]; try { const risk = r.side < 0 ? (r.stop - p)/p : (p - r.stop)/p, mx = (window.SERTX && SERTX.LK[r.k] && SERTX.LK[r.k].maxR) || P.SERT.maxRisk;
+    if (!(p > 0) || !(risk > 0) || risk > mx) throw new Error(`stop %${(mx*100).toFixed(0)}'ten uzak ya da fiyat stopu geçti — atlandı`);
+    const nm = (window.SERTX && SERTX.LK[r.k] ? SERTX.LK[r.k].name : r.k);
+    const q = P.open(st, { sym, side: r.side, margin: $("#ps-m").value.replace(",", "."), lev: $("#ps-lev").value, px: p, stop: r.stop, trail: r.atr, tmax: P.SERT.tmax, rule: r.k, sig: { word: nm, d: r.side, tf: "15m" } });
+    ext[sym] = { hi: p, lo: p }; simOpened.add(sym + "@" + r.close + "@" + r.k); save(); stream(); paint(); NOTIFY.toast(`SİM: ${nm} ${sym.replace("USDT", "")} ${q.lev}x @ ${fp(q.entry)} (sanal)`, "good"); } catch(e){ NOTIFY.toast("✖ " + e.message, "bad"); } }
 function setSide(s){ side = s; document.querySelectorAll("[data-ps]").forEach(b => b.classList.toggle("on", +b.dataset.ps === s)); paint(); }
 function fill(){ const sym = curSym(); if (!sym) return; const g = sigFor(sym); if (!g){ NOTIFY.toast("Bu coin için sinyal yok — önce ANALİZ/SİNYAL'de aç", "bad"); return; }
   if (g.d) setSide(g.d); const P2 = g.plan; $("#ps-stop").value = P2 && P2.stop ? +P2.stop : ""; $("#ps-tp").value = P2 && P2.tp ? +P2.tp : "";
@@ -133,5 +139,5 @@ function init(){ const box = $("#psim-box"); if (!box || box.dataset.on) return;
   $("#ps-sym").addEventListener("change", () => window.SERTS && SERTS.want(curSym())); if (window.SERTS) SERTS.want(curSym()); window.addEventListener("sert:update", paintSert); setInterval(paintSert, 20000);
   stream(); poll(); paint(); setInterval(tick, 500); setInterval(stream, 2000); pollT = setInterval(poll, 3000); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { get st(){ return st; }, px, sigFor, paint, _save: save, SR, sertScan, sertOpen, paintSert };
+return { get st(){ return st; }, px, sigFor, paint, _save: save, SR, sertScan, sertOpen, ruleOpen, paintSert };
 })();

@@ -66,7 +66,7 @@ t = X.tpTrack(1, 10, 10.2, m([[10.25, 9.9, 10.2]].concat(Array.from({ length: 59
     { sym: "B", t: 0, entry: 1, stop: 1.1, res: { net: -0.01, why: "60dk" }, tp: { tp1: false, tp2: false, first: null }, tpr: { tp1: true, tp2: false, first: "TP1" } }];
   const a = X.summary(JT), b2 = X.summary(JT, "rev"); ok(a.tp1 === 0.5 && a.tp2 === 0.5 && b2.tp1 === 0.5 && b2.tp2 === 0, "summary: TP1/TP2 hit rates, both sides");
   ok(X.ilk(JT[0]) === "TP2" && X.ilk(JT[1]) === "60dk" && X.ilk(JT[1], "rev") === "TP1", "ilk: TP first or exit reason");
-  const c = X.csv(JT).split("\n"); ok(/;TP1;TP2;/.test(c[0]) && /tersi TP2 vurdu/.test(c[0]) && /;TP2;evet;evet;/.test(c[1]) && /;SL;hayır;hayır;AÇIK;;;;;AÇIK;;$/.test(c[1]), "CSV: SL/TP levels, ilk, hits, mirrored"); }
+  const c = X.csv(JT).split("\n"); ok(/;TP1;TP2;/.test(c[0]) && /tersi TP2 vurdu/.test(c[0]) && /;TP2;evet;evet;/.test(c[1]) && /;SL;hayır;hayır;AÇIK;;;;;AÇIK;;;SHORT;SHORT$/.test(c[1]), "CSV: SL/TP levels, ilk, hits, mirrored"); }
 // v7.29 non-crypto contracts stay in the scanner; only a small tag
 ok(X.kind({ symbol: "XAUUSDT", baseAsset: "XAU", underlyingType: "COMMODITY", underlyingSubType: ["TradFi"] }) === "ALTIN" && X.kind({ symbol: "PAXGUSDT", baseAsset: "PAXG", underlyingType: "COIN", underlyingSubType: ["RWA", "Crypto"] }) === "ALTIN"
   && X.kind({ symbol: "XAGUSDT", baseAsset: "XAG", underlyingType: "COMMODITY", underlyingSubType: ["TradFi"] }) === "EMTİA" && X.kind({ symbol: "TSLAUSDT", baseAsset: "TSLA", underlyingType: "EQUITY", underlyingSubType: ["TradFi"] }) === "HİSSE"
