@@ -547,3 +547,6 @@ body.simple .agg-det{display:none}
 .hx-note{font-size:12px;font-weight:600;margin:4px 0}
 .hx-pos{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;padding:5px 0;border-top:1px solid #e3d8c4}
 .hx-pos .mini{margin-left:auto}
+/* v7.33.3 header refresh */
+.ver-rf{font-size:13px;line-height:1;padding:3px 7px;margin-left:4px;border-radius:999px;border:1px solid #c9b48a;background:#fffaf0;cursor:pointer;vertical-align:middle;min-width:30px;min-height:26px}
+.ver-rf:disabled{opacity:.6}.ver-rf.spin{animation:verspin 1s linear infinite}@keyframes verspin{to{transform:rotate(360deg)}}
