@@ -1,4 +1,4 @@
-/* MERMER TERMİNAL v7.29 — SHORT tab: SERT SHORT scanner, verdict + chart, DEFTER (journal). v7.28: main signal + 15m SHORT scanner. SIGNAL ONLY: public Binance reads, no keys, no orders, never MEME auto-buy.
+/* MERMER TERMİNAL v7.31 (STOPSUZ defter modu) / v7.29 — SHORT tab: SERT SHORT scanner, verdict + chart, DEFTER (journal). v7.28: main signal + 15m SHORT scanner. SIGNAL ONLY: public Binance reads, no keys, no orders, never MEME auto-buy.
    Rule = PSIM.sertShort (v7.27, unchanged): red 15m close < lowest low of prior 4, volume ≥3× 24h avg, taker sell ≥55 %, OI 1h ≥ +1 % or funding ≥ +0.05 %.
    Stop = signal high +0.05 % (skip if >3 % away). Exit = 1×ATR(15m) trailing or 60 min. Backtest: ≈ +0.08 %/trade, NOT significant — "kanıtlanmadı".
    Live ledger: every trigger is followed on 1m bars (stop-first, fee 0.10 % round trip) so the rule's real win rate is shown. */
@@ -28,19 +28,27 @@ function tpTrack(side, e, slS, bars, tmax = 60){ const L = levels(e, slS, side),
   for (const k of B){ const hitSL = side < 0 ? k.h >= L.sl : k.l <= L.sl; if (hitSL) return { tp1: g1, tp2: false, first: g1 ? "TP1" : "SL" };
     if (side < 0 ? k.l <= L.tp2 : k.h >= L.tp2) return { tp1: true, tp2: true, first: "TP2" }; if (side < 0 ? k.l <= L.tp1 : k.h >= L.tp1) g1 = true; }
   if (B.length < tmax) return null; return { tp1: g1, tp2: false, first: g1 ? "TP1" : null }; }
+/* v7.31 STOPSUZ: same trigger with NO stop — exit when TP2 (entry ∓ 2R, R from the suggested SL) is touched, else the 60th 1m close.
+   mae = worst move against the position until exit (fraction of entry; includes the exit bar). Same fee 0.10 %. side −1 = SHORT, +1 = TERSİ LONG. */
+function simFree(side, e, slS, bars, tmax = 60){ const L = levels(e, slS, side), B = (bars || []).slice(0, tmax); let mae = 0;
+  for (let i = 0; i < B.length; i++){ const k = B[i]; mae = Math.max(mae, side < 0 ? (k.h - e)/e : (e - k.l)/e);
+    if (side < 0 ? k.l <= L.tp2 : k.h >= L.tp2){ const x = L.tp2; return { exit: x, net: side*(x - e)/e - FEE2, why: "TP2", bars: i + 1, mae }; } }
+  if (B.length < tmax) return null; const x = B[B.length - 1].c; return { exit: x, net: side*(x - e)/e - FEE2, why: "60dk", bars: tmax, mae }; }
 function stats(J){ const R = (J || []).filter(j => j.res); const w = R.filter(j => j.res.net > 0).length, s = R.reduce((a, j) => a + j.res.net, 0);
   return { n: R.length, open: (J || []).length - R.length, winRate: R.length ? w/R.length : null, avg: R.length ? s/R.length : null }; }
 /* v7.29 DEFTER: DOĞRU = net > 0 after the 0.10 % fee; open = no result yet */
-const WHY = { stop: "stop", iz: "trailing", "60dk": "60dk" };
+const WHY = { stop: "stop", iz: "trailing", "60dk": "60dk", TP2: "TP2" };
+/* v7.31 Defter modu → which result is the main DOĞRU/YANLIŞ: STOPLU = res/rev, STOPSUZ = ns/nsr */
+const KEYS = { STOPLU: ["res", "rev"], STOPSUZ: ["ns", "nsr"] };
 function summary(J, k = "res"){ const tk = k === "res" ? "tp" : "tpr", T = (J || []).filter(j => j[tk]), t1 = T.filter(j => j[tk].tp1).length, t2 = T.filter(j => j[tk].tp2).length; J = (J || []).map(j => ({ res: j[k] })); const R = J.filter(j => j.res), w = R.filter(j => j.res.net > 0).length, tot = R.reduce((a, j) => a + j.res.net, 0);
-  return { toplam: (J || []).length, dogru: w, yanlis: R.length - w, acik: (J || []).length - R.length, kazanma: R.length ? w/R.length : null, ort: R.length ? tot/R.length : null, net: tot, tpN: T.length, tp1: T.length ? t1/T.length : null, tp2: T.length ? t2/T.length : null }; }
-const ilk = (j, k = "res") => { const t = j[k === "res" ? "tp" : "tpr"], r = j[k]; return t && t.first ? t.first : t && r ? (WHY[r.why] || r.why) : ""; };
+  return { toplam: (J || []).length, dogru: w, yanlis: R.length - w, acik: (J || []).length - R.length, kazanma: R.length ? w/R.length : null, ort: R.length ? tot/R.length : null, net: tot, tpN: T.length, tp1: T.length ? t1/T.length : null, tp2: T.length ? t2/T.length : null, ...((M) => ({ maeOrt: M.length ? M.reduce((a, x) => a + x, 0)/M.length : null, maeMax: M.length ? Math.max(...M) : null }))(R.map(j => j.res.mae).filter(x => typeof x === "number" && isFinite(x))) }; }
+const ilk = (j, k = "res") => { if (k === "ns" || k === "nsr") return j[k] ? WHY[j[k].why] || j[k].why : ""; const t = j[k === "res" ? "tp" : "tpr"], r = j[k]; return t && t.first ? t.first : t && r ? (WHY[r.why] || r.why) : ""; };
 const sonuc = (j, k = "res") => !j[k] ? "AÇIK" : j[k].net > 0 ? "DOĞRU" : "YANLIŞ";
 const berlin = t => new Date(t).toLocaleString("sv-SE", { timeZone: "Europe/Berlin" }).slice(0, 16);
 function csv(J){ const q = v => /[;"\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  return ["zaman (Berlin);coin;giriş;stop (SL);TP1;TP2;sonuç;çıkış nedeni;çıkış;net % (ücret dahil);ilk (TP1/TP2/SL/iz/60dk);TP1 vurdu;TP2 vurdu;squeeze;tersi LONG SL;tersi TP1;tersi TP2;tersi sonuç;tersi çıkış nedeni;tersi çıkış;tersi net %;tersi ilk;tersi TP1 vurdu;tersi TP2 vurdu"].concat((J || []).slice().sort((a, b) => a.t - b.t).map(j =>
+  return ["zaman (Berlin);coin;giriş;stop (SL);TP1;TP2;sonuç;çıkış nedeni;çıkış;net % (ücret dahil);ilk (TP1/TP2/SL/iz/60dk);TP1 vurdu;TP2 vurdu;squeeze;tersi LONG SL;tersi TP1;tersi TP2;tersi sonuç;tersi çıkış nedeni;tersi çıkış;tersi net %;tersi ilk;tersi TP1 vurdu;tersi TP2 vurdu;stopsuz sonuç;stopsuz çıkış nedeni;stopsuz çıkış;stopsuz net %;stopsuz MAE %;tersi stopsuz sonuç;tersi stopsuz net %;tersi stopsuz MAE %"].concat((J || []).slice().sort((a, b) => a.t - b.t).map(j =>
     ((L, M, yn) => [berlin(j.t), j.sym.replace("USDT", ""), j.entry, j.stop, +L.tp1.toPrecision(8), +L.tp2.toPrecision(8), sonuc(j), j.res ? WHY[j.res.why] || j.res.why : "", j.res ? j.res.exit : "", j.res ? (j.res.net*100).toFixed(3) : "", ilk(j), yn(j.tp, "tp1"), yn(j.tp, "tp2"), j.sq ? "evet" : "",
-      +M.sl.toPrecision(8), +M.tp1.toPrecision(8), +M.tp2.toPrecision(8), sonuc(j, "rev"), j.rev ? WHY[j.rev.why] || j.rev.why : "", j.rev ? j.rev.exit : "", j.rev ? (j.rev.net*100).toFixed(3) : "", ilk(j, "rev"), yn(j.tpr, "tp1"), yn(j.tpr, "tp2")])(levels(j.entry, j.stop, -1), levels(j.entry, j.stop, 1), (t, k) => t ? (t[k] ? "evet" : "hayır") : "").map(q).join(";"))).join("\n"); }
+      +M.sl.toPrecision(8), +M.tp1.toPrecision(8), +M.tp2.toPrecision(8), sonuc(j, "rev"), j.rev ? WHY[j.rev.why] || j.rev.why : "", j.rev ? j.rev.exit : "", j.rev ? (j.rev.net*100).toFixed(3) : "", ilk(j, "rev"), yn(j.tpr, "tp1"), yn(j.tpr, "tp2"), sonuc(j, "ns"), j.ns ? WHY[j.ns.why] || j.ns.why : "", j.ns ? j.ns.exit : "", j.ns ? (j.ns.net*100).toFixed(3) : "", j.ns ? (j.ns.mae*100).toFixed(3) : "", sonuc(j, "nsr"), j.nsr ? (j.nsr.net*100).toFixed(3) : "", j.nsr ? (j.nsr.mae*100).toFixed(3) : ""])(levels(j.entry, j.stop, -1), levels(j.entry, j.stop, 1), (t, k) => t ? (t[k] ? "evet" : "hayır") : "").map(q).join(";"))).join("\n"); }
 /* v7.29 small tag for non-crypto contracts (kept in the scanner): gold → ALTIN, other commodities → EMTİA, stocks/ETFs → HİSSE */
 function kind(s){ if (!s) return ""; const b = String(s.baseAsset || s.symbol || "").replace(/USDT$/, ""), u = String(s.underlyingType || ""), sub = (s.underlyingSubType || []).join(",");
   if (/^(XAU|PAXG|XAUT)$/.test(b)) return "ALTIN"; if (u === "COMMODITY") return "EMTİA"; if (/EQUITY|PREMARKET/.test(u) || (/TradFi/.test(sub) && u !== "COIN")) return "HİSSE"; return ""; }
@@ -52,7 +60,7 @@ function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of p
 /* incremental 15m bars: merge a short fresh fetch into the cached closed bars (new wins), keep the last max */
 function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || []) m.set(x.t, x); for (const x of nb || []) m.set(x.t, x); return [...m.values()].sort((a, b) => a.t - b.t).slice(-max); }
 const okRisk = (entry, stop) => entry > 0 && stop > entry && (stop - entry)/entry <= MAXR;
-return { kind, universe, order, merge, top, pre, simExit, simLong, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
+return { kind, universe, order, merge, top, pre, simExit, simLong, simFree, KEYS, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
 });
 
 if (typeof window !== "undefined" && typeof document !== "undefined") window.SERTS = (() => {
@@ -70,7 +78,7 @@ function livePx(sym){ try { const S = window.SCALP && SCALP.S; if (S && S.sym ==
 function active(sym){ const r = R.sig.get(sym); if (!r) return null; if (Date.now() > r.until){ R.sig.delete(sym); return null; } const p = livePx(sym); if (p > 0 && p >= r.stop) return null;
   const j = J.find(x => x.sym === sym && x.t === r.close); if (j && j.res) return null; /* DEFTER already closed it (stop / iz / 60dk) → no longer a live GİR SHORT */ return r; }
 const sqOn = sym => { const q = window.SQZ && SQZ.peek(sym); return !!(q && q.on); };
-const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</b></span> · <span>stop <b class="dn">${fp(r.stop)}</b></span> · <span>çıkış 1×ATR iz / 60dk</span> <small class="sert-tag">SERT SHORT</small></div>`;
+const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</b></span> · <span>önerilen SL <b class="dn">${fp(r.stop)}</b></span> · <span>çıkış 1×ATR iz / 60dk · stopsuz: TP2 / 60dk</span> <small class="sert-tag">SERT SHORT</small></div>`;
 /* VADELİ main block */
 function big(sym){ const r = active(sym); if (!r || sqOn(sym)) return ""; return `<div class="sert-big dn">GİR SHORT</div>${line(r)}`; }
 /* 15m bars per symbol: first pass limit=110 (weight 2), then limit=6 (weight 1) merged into the cache */
@@ -112,9 +120,9 @@ function alertAll(L){ if (!L.length) return; const cs = L.map(r => r.sym.replace
    A record is closed as soon as its stop/trailing is hit, or after 60 one-minute bars. */
 let resBusy = false;
 async function resolve(){ if (resBusy) return; resBusy = true; let n = 0;
-  for (const j of J){ if ((j.res && j.rev && j.tp && j.tpr) || Date.now() < j.t + 60000 || n >= 20) continue; n++;
+  for (const j of J){ if ((j.res && j.rev && j.tp && j.tpr && j.ns && j.nsr) || Date.now() < j.t + 60000 || n >= 20) continue; n++;
     try { const k = await fj(`/fapi/v1/klines?symbol=${j.sym}&interval=1m&startTime=${j.t}&limit=60`); const b = k.map(x => ({ t: +x[0], h: +x[2], l: +x[3], c: +x[4], T: +x[6] })).filter(x => x.t >= j.t && x.T < Date.now());
-      const r = j.res ? null : X.simExit(j.entry, j.stop, j.atr, b, 60), v = j.rev ? null : X.simLong(j.entry, j.stop, j.atr, b, 60); if (r) j.res = { net: r.net, why: r.why, exit: r.exit, t1: j.t + r.bars*60000 }; if (v) j.rev = { net: v.net, why: v.why, exit: v.exit, t1: j.t + v.bars*60000 }; if (!j.tp) j.tp = X.tpTrack(-1, j.entry, j.stop, b, 60) || undefined; if (!j.tpr) j.tpr = X.tpTrack(1, j.entry, j.stop, b, 60) || undefined; else if (!b.length && Date.now() > j.t + 3*86400000) j.skip = 1; } catch(e){} await new Promise(z => setTimeout(z, 80)); }
+      const r = j.res ? null : X.simExit(j.entry, j.stop, j.atr, b, 60), v = j.rev ? null : X.simLong(j.entry, j.stop, j.atr, b, 60); if (r) j.res = { net: r.net, why: r.why, exit: r.exit, t1: j.t + r.bars*60000 }; if (v) j.rev = { net: v.net, why: v.why, exit: v.exit, t1: j.t + v.bars*60000 }; if (!j.ns){ const f = X.simFree(-1, j.entry, j.stop, b, 60); if (f) j.ns = { net: f.net, why: f.why, exit: f.exit, mae: f.mae, t1: j.t + f.bars*60000 }; } if (!j.nsr){ const f = X.simFree(1, j.entry, j.stop, b, 60); if (f) j.nsr = { net: f.net, why: f.why, exit: f.exit, mae: f.mae, t1: j.t + f.bars*60000 }; } if (!j.tp) j.tp = X.tpTrack(-1, j.entry, j.stop, b, 60) || undefined; if (!j.tpr) j.tpr = X.tpTrack(1, j.entry, j.stop, b, 60) || undefined; else if (!b.length && Date.now() > j.t + 3*86400000) j.skip = 1; } catch(e){} await new Promise(z => setTimeout(z, 80)); }
   J = J.filter(j => !j.skip); jSave(); resBusy = false; if (n) paint(); }
 function liveLine(){ const s = X.stats(J), pc = x => x === null ? "—" : "%" + Math.round(x*100);
   return `SERT SHORT canlı: ${s.n} işlem · kazanma ${pc(s.winRate)} · ort ${s.avg === null ? "—" : (s.avg >= 0 ? "+" : "") + (s.avg*100).toFixed(2) + "%"} (ücret dahil)${s.open ? ` · ${s.open} takipte` : ""}`; }
@@ -143,12 +151,18 @@ function draw(cv, b, r){ if (!cv || !b || !b.length) return; const w = cv.client
     const y1 = Y(Math.max(x.o, x.c)), y2 = Y(Math.min(x.o, x.c)); g.fillRect(X0 - Math.max(1, cw*0.35), y1, Math.max(2, cw*0.7), Math.max(1, y2 - y1)); if (x.t + 900000 === r.close){ g.strokeStyle = dark ? "#d6b171" : "#9a7432"; g.strokeRect(X0 - cw*0.6, Y(x.h) - 3, cw*1.2, Y(x.l) - Y(x.h) + 6); } });
   g.font = "11px system-ui, sans-serif"; let lastY = -99; lv.sort((a, b2) => b2[1] - a[1]).forEach(([t, v, col]) => { const y = Y(v); g.strokeStyle = col; g.setLineDash(t === "giriş" ? [] : [5, 4]); g.beginPath(); g.moveTo(0, y); g.lineTo(w - R0, y); g.stroke(); g.setLineDash([]);
     const ty = Math.min(h - 9 - (lv.length - 1 - lv.findIndex(q => q[0] === t))*15, Math.max(y, lastY + 15)); lastY = ty; g.fillStyle = col; g.fillRect(w - R0 + 2, ty - 8, R0 - 4, 16); g.fillStyle = "#fff"; g.fillText(`${t} ${fp(v)}`.slice(0, 11), w - R0 + 5, ty + 4); }); }
-function paintJ(){ const el = $("#sert-j"); if (!el) return; const S = X.summary(J), V = X.summary(J, "rev"), pc = x => x === null ? "—" : "%" + Math.round(x*100);
-  const rows = J.slice().sort((a, b) => b.t - a.t).slice(0, 100).map(j => { const s = X.sonuc(j); return `<tr><td>${esc(X.berlin(j.t).slice(5))}</td><td><b>${esc(j.sym.replace("USDT", ""))}</b>${ktag(j.sym)}${j.sq ? ` <small class="y">sq</small>` : ""}</td><td>${fp(j.entry)}</td><td>${fp(j.stop)}</td><td class="${s === "DOĞRU" ? "up" : s === "YANLIŞ" ? "dn" : "dim"}">${s}</td><td>${j.res || j.tp ? esc(X.ilk(j)) : "—"}</td><td class="${j.res ? (j.res.net > 0 ? "up" : "dn") : "dim"}">${j.res ? pct(j.res.net) : "—"}</td><td class="sert-rev ${j.rev ? (j.rev.net > 0 ? "up" : "dn") : "dim"}">${j.rev ? `${j.rev.net > 0 ? "D" : "Y"} ${pct(j.rev.net)} · ${esc(X.ilk(j, "rev"))}` : "—"}</td></tr>`; }).join("");
-  el.innerHTML = `<div class="sert-h">DEFTER <small class="dim">her tetik otomatik · DOĞRU = iz/60dk çıkışı net &gt; 0 (%0.10 ücret dahil) · ilk = TP1/TP2/SL hangisi önce</small></div>
-    <div class="sert-sum"><span><b class="dn">SHORT</b></span><span>toplam <b>${S.toplam}</b></span><span>doğru <b class="up">${S.dogru}</b></span><span>yanlış <b class="dn">${S.yanlis}</b></span>${S.acik ? `<span>açık <b>${S.acik}</b></span>` : ""}<span>kazanma <b>${pc(S.kazanma)}</b></span><span>ort net <b class="${S.ort > 0 ? "up" : S.ort < 0 ? "dn" : ""}">${pct(S.ort)}</b></span><span>toplam net <b class="${S.net > 0 ? "up" : S.net < 0 ? "dn" : ""}">${S.toplam - S.acik ? pct(S.net) : "—"}</b></span><span>TP1 <b>${pc(S.tp1)}</b></span><span>TP2 <b>${pc(S.tp2)}</b></span></div>
-    <div class="sert-sum sert-sum2"><span><b>TERSİ (LONG)</b></span><span>kazanma <b>${pc(V.kazanma)}</b></span><span>ort net <b class="${V.ort > 0 ? "up" : V.ort < 0 ? "dn" : ""}">${pct(V.ort)}</b></span><span>toplam net <b class="${V.net > 0 ? "up" : V.net < 0 ? "dn" : ""}">${V.toplam - V.acik ? pct(V.net) : "—"}</b></span><span>TP1 <b>${pc(V.tp1)}</b></span><span>TP2 <b>${pc(V.tp2)}</b></span></div>
-    ${rows ? `<div class="sert-tw"><table class="sert-t"><tr><th>zaman</th><th>coin</th><th>giriş</th><th>stop</th><th>sonuç</th><th>ilk</th><th>net</th><th>TERSİ (LONG)</th></tr>${rows}</table></div>` : `<div class="dim">henüz kayıt yok</div>`}
+const mp = x => x === null || !isFinite(x) ? "—" : (x*100).toFixed(2) + "%"; /* MAE magnitude */
+const MK = "mermer.sert.mode"; let MODE = (() => { try { return localStorage.getItem(MK) === "STOPLU" ? "STOPLU" : "STOPSUZ"; } catch(e){ return "STOPSUZ"; } })(); /* v7.31 Defter modu (default STOPSUZ) */
+function sumLine(lab, S, cls, free){ const pc = x => x === null ? "—" : "%" + Math.round(x*100), sg = x => x > 0 ? "up" : x < 0 ? "dn" : "";
+  return `<div class="sert-sum${cls}"><span><b${lab[1] ? ` class="${lab[1]}"` : ""}>${lab[0]}</b></span>${lab[2] ? `<span>toplam <b>${S.toplam}</b></span><span>doğru <b class="up">${S.dogru}</b></span><span>yanlış <b class="dn">${S.yanlis}</b></span>${S.acik ? `<span>açık <b>${S.acik}</b></span>` : ""}` : ""}<span>kazanma <b>${pc(S.kazanma)}</b></span><span>ort net <b class="${sg(S.ort)}">${pct(S.ort)}</b></span><span>toplam net <b class="${sg(S.net)}">${S.toplam - S.acik ? pct(S.net) : "—"}</b></span>${free ? `<span>ort MAE <b class="dn">${mp(S.maeOrt)}</b></span><span>en kötü MAE <b class="dn">${mp(S.maeMax)}</b></span>` : `<span>TP1 <b>${pc(S.tp1)}</b></span><span>TP2 <b>${pc(S.tp2)}</b></span>`}</div>`; }
+function paintJ(){ const el = $("#sert-j"); if (!el) return; const [k, kr] = X.KEYS[MODE], free = MODE === "STOPSUZ";
+  const rows = J.slice().sort((a, b) => b.t - a.t).slice(0, 100).map(j => { const s = X.sonuc(j, k), r = j[k], v = j[kr]; return `<tr><td>${esc(X.berlin(j.t).slice(5))}</td><td><b>${esc(j.sym.replace("USDT", ""))}</b>${ktag(j.sym)}${j.sq ? ` <small class="y">sq</small>` : ""}</td><td>${fp(j.entry)}</td><td class="dim">${fp(j.stop)}</td><td class="${s === "DOĞRU" ? "up" : s === "YANLIŞ" ? "dn" : "dim"}">${s}</td><td>${r || (!free && j.tp) ? esc(X.ilk(j, k)) : "—"}</td><td class="${r ? (r.net > 0 ? "up" : "dn") : "dim"}">${r ? pct(r.net) : "—"}</td><td class="dn">${j.ns ? mp(j.ns.mae) : "—"}</td><td class="sert-rev ${v ? (v.net > 0 ? "up" : "dn") : "dim"}">${v ? `${v.net > 0 ? "D" : "Y"} ${pct(v.net)} · ${esc(X.ilk(j, kr))}` : "—"}</td></tr>`; }).join("");
+  el.innerHTML = `<div class="sert-h">DEFTER <small class="dim">her tetik otomatik · DOĞRU = net &gt; 0 (%0.10 ücret dahil) · STOPLU: SL / 1×ATR iz / 60dk · STOPSUZ: SL yok, TP2 ya da 60dk kapanışı · MAE = en çok ters gidiş</small></div>
+    <div class="sert-mode">Defter modu: <button type="button" class="mini${MODE === "STOPLU" ? " on" : ""}" data-smode="STOPLU">STOPLU</button><button type="button" class="mini${free ? " on" : ""}" data-smode="STOPSUZ">STOPSUZ</button></div>
+    ${sumLine(["SHORT · STOPLU", "dn", !free], X.summary(J, "res"), free ? " sert-sum2" : "", false)}
+    ${sumLine(["SHORT · STOPSUZ", "dn", free], X.summary(J, "ns"), free ? "" : " sert-sum2", true)}
+    ${sumLine([`TERSİ (LONG) · ${MODE}`, "", false], X.summary(J, kr), " sert-sum2", free)}
+    ${rows ? `<div class="sert-tw"><table class="sert-t"><tr><th>zaman</th><th>coin</th><th>giriş</th><th>önerilen SL</th><th>sonuç (${MODE})</th><th>çıkış</th><th>net</th><th>MAE</th><th>TERSİ (LONG)</th></tr>${rows}</table></div>` : `<div class="dim">henüz kayıt yok</div>`}
     <div class="sert-btns"><button type="button" class="mini" id="sert-csv"${J.length ? "" : " disabled"}>CSV dışa aktar</button><button type="button" class="mini" id="sert-clr"${J.length ? "" : " disabled"}>temizle</button></div>`; }
 function paint(){ paintList(); if (document.body.dataset.pg === "short") paintDet(); paintJ(); }
 async function exportCsv(){ const txt = "\ufeff" + X.csv(J), name = `mermer-short-defter-${X.berlin(Date.now()).slice(0, 10)}.csv`;
@@ -162,7 +176,7 @@ async function simOpen(sym){ try { if (!window.PSIMUI) throw new Error("simülat
 function show(){ paint(); }
 function init(){ const el = $("#short-box"); if (el) el.onclick = e => { const s = e.target.closest("[data-ssim]"); if (s){ e.stopPropagation(); simOpen(s.dataset.ssim); return; }
     const b = e.target.closest("[data-sgo]"); if (b){ SEL = b.dataset.sgo; paintList(); paintDet(); const d = $("#sert-det"); d && d.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
-    if (e.target.closest("#sert-csv")) exportCsv(); else if (e.target.closest("#sert-clr")) clearJ(); };
+    { const m = e.target.closest("[data-smode]"); if (m){ MODE = m.dataset.smode; try { localStorage.setItem(MK, MODE); } catch(x){} paintJ(); return; } } if (e.target.closest("#sert-csv")) exportCsv(); else if (e.target.closest("#sert-clr")) clearJ(); };
   paint(); setTimeout(() => scan(true), 3000); setTimeout(resolve, 5000);
   setInterval(() => { if (Math.floor(Date.now()/900000) !== R.slot && Date.now() % 900000 > 4000) scan(false); else paintList(); }, 10000); setInterval(resolve, 60000);
   setInterval(() => { if (document.body.dataset.pg === "short" && !document.hidden && SEL) paintDet(); }, 30000);
