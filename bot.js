@@ -114,7 +114,7 @@ async function jupSwap({ inMint, outMint, rawAmount, slipBps }){ const q = await
   const j = await r.json(); if (!j.swapTransaction) throw new Error("Jupiter swap: " + (j.error || r.status)); const sig = await signSendVersioned(unb64(j.swapTransaction)); return { sig, q }; }
 async function tokInfo(mint){ const a = await (await fetch(JUP + "/tokens/v2/search?query=" + mint, { cache: "no-store" })).json(); return (a || []).find(x => x.id === mint) || null; }
 async function solPrice(){ try { const j = await (await fetch(JUP + "/price/v3?ids=" + SOLM, { cache: "no-store" })).json(); solUsd = +(j[SOLM] || {}).usdPrice || solUsd; } catch(e){} return solUsd; }
-let qrp = null; const qrLib = () => window.qrcode ? Promise.resolve() : (qrp = qrp || new Promise((ok, no) => { const s = document.createElement("script"); s.src = "vendor/qrcode.js?v=6"; s.onload = ok; s.onerror = () => { qrp = null; no(); }; document.head.appendChild(s); }));
+let qrp = null; const qrLib = () => window.qrcode ? Promise.resolve() : (qrp = qrp || new Promise((ok, no) => { const s = document.createElement("script"); s.src = "vendor/qrcode.js?v=7.30.1"; s.onload = ok; s.onerror = () => { qrp = null; no(); }; document.head.appendChild(s); }));
 async function qr(el, text){ try { await qrLib(); const q = qrcode(0, "M"); q.addData("solana:" + text); q.make(); el.innerHTML = q.createSvgTag({ cellSize: 4, margin: 3, scalable: true }); } catch(e){ el.textContent = "QR yüklenemedi"; } }
 
 /* ------------------------------ UI ------------------------------ */
