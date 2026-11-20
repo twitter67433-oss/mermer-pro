@@ -73,3 +73,11 @@ Yöntem: tüm JS için `node --check` (0 sözdizimi hatası), mevcut 23 testin t
 | CSP `script-src 'unsafe-inline'` | **Kaldırıldı.** Satır içi `<script>` (APP_V → appv.js) ve 8 satır içi olay işleyicisi (onclick/onerror/onsubmit → act.js `data-act` / `data-onerr` / `data-nosubmit`) yok. `style-src 'unsafe-inline'` kalıyor (çok sayıda `style=` özniteliği; betik çalıştırmaz). |
 | Native Android Keystore | **Eklendi (APK 8.0):** NeonKeystore eklentisi, API Secret'ın PIN-şifreli kaydını bir kez daha Keystore anahtarıyla sarar. Cihazda elle denenmedi (emülatör/cihaz yok) — docs/ANDROID.md. Bot cüzdanı PIN-only kalır (yedek/sunucuya gönderim taşınabilir olmalı). |
 | "sözleşme bulunamadı" anlık yazısı | Açık (DÜŞÜK, görsel). |
+
+## 6. v8.0.1
+
+| Önem | Bulgu | Durum |
+|---|---|---|
+| YÜKSEK (kullanıcı) | Listeler hep hisse gösteriyor. 48 saatlik tekrar: 645 tetiğin 421'i hisse/emtia (kontratların %32'si). Kural yanlılığı: düşük gece hacmi → hacim tabanı düşük; ince OI; yapısal yüksek funding. Tarama hatası yok (canlı: 767/767 kontrat, ~175 sn). | Düzeltildi: hisse hacim tabanı seans mumlarından (421 → 275), KRİPTO varsayılan filtre, tarama kripto önce. OI/funding yanlılığı belgelendi, kural değişmedi. |
+| ORTA | Binance eski `fstream.binance.com/ws` ve `/stream` yolları market akışlarında sessiz (açılıyor, mesaj yok): psim.js aggTrade, sert.js !forceOrder@arr, coinan.js forceOrder, agg.js aggTrade | Düzeltildi: `/market` + `/public`; test eski yolu yakalar. app.js / sinyal.js zaten `/market` kullanıyordu. |
+| DÜŞÜK | Fiyatı hızla hareket eden coinler (ör. MMT, EVAA) için ayrı uyarı yoktu; listeler yalnız kural tetiğini gösteriyor | HAREKET eklendi (yalnız kripto). |

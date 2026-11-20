@@ -1,5 +1,14 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.0.1 — 2026-11-20
+**"Sinyal hep hisse veriyor, coinler niye yok" + "Bu coinler yükselmiş niye haberim yok".** Yatırım tavsiyesi değildir.
+- **Neden hisse çıkıyordu (ölçüldü, 48 saat, 767 USDT perp = 519 kripto + 248 hisse/emtia):** listelerdeki tetiklerin %65'i hisseydi (kripto 224, hisse/emtia 421), oysa kontratların yalnız %32'si hisse. Sebep kural yanlılığı, tarama hatası değil: (1) hisse kontratlarında borsa kapalıyken hacim ~0 → 24 saatlik ortalama düşük → "hacim ≥3×" her seans açılışında kendiliğinden tutuyor (hisse mumlarının %7.6'sı vs kripto %4.25; 14–15 UTC = ABD açılışı en yoğun saat); (2) hisse OI'si ince → "OI 1s ≥+%1" kolay (medyan +%3.2 vs kripto +%1.5); (3) hisse funding'i yapısal olarak yüksek → SQUEEZE SHORT'un "funding ≥%0.05" şartı hisselerde hep tutuyor (68'in 68'i).
+- **Düzeltme:** hisse/emtia için hacim tabanı yalnız aktif (seans) mumlardan → hisse tetikleri 421 → 275 (−%35), kripto kuralları ve sayıları aynı (224). OI/funding yanlılığı kalıyor → görünüm filtresiyle çözüldü.
+- **KRİPTO / HİSSE / HEPSİ** düğmesi (SHORT ve LONG sekmelerinin üstü, varsayılan **KRİPTO**): hisse/emtia silinmedi, ayrıldı. Listeler, DEFTER, 24s sayaçları ve telefon bildirimleri filtreye uyar; gizli hisse tetiği sayısı gösterilir. Tarama sırası: izleme listesi → tüm kripto (hacme göre) → hisse/emtia.
+- **HAREKET (yeni, yalnız kripto):** 1 saatte ±%8, 24 saatte ±%15 ya da 15dk mumda ±%4 + hacim ≥3× → listede ↑ POMPA / ↓ DÜŞÜŞ + telefon bildirimi; coin+pencere başına bir uyarı (1s: 60 dk, 24s: 12 sa, 15dk: mum başına; yeniden açılışta tekrar etmez); squeeze/tasfiye risk satırı (SQZ modülü + funding); eşikler ayarlanabilir, AKTİF/PASİF, 🔔 aç/kapa. Sinyal; emir yok, otomatik alım yok.
+- **Hata (gerçek):** Binance USDⓈ-M WebSocket'leri ayrıldı; eski `/ws` ve `/stream` yolları açılıyor ama işlem/likidasyon/ticker göndermiyor. Etkilenen: SİM canlı fiyatı (REST yedeğiyle 2 sn gecikmeli çalışıyordu), canlı likidasyon satırı (SHORT/LONG, ANALİZ — hep boştu), çok borsa aggTrade (Binance ayağı). Hepsi `/market` (işlem, ticker, likidasyon) ve `/public` (emir defteri) yollarına taşındı.
+- Testler: `tests/hareket.test.js` (39 kontrol) — 31 dosya.
+
 ## 8.0.0 — 2026-11-19
 **FAZ 4 / teslim.** Yatırım tavsiyesi değildir; sinyaller kanıtlanmış değildir.
 - **SERT defteri boşluk dolumu (düzeltme):** iz süren stop mumun stopun ötesinde açıldığı durumda artık açılıştan dolar (`sert.js gapX`); 1dk mumlar açılışı saklar, eski sonuçlar bir kez yeniden hesaplanır. 28 gün / 120 coin tekrar: etki küçük ve olumsuz (−0.00…−0.02 puan/işlem) — BACKTEST_REPORT.md §v8.0, liste açıklamaları güncellendi.

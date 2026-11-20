@@ -289,3 +289,25 @@ Betikler `tools/bt8/tf/` altında. Kutuda `/workspace/r750` yolu ile çalıştı
 | dvs | 13 | 0 | 62% / +0.57% | 62% / +0.57% | 0.000 | 100% / +1.07% |
 
 **Yorum (dürüst):** 1dk mumlarda boşluk nadir (liste başına 0–14 işlem), etki küçük ve her listede aynı yönde (biraz daha kötü). Rakamlar beklendiği gibi düştü ama hiçbir listenin işareti değişmedi. Örneklemler küçük (sql 43, lng 36, dvl 11, dvs 13) — pozitif görünen listeler (sql, dvs, stopsuz sqs) **kanıt değildir**, 28 gün tek rejimdir. Uygulamadaki liste açıklamaları bu satırla güncellendi.
+
+
+---
+
+# v8.0.1 — Kripto mu hisse mi? 48 saatlik canlı kural tekrarı
+
+**Kurulum:** 2026-11-18 11:34 → 2026-11-20 11:34 (Berlin), Binance USDT-M TRADING durumundaki tüm 767 perp (519 kripto, 248 hisse/altın/emtia = TRADIFI_PERPETUAL), canlıdaki kurallar aynen (`sert.js evalAll`), 15dk mumlar, 5dk OI geçmişi ile OI 1s, son funding. Kod: `tools/kripto801/`.
+
+| Liste | ÖNCE kripto | ÖNCE hisse/emtia | SONRA kripto | SONRA hisse/emtia |
+|---|---|---|---|---|
+| SHORT (sert) | 54 | 169 | 54 | 110 |
+| SQUEEZE SHORT (sqs) | 10 | 68 | 10 | 49 |
+| SQUEEZE DEVAM SHORT (dvs) | 5 | 13 | 5 | 9 |
+| LONG (lng) | 80 | 86 | 80 | 46 |
+| SQUEEZE LONG (sql) | 27 | 32 | 27 | 23 |
+| KAPİTÜLASYON (kap) | 43 | 42 | 43 | 29 |
+| SQUEEZE DEVAM LONG (dvl) | 5 | 11 | 5 | 9 |
+| **Toplam** | **224** | **421** | **224** | **275** |
+
+"SONRA" penceresi 7 dk kaydırılmış ikinci koşudur (kripto sayıları aynı çıktı). Hacim ≥3× mum oranı: kripto %4.25 · hisse %7.60 → seans tabanıyla %4.62 (yalnız sıfır-dışı mumlar %7.42, aynı saat önceki günler %15.97 — reddedildi). Hisse tetiği hâlâ kontrat başına kriptonun ~2.6 katı (OI/funding yanlılığı); bu yüzden görünüm varsayılanı KRİPTO.
+
+**Onur'un ekran görüntüsündeki 8 coin (son 48 saat, mevcut listeler):** CYBER → LONG 20.11 08:30 ve 09:00, SQUEEZE LONG 09:00 · HUMA → SQUEEZE LONG 19.11 14:15 ve 14:30 · PIPPIN → SQUEEZE SHORT 18.11 13:15 · MMT, EVAA, DOS, ZEST, RARE → hiçbir liste (mum şartı birkaç kez tuttu ama OI/funding şartı tutmadı). Yeni HAREKET varsayılan eşikleriyle 8'in 6'sı uyarı alırdı (MMT 1s +%26, EVAA 1s +%13, CYBER 1s +%36, PIPPIN 1s −%21 / 24s +%17, HUMA 1s +%9.6, RARE 1s +%17.6); DOS (24s +%12, 1s +%3) ve ZEST (24s +%13, 1s +%7.5) eşiğin altında kalırdı.

@@ -42,8 +42,8 @@ const FEE2 = 0.001;
   ok(rm === 1 && calls.includes("p"), "img error handlers");
   ok(!/fetch|order|sign|send/i.test(rd("act.js").replace(/\/\*[\s\S]*?\*\//g, "")), "act.js never trades / fetches"); }
 // 4) version
-{ const v = JSON.parse(rd("version.json")).v; ok(v === "8.0.0", "version.json 8.0.0"); ok(rd("appv.js").includes(`"${v}"`), "appv.js matches");
-  ok(rd("index.html").includes('class="ver">v8.0<'), "header badge v8.0"); }
+{ const v = JSON.parse(rd("version.json")).v; ok(/^8\.0\.\d+$/.test(v), "version.json 8.0.x"); ok(rd("appv.js").includes(`"${v}"`), "appv.js matches");
+  ok(rd("index.html").includes(`class="ver">v${v.replace(/\.0$/, "")}<`), "header badge matches version"); }
 // 5) Android Keystore layer in BKEYS (mock native plugin)
 (async () => { const B = require("../bkeys.js"); const store = {}; let seen = [];
   const plug = { wrap: async o => { seen.push(o.data); const iv = "IV" + Object.keys(store).length; store[iv] = o.data; return { iv, ct: Buffer.from("KS:" + iv).toString("base64"), alias: "mermer_secret_wrap_v1" }; },

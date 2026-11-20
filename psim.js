@@ -81,7 +81,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") window.PSI
 const K = "mermer.psim", P = window.PSIM, $ = s => document.querySelector(s), esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 let st = (() => { try { const s = JSON.parse(localStorage.getItem(K) || "null"); if (s && s.v === 1 && isFinite(s.bal)) return s; } catch(e){} return P.create(1000); })();
 const save = () => { try { localStorage.setItem(K, JSON.stringify(st)); } catch(e){} try { window.dispatchEvent(new Event("psim:change")); } catch(e){} }; /* v7.33.2: SHORT/LONG tabs show open sim positions too */
-const px = {}, ext = {}, book = {}; let ws = null, wsKey = "", side = 1, sel = "", lastPaint = 0, pollT = null;
+const px = {}, ext = {}, book = {}; let ws = null, wsb = null, wsKey = "", side = 1, sel = "", lastPaint = 0, pollT = null;
 const fp = v => !isFinite(v) ? "—" : v >= 1000 ? v.toFixed(1) : v >= 10 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v >= 0.01 ? v.toFixed(5) : v.toPrecision(4);
 const us = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
 const fillNote = q => ` · dolum ${q.fillVia === "defter" ? "emir defterinden" : "model (spread+kayma)"}${q.filled < 0.999 ? ` · KISMİ %${Math.round(q.filled*100)} (derinlik yetmedi)` : ""}`;
@@ -90,10 +90,12 @@ function sigFor(sym){ const S = window.SCALP && SCALP.S; if (S && S.sym === sym 
   try { const c = window.SGB && SGB._c; if (c) for (const [k, r] of c) if (k.startsWith("p:" + sym + "@") && r && r.word && !r.none) return { word: r.word, d: Math.sign(r.d || 0), tf: k.split("@")[1], plan: null }; } catch(e){} return null; }
 /* live prices: public aggTrade stream for the open + selected symbols; REST fallback every 3 s */
 function syms(){ const s = new Set(st.pos.map(p => p.sym)); for (const k of SR.sig.keys()) s.add(k); const c = curSym(); if (c && document.body.dataset.pg === "fut") s.add(c); return [...s].slice(0, 8); }
-function stream(){ const L = syms(), key = L.join(","); if (key === wsKey && ws && ws.readyState <= 1) return; wsKey = key; try { ws && ws.close(); } catch(e){} ws = null; if (!L.length) return;
-  try { const w = new WebSocket("wss://fstream.binance.com/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade/" + s.toLowerCase() + "@depth20@500ms").join("/")); ws = w; /* v8.0: public top-20 book for SIM fills */
+function stream(){ const L = syms(), key = L.join(","); if (key === wsKey && ws && ws.readyState <= 1) return; wsKey = key; try { ws && ws.close(); } catch(e){} try { wsb && wsb.close(); } catch(e){} ws = wsb = null; if (!L.length) return;
+  try { /* v8.0.1: Binance split the USDⓈ-M streams — trades on /market, order book on /public (the legacy /stream path stays silent for trades) */
+    const w = new WebSocket("wss://fstream.binance.com/market/stream?streams=" + L.map(s => s.toLowerCase() + "@aggTrade").join("/")); ws = w;
+    const wb = new WebSocket("wss://fstream.binance.com/public/stream?streams=" + L.map(s => s.toLowerCase() + "@depth20@500ms").join("/")); wsb = wb; /* v8.0: public top-20 book for SIM fills */
     w.onmessage = ev => { try { const m = JSON.parse(ev.data), d = m.data; if (!d) return; if (/@depth/.test(m.stream || "")){ book[d.s] = { t: Date.now(), bids: d.b, asks: d.a }; return; } const s = d.s, p = +d.p; px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); if (p > e.hi) e.hi = p; if (p < e.lo) e.lo = p; } catch(e){} };
-    w.onclose = () => { if (ws === w){ ws = null; wsKey = ""; } }; } catch(e){} }
+    w.onclose = () => { if (ws === w){ ws = null; wsKey = ""; } }; wb.onmessage = w.onmessage; wb.onclose = () => { if (wsb === wb) wsb = null; }; } catch(e){} }
 async function poll(){ for (const s of syms()){ if (ws && ws.readyState === 1 && px[s]) continue; try { const r = await fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + s); if (r.ok){ const j = await r.json(); const p = +j.price; if (p > 0){ px[s] = p; const e = ext[s] || (ext[s] = { hi: p, lo: p }); e.hi = Math.max(e.hi, p); e.lo = Math.min(e.lo, p); } } } catch(e){} } }
 function tick(){ let changed = false;
   for (const x of P.expire(st, px, Date.now())){ changed = true; try { NOTIFY.toast(`SİM: ${x.sym.replace("USDT", "")} süre doldu (60 dk) ${us(x.net)} USDT`, x.net >= 0 ? "good" : "bad"); } catch(e){} } for (const s of Object.keys(ext)){ const e = ext[s], p = px[s]; delete ext[s]; if (!(p > 0)) continue; const r = P.mark(st, s, p, Date.now(), e.hi, e.lo);

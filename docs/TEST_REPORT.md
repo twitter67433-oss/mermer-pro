@@ -1,4 +1,10 @@
-# MERMER TERMİNAL — Test Raporu (v8.0.0, 2026-11-19)
+# MERMER TERMİNAL — Test Raporu (v8.0.1, 2026-11-20)
+
+## v8.0.1
+- 31 test dosyası, hepsi geçti. Yeni: `tests/hareket.test.js` (39 kontrol: 1s/24s/15dk eşikleri, coin+pencere başına tek uyarı, yön, risk satırı, yalnız kripto, emir/anahtar/cüzdan yok, KRİPTO/HİSSE/HEPSİ, kripto önce tarama, hisse seans hacim tabanı, eski fstream yolu yok).
+- Tarayıcı (yerel): KRİPTO varsayılan, tam tarama 767/767 (~177 sn), HAREKET 45 sn'de 13 uyarı (EVAA, MMT, CYBER, DOS, PIPPIN …), 0 emir, 0 sayfa hatası, 0 CSP. Canlı sonuçlar teslim notunda.
+
+## v8.0.0
 
 ## Birim / sözleşme testleri
 `for f in tests/*.test.js; do node $f; done` → **30 dosya, 30 geçti, 0 başarısız** (v7.51: 28 dosya).

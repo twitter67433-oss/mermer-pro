@@ -59,8 +59,13 @@ function kind(s){ if (!s) return ""; const b = String(s.baseAsset || s.symbol ||
 const isUsdt = s => s && (s.quoteAsset ? s.quoteAsset === "USDT" : /USDT$/.test(s.symbol || "")); /* v7.33.1: only USDT-quoted perps (no USDC / other quotes) */
 const universe = ei => ((ei && ei.symbols) || []).filter(s => (s.contractType === "PERPETUAL" || s.contractType === "TRADIFI_PERPETUAL") && s.status === "TRADING" && isUsdt(s)).map(s => s.symbol); /* gold/stocks are TRADIFI_PERPETUAL */
 /* scan order: priority (selected/watchlist) first, then by 24h quote volume, then the rest */
-function order(U, pri, vol){ const seen = new Set(), out = []; for (const x of pri || []) if (x && /USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); }
-  for (const x of (U || []).slice().sort((a, b) => ((vol && vol[b]) || 0) - ((vol && vol[a]) || 0))) if (/USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); } return out; }
+/* v8.0.1: isT(sym) = TradFi (stock / gold / commodity) → those go AFTER every crypto contract, so crypto always gets scanned first */
+function order(U, pri, vol, isT){ const seen = new Set(), out = []; for (const x of pri || []) if (x && /USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); }
+  const t = s => (isT && isT(s)) ? 1 : 0;
+  for (const x of (U || []).slice().sort((a, b) => (t(a) - t(b)) || (((vol && vol[b]) || 0) - ((vol && vol[a]) || 0)))) if (/USDT$/.test(x) && !seen.has(x)){ seen.add(x); out.push(x); } return out; }
+/* v8.0.1 view filter: "kripto" (default) = crypto only · "hisse" = stocks / gold / commodities only · "hepsi" = everything. kindOf(sym) = "" for crypto */
+const KMODES = ["kripto", "hisse", "hepsi"];
+const kvis = (mode, kd) => mode === "hepsi" ? true : mode === "hisse" ? !!kd : !kd;
 /* incremental 15m bars: merge a short fresh fetch into the cached closed bars (new wins), keep the last max */
 function merge(old, nb, max = 110){ const m = new Map(); for (const x of old || []) m.set(x.t, x); for (const x of nb || []) m.set(x.t, x); return [...m.values()].sort((a, b) => a.t - b.t).slice(-max); }
 /* ===== v7.32 RULE BOOK — SHORT tab: SHORT · SQUEEZE SHORT · SQUEEZE DEVAM (SHORT); LONG tab: LONG · SQUEEZE LONG · KAPİTÜLASYON · SQUEEZE DEVAM (LONG).
@@ -77,8 +82,13 @@ const LISTS = [
   { k: "top", side: 1, tab: "long", ext: 1, name: "TOPLAMA (LONG)", sub: "çok borsa: fiyat 1s ±%1 / 4s ±%2 · hacim ≥1.5× · toplam OI 1s ≥+%3 · taker alış ≥%3", maxR: 0.05, bt: "45g test: n=102 · stoplu %41 +0.17% · stopsuz %53 +0.16% (kanıtlanmadı)" },
   { k: "dvl", side: 1, tab: "long", name: "SQUEEZE DEVAM (LONG)", sub: "short squeeze sürüyor · sert yükseliş · OI↓ · funding≤%0.01 · hacim≥3×", maxR: 0.05, bt: "45g test: n=32 · stoplu %28 −0.14% · stopsuz %41 +0.12% (çok az örnek) · v8.0 28g tekrar (120 coin, boşluk dolumlu): n=11 · stoplu %9 −0.72% · stopsuz %55 −1.45% (çok az örnek)" } ];
 const LK = Object.fromEntries(LISTS.map(l => [l.k, l]));
-function feat(b){ const n = (b || []).length; if (n < 101) return null; const x = b[n - 1], P = b.slice(Math.max(0, n - 289), n - 1);
-  let s = 0; for (let i = n - 97; i < n - 1; i++) s += b[i].qv; const avg = s/96, rng = x.h - x.l;
+/* v8.0.1 sess (TradFi: stocks / gold / commodities): those perps have dead hours (market closed → near-zero volume), so the plain 24 h average is
+   deflated and "volume ≥3×" fired at every session open (48 h replay: 7.6 % of stock bars vs 4.25 % of crypto bars). With sess the baseline
+   is the mean of the ACTIVE bars only (bars ≥ 25 % of the plain mean) → stock bars ≥3×: 4.6 %. Crypto is unchanged (sess off). */
+function base96(b, n, sess){ let s = 0; for (let i = n - 97; i < n - 1; i++) s += b[i].qv; const m = s/96; if (!sess || !(m > 0)) return m;
+  let t = 0, c = 0; for (let i = n - 97; i < n - 1; i++) if (b[i].qv >= 0.25*m){ t += b[i].qv; c++; } return c ? t/c : m; }
+function feat(b, o){ const n = (b || []).length; if (n < 101) return null; const x = b[n - 1], P = b.slice(Math.max(0, n - 289), n - 1);
+  const avg = base96(b, n, !!(o && o.sess)), rng = x.h - x.l;
   let a = null; for (let i = 0; i < n; i++){ const y = b[i], pc = i ? b[i - 1].c : y.c, tr = Math.max(y.h - y.l, Math.abs(y.h - pc), Math.abs(y.l - pc)); a = i < 14 ? (i === 0 ? tr : (a*i + tr)/(i + 1)) : (a*13 + tr)/14; }
   return { x, red: x.c < x.o, green: x.c > x.o, vr: avg > 0 ? x.qv/avg : 0, sell: x.qv > 0 ? 1 - x.tb/x.qv : 0, lo4p: Math.min(...b.slice(n - 5, n - 1).map(y => y.l)), hi4p: Math.max(...b.slice(n - 5, n - 1).map(y => y.h)),
     pl1: b[n - 2].l, r15: x.c/x.o - 1, c4: x.c/b[n - 5].c - 1, lo72: Math.min(...P.map(y => y.l)), atr: a, rng, lw: rng > 0 ? (Math.min(x.o, x.c) - x.l)/rng : 0,
@@ -104,7 +114,7 @@ function fullK(k, f, oi1, fr){ if (!preK(k, f)) return false; const x = f.x, o =
 function stopK(k, f){ const x = f.x; return k === "dvs" ? f.hi4*1.0005 : k === "dvl" ? f.lo4*0.9995 : LK[k].side < 0 ? x.h*1.0005 : x.l*0.9995; }
 const okR = (side, e, st, maxR) => e > 0 && (st - e)*side < 0 && Math.abs(st - e)/e <= maxR;
 /* every rule for one coin → triggers [{ k, side, entry, stop, atr, why }] */
-function evalAll(b, oi1, fr, on){ const f = feat(b); if (!f) return []; const out = [];
+function evalAll(b, oi1, fr, on, o){ const f = feat(b, o); if (!f) return []; const out = [];
   for (const l of LISTS){ if (l.ext || (on && on[l.k] === false)) continue; if (!fullK(l.k, f, oi1, fr)) continue; const st = stopK(l.k, f), e = f.x.c; if (!okR(l.side, e, st, l.maxR)) continue;
     out.push({ k: l.k, side: l.side, entry: e, stop: st, atr: f.atr, vr: f.vr, sell: f.sell, oi1, fr, why: `hacim ${f.vr.toFixed(1)}× · satış %${Math.round(f.sell*100)} · 15dk ${(f.r15*100).toFixed(1)}% · OI 1s ${fin(oi1) ? (oi1*100).toFixed(1) + "%" : "—"} · funding ${fin(fr) ? (fr*100).toFixed(3) + "%" : "—"}` }); }
   return out; }
@@ -114,7 +124,7 @@ function follow(j, b){ const s = j.side || -1, e = j.entry, st = j.stop, o = {};
   const put = (r, extra) => r ? Object.assign({ net: r.net, why: r.why, exit: r.exit, t1: j.t + r.bars*60000 }, extra ? { mae: r.mae } : {}) : null;
   o.res = put(main); o.rev = put(rev); o.ns = put(simFree(s, e, st, b, 60), 1); o.nsr = put(simFree(-s, e, st, b, 60), 1); o.tp = tpTrack(s, e, st, b, 60); o.tpr = tpTrack(-s, e, st, b, 60); return o; }
 const okRisk = (entry, stop) => entry > 0 && stop > entry && (stop - entry)/entry <= MAXR;
-return { LISTS, LK, feat, preK, fullK, needX, stopK, okR, evalAll, follow, kind, universe, order, merge, top, pre, simExit, simLong, simFree, KEYS, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
+return { LISTS, LK, KMODES, kvis, feat, base96, preK, fullK, needX, stopK, okR, evalAll, follow, kind, universe, order, merge, top, pre, simExit, simLong, simFree, KEYS, levels, tpTrack, stats, okRisk, MAXR, summary, sonuc, ilk, csv, berlin, WHY };
 });
 
 if (typeof window !== "undefined" && typeof document !== "undefined") window.SERTS = (() => {
@@ -143,7 +153,7 @@ const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</
 function big(sym){ const r = active(sym); if (!r || sqOn(sym)) return ""; return `<div class="sert-big dn">GİR SHORT</div>${line(r)}`; }
 /* ---- live liquidations: Binance public !forceOrder@arr (all symbols, ≤1 msg/s per symbol). SELL = a long was liquidated. Info only. ---- */
 const LQ = new Map(); let lws = null, lwsT = 0;
-function liqOpen(){ if (lws && lws.readyState < 2) return; try { lws = new WebSocket("wss://fstream.binance.com/ws/!forceOrder@arr");
+function liqOpen(){ if (lws && lws.readyState < 2) return; try { lws = new WebSocket("wss://fstream.binance.com/market/ws/!forceOrder@arr");
     lws.onmessage = ev => { try { const d = JSON.parse(ev.data), a = Array.isArray(d) ? d : [d]; for (const m of a){ const o = m.o || m; if (!o || !o.s) continue; const usd = (+o.ap || +o.p)*(+o.z || +o.q); if (!(usd > 0)) continue;
         const L = LQ.get(o.s) || []; L.push({ t: +o.T || Date.now(), usd, long: o.S === "SELL" }); LQ.set(o.s, L); } } catch(e){} };
     lws.onclose = e => { if (e && e.code === 4000) return; clearTimeout(lwsT); lwsT = setTimeout(liqOpen, 15000); }; } catch(e){} }
@@ -155,16 +165,17 @@ const C = new Map();
 async function bars15(s){ const now = Date.now(), lastT = Math.floor(now/900000)*900000 - 900000, o = C.get(s), inc = o && o.length >= 101 && o[o.length - 1].t >= lastT - 4*900000;
   const k = await fj(`/fapi/v1/klines?symbol=${s}&interval=15m&limit=${inc ? 6 : 300}`), nb = k.filter(x => +x[6] < now).map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4], qv: +x[7], tb: +x[10] }));
   const b = inc ? X.merge(o, nb, 300) : nb.slice(-300); C.set(s, b); return b; }
-async function one(s){ const b = await bars15(s), f = X.feat(b); const ks = SCAN.filter(l => ON[l.k] !== false && X.preK(l.k, f)).map(l => l.k);
+async function one(s){ const b = await bars15(s), so = { sess: !!KIND[s] }, f = X.feat(b, so); /* v8.0.1: TradFi → session volume baseline */ const ks = SCAN.filter(l => ON[l.k] !== false && X.preK(l.k, f)).map(l => l.k);
+  try { window.HAREKET && f && HAREKET.bars(s, b, f); } catch(e){} /* v8.0.1 HAREKET: sudden 15m move + volume (crypto only, alert only) */
   if (f && X.preK("sert", f)) R.brN = (R.brN || 0) + 1; if (f) R.brD = (R.brD || 0) + 1;
   if (!ks.length){ for (const l of SCAN) R.L[l.k].delete(s); return; } const last = b[b.length - 1], cT = last.t + 900000; let oi1 = NaN, fr = NaN;
   if (ks.some(X.needX)){ const [oh, on, fq] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
     const ago = (oh || []).filter(x => +x.timestamp <= cT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN; oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN; fr = fq && fq[0] ? +fq[0].fundingRate : NaN; }
-  R.cand = (R.cand || 0) + 1; const T = X.evalAll(b, oi1, fr, ON), got = new Set(T.map(t => t.k));
+  R.cand = (R.cand || 0) + 1; const T = X.evalAll(b, oi1, fr, ON, so), got = new Set(T.map(t => t.k));
   for (const t of T){ Object.assign(t, { sym: s, close: cT, until: cT + 900000, t: last.t }); R.L[t.k].set(s, t); }
   for (const l of SCAN) if (!got.has(l.k)) R.L[l.k].delete(s); if (T.length) paintLists(); }
-const KIND = {}; let kindAt = 0, UNI = [], VOL = {}, volAt = 0;
-async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } UNI = X.universe(ei); kindAt = Date.now(); } catch(e){} }
+const KIND = (() => { try { return JSON.parse(localStorage.getItem("mermer.kinds") || "{}") || {}; } catch(e){ return {}; } })(); let kindAt = 0, UNI = [], VOL = {}, volAt = 0;
+async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } UNI = X.universe(ei); kindAt = Date.now(); try { localStorage.setItem("mermer.kinds", JSON.stringify(KIND)); } catch(e){} } catch(e){} }
 const ktag = sym => KIND[sym] ? ` <small class="sert-k">${KIND[sym]}</small>` : "";
 const sleep = ms => new Promise(z => setTimeout(z, ms));
 const SCAN = X.LISTS.filter(l => !l.ext); /* scanner-owned lists (TOPLAMA / DAĞITIM come from agg.js) */
@@ -172,7 +183,7 @@ const anyOn = () => X.LISTS.some(l => ON[l.k] !== false);
 /* full pass over every TRADING perpetual (~810): 5 workers, 650 ms gap → ~6 req/s; OI/funding only for bar-level candidates. 429/418 → pause 60 s */
 async function scan(force){ const slot = Math.floor(Date.now()/900000); if (R.busy || (!force && slot === R.slot) || !anyOn()) return; R.busy = true; R.slot = slot; R.t0 = Date.now();
   await loadKinds(); try { if (Date.now() - volAt > 3600000){ for (const x of await fj("/fapi/v1/ticker/24hr")) VOL[x.symbol] = +x.quoteVolume; volAt = Date.now(); } } catch(e){}
-  const L = X.order(UNI.length ? UNI : list(), list(), VOL); R.n = R.total = L.length; R.done = 0; R.cand = 0; R.brN = 0; R.brD = 0; let i = 0, lastP = 0;
+  const L = X.order(UNI.length ? UNI : list(), list(), VOL, sym => !!KIND[sym]); R.n = R.total = L.length; R.done = 0; R.cand = 0; R.brN = 0; R.brD = 0; let i = 0, lastP = 0;
   const work = async () => { while (i < L.length){ while (R.pause > Date.now()) await sleep(1000); const s = L[i++];
       try { await one(s); } catch(e){ if (/HTTP (429|418)/.test(e.message)){ R.e429 = (R.e429 || 0) + 1; R.pause = Date.now() + 60000; L.push(s); continue; } }
       R.done++; if (Date.now() - lastP > 1500){ lastP = Date.now(); paintLists(); } await sleep(650); } };
@@ -182,7 +193,7 @@ async function scan(force){ const slot = Math.floor(Date.now()/900000); if (R.bu
 /* new trigger → DEFTER (+ breadth at that scan). Squeeze-risk coins never get GİR SHORT (record kept, flagged "sq") */
 async function fresh(r){ const j = { k: r.k, side: r.side, sym: r.sym, t: r.close, entry: r.entry, stop: r.stop, atr: r.atr, br: R.br === null ? undefined : +R.br.toFixed(3) }; J.push(j); jSave();
   if (r.side < 0 && window.SQZ){ SQZ.get(r.sym); for (let k = 0; k < 24 && !SQZ.peek(r.sym); k++) await sleep(250); if (sqOn(r.sym)){ j.sq = 1; jSave(); return null; } } return r; }
-function alertAll(L){ for (const side of [-1, 1]){ const A = L.filter(r => r.side === side); if (!A.length) continue; const cs = A.map(r => r.sym.replace("USDT", "")), w = "GİR " + W(side);
+function alertAll(L){ L = L.filter(r => vis(r.sym)); /* v8.0.1: no phone alert for contracts hidden by the KRİPTO / HİSSE filter */ for (const side of [-1, 1]){ const A = L.filter(r => r.side === side); if (!A.length) continue; const cs = A.map(r => r.sym.replace("USDT", "")), w = "GİR " + W(side);
   try { window.NOTIFY && NOTIFY.toast(`${w} · ${cs.slice(0, 4).join(", ")}${cs.length > 4 ? ` +${cs.length - 4}` : ""} → ${W(side)}`, side < 0 ? "bad" : "good"); } catch(e){}
   try { window.SCALP && SCALP.extAlert && SCALP.extAlert(`${w} · ${A.length === 1 ? cs[0] : cs.length + " coin"}`, `${cs.join(", ")} · 15dk · ${W(side)} sekmesinde giriş/SL/TP (kanıtlanmadı)`, "neon-sert"); } catch(e){} } }
 /* DEFTER follow-up on 1m bars (every minute, every tab while open; back-fills on reopen/resume) */
@@ -199,16 +210,20 @@ function liveLine(){ const s = X.stats(J.filter(j => j.k === "sert")), pc = x =>
   return `SERT SHORT canlı: ${s.n} işlem · kazanma ${pc(s.winRate)} · ort ${s.avg === null ? "—" : (s.avg >= 0 ? "+" : "") + (s.avg*100).toFixed(2) + "%"} (ücret dahil)${s.open ? ` · ${s.open} takipte` : ""}`; }
 /* ---- UI: per tab → scanner status · one block per list · selected trigger (big verdict + chart) · DEFTER (list chooser, STOPLU | STOPSUZ) ---- */
 const TABS = { short: X.LISTS.filter(l => l.tab === "short"), long: X.LISTS.filter(l => l.tab === "long") };
+const KMK = "mermer.hx.kind"; let KM = (() => { try { const v = localStorage.getItem(KMK); return X.KMODES.includes(v) ? v : "kripto"; } catch(e){ return "kripto"; } })();
+const vis = sym => X.kvis(KM, KIND[sym]);
+const kchip = () => `<span class="hx-kind" role="group" aria-label="gösterilen kontratlar">${X.KMODES.map(m => `<button type="button" class="mini${m === KM ? " on" : ""}" data-hxkind="${m}">${m === "kripto" ? "KRİPTO" : m === "hisse" ? "HİSSE" : "HEPSİ"}</button>`).join("")}</span>`;
+const hidN = () => { if (KM === "hepsi") return ""; let n = 0; for (const l of SCAN) for (const sy of R.L[l.k].keys()) if (!vis(sy) && act(l.k, sy)) n++; return n ? ` · <small class="dim">${n} ${KM === "kripto" ? "hisse/emtia" : "kripto"} tetiği gizli</small>` : ""; };
 const SEL = { short: null, long: null }, JSEL = { short: "sert", long: "sql" }, CH = { sym: "", b: null, at: 0 };
 const MK = "mermer.sert.mode"; let MODE = (() => { try { return localStorage.getItem(MK) === "STOPLU" ? "STOPLU" : "STOPSUZ"; } catch(e){ return "STOPSUZ"; } })();
 function status(){ return !anyOn() ? "tüm listeler PASİF — tarama durdu" : window.SEC && !SEC.on("short") ? "PASİF — tarama durdu" : R.busy ? `taranan ${R.done || 0}/${R.total || "…"}` : `${R.n} kontrat · ${R.scanned ? tm(R.scanned) : "taranıyor…"}${R.br !== null && R.br !== undefined ? ` · genişlik %${(R.br*100).toFixed(1)}` : ""}`; }
 /* v7.33.3: how many triggers this list logged in DEFTER in the last 24 h (+ last time), so "şu an tetik yok" is not mistaken for a dead scanner */
-function last24(k){ const now = Date.now(), L = J.filter(j => (j.k || "sert") === k && now - j.t < 86400000); return ` <small class="dim hx-24">24s: ${L.length}${L.length ? " · son " + tm(Math.max(...L.map(j => j.t))) : ""}</small>`; }
-function rowsOf(k){ return [...R.L[k].keys()].map(s => act(k, s)).filter(Boolean); }
+function last24(k){ const now = Date.now(), L = J.filter(j => (j.k || "sert") === k && now - j.t < 86400000 && vis(j.sym)); return ` <small class="dim hx-24">24s: ${L.length}${L.length ? " · son " + tm(Math.max(...L.map(j => j.t))) : ""}</small>`; }
+function rowsOf(k){ return [...R.L[k].keys()].filter(vis).map(s => act(k, s)).filter(Boolean); }
 function paintLists(){ for (const tab of ["short", "long"]){ const el = $(`#hx-${tab}`); if (!el) continue;
-    const sel = SEL[tab]; if (sel && !act(sel.k, sel.sym)) SEL[tab] = null;
+    const sel = SEL[tab]; if (sel && (!act(sel.k, sel.sym) || !vis(sel.sym))) SEL[tab] = null;
     if (!SEL[tab]) for (const l of TABS[tab]){ const r = rowsOf(l.k).find(r => !(r.side < 0 && sqOn(r.sym))); if (r){ SEL[tab] = { k: l.k, sym: r.sym }; break; } }
-    el.innerHTML = `<div class="hx-st dim">${status()}</div>` + TABS[tab].map(l => { const on = ON[l.k] !== false, rows = on ? rowsOf(l.k) : [];
+    el.innerHTML = `<div class="hx-st dim">${kchip()} ${status()}${hidN()}</div>` + TABS[tab].map(l => { const on = ON[l.k] !== false, rows = on ? rowsOf(l.k) : [];
       return `<div class="hx-l${on ? "" : " off"}"><div class="hx-lh"><b class="${l.side < 0 ? "dn" : "up"}">${esc(l.name)}</b> <small class="dim">kanıtlanmadı</small>${last24(l.k)}<button type="button" class="sec-tg hx-tg${on ? "" : " off"}" data-hxon="${l.k}">${on ? "AKTİF" : "PASİF"}</button></div>
         <div class="hx-sub dim">${esc(l.sub)} · ${esc(l.bt)}</div>`
         + (!on ? "" : rows.length ? rows.map(r => { const q = r.side < 0 && sqOn(r.sym), opened = window.PSIMUI && PSIMUI.st.pos.some(p => p.rule === r.k && p.sym === r.sym), L = X.levels(r.entry, r.stop, r.side), on2 = SEL[tab] && SEL[tab].k === r.k && SEL[tab].sym === r.sym, lq = r.k[0] === "d" ? liqTxt(r.sym) : "";
@@ -232,7 +247,7 @@ function draw(cv, b, r){ if (!cv || !b || !b.length) return; const w = cv.client
     const ty = Math.min(h - 9 - (lv.length - 1 - lv.findIndex(q => q[0] === t))*15, Math.max(y, lastY + 15)); lastY = ty; g.fillStyle = col; g.fillRect(w - R0 + 2, ty - 8, R0 - 4, 16); g.fillStyle = "#fff"; g.fillText(`${t} ${fp(v)}`.slice(0, 11), w - R0 + 5, ty + 4); }); }
 function sumLine(lab, S, cls, free){ const pc = x => x === null ? "—" : "%" + Math.round(x*100), sg = x => x > 0 ? "up" : x < 0 ? "dn" : "";
   return `<div class="sert-sum${cls}"><span><b${lab[1] ? ` class="${lab[1]}"` : ""}>${lab[0]}</b></span>${lab[2] ? `<span>toplam <b>${S.toplam}</b></span><span>doğru <b class="up">${S.dogru}</b></span><span>yanlış <b class="dn">${S.yanlis}</b></span>${S.acik ? `<span>açık <b>${S.acik}</b></span>` : ""}` : ""}<span>kazanma <b>${pc(S.kazanma)}</b></span><span>ort net <b class="${sg(S.ort)}">${pct(S.ort)}</b></span><span>toplam net <b class="${sg(S.net)}">${S.toplam - S.acik ? pct(S.net) : "—"}</b></span>${free ? `<span>ort MAE <b class="dn">${mp(S.maeOrt)}</b></span><span>en kötü MAE <b class="dn">${mp(S.maeMax)}</b></span>` : `<span>TP1 <b>${pc(S.tp1)}</b></span><span>TP2 <b>${pc(S.tp2)}</b></span>`}</div>`; }
-const JL = k => J.filter(j => (j.k || "sert") === k);
+const JL = k => J.filter(j => (j.k || "sert") === k && vis(j.sym)); /* v8.0.1: DEFTER follows the KRİPTO / HİSSE / HEPSİ filter */
 function paintJ(tab){ const el = $(`#hx-j-${tab}`); if (!el) return; const lk = JSEL[tab], l = X.LK[lk], JJ = JL(lk), [k, kr] = X.KEYS[MODE], free = MODE === "STOPSUZ", w = W(l.side), wr = W(-l.side);
   const rows = JJ.slice().sort((a, b) => b.t - a.t).slice(0, 100).map(j => { const s = X.sonuc(j, k), r = j[k], v = j[kr]; return `<tr><td>${esc(X.berlin(j.t).slice(5))}</td><td><b>${esc(j.sym.replace("USDT", ""))}</b>${ktag(j.sym)}${j.sq ? ` <small class="y">sq</small>` : ""}</td><td>${fp(j.entry)}</td><td class="dim">${fp(j.stop)}</td><td class="${s === "DOĞRU" ? "up" : s === "YANLIŞ" ? "dn" : "dim"}">${s}</td><td>${r || (!free && j.tp) ? esc(X.ilk(j, k)) : "—"}</td><td class="${r ? (r.net > 0 ? "up" : "dn") : "dim"}">${r ? pct(r.net) : "—"}</td><td class="dn">${j.ns ? mp(j.ns.mae) : "—"}</td><td class="sert-rev ${v ? (v.net > 0 ? "up" : "dn") : "dim"}">${v ? `${v.net > 0 ? "D" : "Y"} ${pct(v.net)} · ${esc(X.ilk(j, kr))}` : "—"}</td></tr>`; }).join("");
   el.innerHTML = `<div class="sert-h">DEFTER <small class="dim">her tetik otomatik · DOĞRU = net &gt; 0 (%0.10 ücret dahil) · STOPLU: SL / 1×ATR iz / 60dk · STOPSUZ: SL yok, TP2 ya da 60dk · MAE = en çok ters gidiş</small></div>
@@ -265,6 +280,7 @@ function setOn(k, v){ ON[k] = v; try { localStorage.setItem(OK, JSON.stringify(O
   else if (v) scan(true); paint(); try { window.NOTIFY && NOTIFY.toast(`${X.LK[k].name} ${v ? "AKTİF" : "PASİF"}`, v ? "good" : "info"); } catch(e){} }
 function show(){ paint(); }
 function onClick(e){ const t = e.target;
+  const km = t.closest("[data-hxkind]"); if (km){ e.stopPropagation(); KM = km.dataset.hxkind; try { localStorage.setItem(KMK, KM); } catch(e2){} SEL.short = SEL.long = null; paint(); return; }
   const o = t.closest("[data-hxon]"); if (o){ e.stopPropagation(); setOn(o.dataset.hxon, ON[o.dataset.hxon] === false); return; }
   const s = t.closest("[data-hxsim]"); if (s){ e.stopPropagation(); const [k, y] = s.dataset.hxsim.split("|"); simOpen(k, y); return; }
   const g = t.closest("[data-hxgo]"); if (g){ const [k, y] = g.dataset.hxgo.split("|"), tab = X.LK[k].tab; SEL[tab] = { k, sym: y }; paintLists(); paintDet(tab); const d = $(`#hx-det-${tab}`); d && d.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }

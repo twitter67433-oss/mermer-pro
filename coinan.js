@@ -113,7 +113,7 @@ async function analyze(sym){ sym = sym || S.sym; if (S.busy) return; S.busy = tr
     const liq = S.liq.filter(x => x.s === sym);
     S.A = { sym, at: Date.now(), tf, der, wh, px24, chg24: t24 ? +t24.priceChangePercent : NaN, liq }; S.A.v = CAN.verdict(S.A); S.sym = sym; S.at = Date.now(); localStorage.setItem("neon.can.sym", sym); liqWs(sym);
   } catch(e){ if (my === S.n) S.err = e.message; } finally { if (my === S.n){ S.busy = false; paintV(); draw(); } } }
-function liqWs(sym){ if (S.ws && S.ws.sym === sym) return; try { S.ws && S.ws.close(); } catch(e){} try { const ws = new WebSocket(`wss://fstream.binance.com/ws/${sym.toLowerCase()}@forceOrder`); ws.sym = sym;
+function liqWs(sym){ if (S.ws && S.ws.sym === sym) return; try { S.ws && S.ws.close(); } catch(e){} try { const ws = new WebSocket(`wss://fstream.binance.com/market/ws/${sym.toLowerCase()}@forceOrder`); ws.sym = sym;
     ws.onmessage = ev => { try { const o = JSON.parse(ev.data).o; if (!o) return; const p = +o.ap || +o.p, q = +o.z || +o.q; S.liq.unshift({ s: o.s, t: +o.T, p, usd: p*q, side: o.S }); if (S.liq.length > 60) S.liq.length = 60; if (S.A && o.s === S.A.sym){ S.A.liq = S.liq.filter(x => x.s === S.A.sym); paintD(); } } catch(e){} };
     S.ws = ws; } catch(e){} }
 const row = (k, v, c) => `<div><span>${k}</span><b class="${c || ""}">${v}</b></div>`;
