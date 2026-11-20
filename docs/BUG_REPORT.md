@@ -81,3 +81,9 @@ Yöntem: tüm JS için `node --check` (0 sözdizimi hatası), mevcut 23 testin t
 | YÜKSEK (kullanıcı) | Listeler hep hisse gösteriyor. 48 saatlik tekrar: 645 tetiğin 421'i hisse/emtia (kontratların %32'si). Kural yanlılığı: düşük gece hacmi → hacim tabanı düşük; ince OI; yapısal yüksek funding. Tarama hatası yok (canlı: 767/767 kontrat, ~175 sn). | Düzeltildi: hisse hacim tabanı seans mumlarından (421 → 275), KRİPTO varsayılan filtre, tarama kripto önce. OI/funding yanlılığı belgelendi, kural değişmedi. |
 | ORTA | Binance eski `fstream.binance.com/ws` ve `/stream` yolları market akışlarında sessiz (açılıyor, mesaj yok): psim.js aggTrade, sert.js !forceOrder@arr, coinan.js forceOrder, agg.js aggTrade | Düzeltildi: `/market` + `/public`; test eski yolu yakalar. app.js / sinyal.js zaten `/market` kullanıyordu. |
 | DÜŞÜK | Fiyatı hızla hareket eden coinler (ör. MMT, EVAA) için ayrı uyarı yoktu; listeler yalnız kural tetiğini gösteriyor | HAREKET eklendi (yalnız kripto). |
+
+## 7. v8.0.2 — açılış ekranında takılma
+| Önem | Bulgu | Durum |
+|---|---|---|
+| YÜKSEK | Açılış ekranını yalnız app.js kaldırıyordu → yavaş ağda uzun süre (ölçüm 26 sn), dosya/JS hatasında sonsuza dek açılış ekranı; satırlar sabit ve eski ("v7.18", "OTO AL-SAT KAPALI") | Düzeltildi: appv.js 4 sn koruması + YENİLE çubuğu + eski kopya otomatik yenileme; açılış ≈1 sn ve güncel |
+| ORTA | Bozuk/eski localStorage değerleri bazı modülleri başlangıçta düşürebiliyor (fuzz: copy.js `WL.some`, auto.js, sinyal.js, remote.js) → zincirleme "X is not defined" | Kısmen: uygulama artık açılır ve YENİLE çubuğu gösterir; modül bazında doğrulama sonraki iş (gerçek kullanıcı verisiyle tekrarlanmadı) |

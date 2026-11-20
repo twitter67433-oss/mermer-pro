@@ -42,10 +42,11 @@ function show(){ if (document.getElementById("spl")) return; if (!document.getEl
   const joke = () => { ding(); j.textContent = LINES[Math.min(n, LINES.length - 1)]; n++; el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
     if (!dodged){ dodged = true; no.style.transform = "translate(" + (Math.random() < .5 ? -1 : 1)*18 + "px,-14px) rotate(-4deg)"; setTimeout(() => { no.style.transform = ""; }, 700); } go.focus(); };
   const close = () => { if (el.classList.contains("bye")) return; el.classList.add("bye"); setTimeout(() => { el.remove(); try { (prev && prev.focus && prev !== document.body ? prev : document.body).focus(); } catch(e){} }, matchMedia("(prefers-reduced-motion:reduce)").matches ? 0 : 290); };
-  go.onclick = close; no.onclick = joke; x.onclick = joke;
+  go.onclick = close; no.onclick = joke; x.onclick = close; /* v8.0.2: ✕ closes; and the dialog closes by itself after 4 s — it can never block the app */
+  setTimeout(close, 4000);
   el.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); joke(); return; } if (e.key === "Tab"){ const f = [x, no, go], i = f.indexOf(document.activeElement); e.preventDefault(); f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus(); } });
   setTimeout(() => go.focus(), 30); }
-function whenBooted(cb){ const t0 = Date.now(); (function w(){ if (!document.getElementById("boot") || Date.now() - t0 > 15000) cb(); else setTimeout(w, 120); })(); }
+function whenBooted(cb){ const t0 = Date.now(); (function w(){ if (!document.getElementById("boot") || Date.now() - t0 > 5000) cb(); else setTimeout(w, 120); })(); }
 const qs = new URLSearchParams(location.search); if (on() && !qs.get("nosplash")) whenBooted(show);
 /* ⚙ AYARLAR toggle */
 function bindSetting(){ const c = document.getElementById("set-splash"); if (!c) return; c.checked = on(); c.onchange = () => { try { localStorage.setItem(KEY, c.checked ? "on" : "off"); } catch(e){} }; }

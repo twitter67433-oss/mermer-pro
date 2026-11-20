@@ -290,7 +290,9 @@ function onClick(e){ const t = e.target;
   const c = t.closest("[data-hxcsv]"); if (c){ exportCsv(c.dataset.hxcsv); return; } const z = t.closest("[data-hxclr]"); if (z){ clearJ(z.dataset.hxclr); return; } }
 function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el) el.addEventListener("click", onClick); }
   paint(); liqOpen(); if (window.SEC && SEC.on("short") !== anyOn()) SEC.set("short", anyOn());
-  setTimeout(() => scan(true), 3000); setTimeout(resolve, 5000);
+  /* v8.0.2: the 767-contract scan starts after the page has finished loading (max 15 s wait) so it does not compete with the app's own files on a slow network */
+  { let st = false; const go = () => { if (st) return; st = true; setTimeout(() => scan(true), 2000); setTimeout(resolve, 4000); };
+    if (document.readyState === "complete") go(); else { window.addEventListener("load", go); setTimeout(go, 15000); } }
   setInterval(() => { if (Math.floor(Date.now()/900000) !== R.slot && Date.now() % 900000 > 4000) scan(false); else paintLists(); }, 10000); setInterval(resolve, 60000);
   setInterval(() => { const pg = document.body.dataset.pg; if ((pg === "short" || pg === "long") && !document.hidden && SEL[pg]) paintDet(pg); }, 30000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) resolve(); });

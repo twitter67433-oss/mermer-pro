@@ -36,24 +36,21 @@ async function loadTape(){
 loadTape(); setInterval(loadTape, 30000);
 
 /* ---------------- boot ---------------- */
+/* v8.0.2: short boot (≈1 s, no per-letter typing), current version, no static claims that can go stale; appv.js removes it after 4 s anyway */
 const BOOT = [
- ["MERMER TERMİNAL · v7.18  (c) 2026", ""], ["11 beceri çekirdeği ..................", "ok"],
- ["Binance public API hattı .............", "ok"], ["CoinGecko analist modülü .............", "ok"],
- ["Zaman makinesi worker'ı ..............", "ok"], ["7/24 kripto seans adaptörü ...........", "ok"],
- ["Canlı akış (WebSocket) ................", "ok"], ["Veri yolu · ışık ağı ..................", "ok"], ["pump.fun canlı akış (PumpPortal) ......", "ok"], ["BOT CÜZDANI ....... PIN İLE ŞİFRELİ", "warn"], ["OTO AL-SAT ................. KAPALI", "warn"], ["Emir motoru ........ YALNIZ ONAYLA İLE", "warn"], ["Cüzdan ......... YALNIZ SEN BAĞLARSAN", "warn"],
- ["Sistem hazır. Bir coin yaz ve Enter'a bas.", ""],
+ [`MERMER TERMİNAL · v${window.APP_V || ""}`, ""], ["Binance vadeli · canlı veri ..........", "ok"], ["Sinyal tarayıcı · HAREKET ............", "ok"],
+ ["Emir motoru ........ YALNIZ ONAYLA İLE", "warn"], ["Hazır.", ""],
 ];
 async function boot(){
-  if (params.get("noboot")) { $("#boot").remove(); return; }
-  const box = $("#boot-lines"), fill = $("#boot-fill"), p = $("#boot-pct");
-  for (let i=0;i<BOOT.length;i++){
-    const [txt, st] = BOOT[i]; const line = document.createElement("div"); box.appendChild(line);
-    for (let j=0;j<=txt.length;j+=3){ line.textContent = txt.slice(0,j); await sleep(8); }
-    line.innerHTML = esc(txt) + (st==="ok" ? ' <span class="ok">[ OK ]</span>' : st==="warn" ? ' <span class="warn">[ ! ]</span>' : "");
-    const k = Math.round((i+1)/BOOT.length*100); fill.style.width = k+"%"; p.textContent = k+"%";
-    await sleep(110);
-  }
-  await sleep(450); $("#boot").classList.add("fade"); await sleep(650); $("#boot").remove();
+  if (params.get("noboot")) { const b0 = $("#boot"); if (b0) b0.remove(); return; }
+  try { const box = $("#boot-lines"), fill = $("#boot-fill"), p = $("#boot-pct");
+    for (let i=0;i<BOOT.length && $("#boot");i++){
+      const [txt, st] = BOOT[i]; const line = document.createElement("div"); box.appendChild(line);
+      line.innerHTML = esc(txt) + (st==="ok" ? ' <span class="ok">[ OK ]</span>' : st==="warn" ? ' <span class="warn">[ ! ]</span>' : "");
+      const k = Math.round((i+1)/BOOT.length*100); fill.style.width = k+"%"; p.textContent = k+"%";
+      await sleep(120);
+    } } catch(e){}
+  await sleep(250); const b = $("#boot"); if (b){ b.classList.add("fade"); await sleep(400); b.remove(); }
 }
 
 /* ---------------- command line ---------------- */
@@ -420,7 +417,8 @@ $("#sheet-form").addEventListener("submit", e => { e.preventDefault(); const f =
   $("#sheet").classList.add("hidden"); if (CUR) run(CUR.base); });
 
 /* go */
-(async () => { await boot(); mirror(); if (matchMedia("(pointer:fine)").matches) inp.focus(); const q = params.get("coin"); if (q) run(q); else startDemo(); })();
+(async () => { try { await boot(); } catch(e){ const b = $("#boot"); if (b) b.remove(); } /* v8.0.2: boot can never block the app */
+  try { mirror(); if (matchMedia("(pointer:fine)").matches) inp.focus(); const q = params.get("coin"); if (q) run(q); else startDemo(); } catch(e){ console.error(e); } })();
 
 document.addEventListener("visibilitychange", () => { if (!document.hidden && $("#live").checked && CUR && !LIVE.ws){ clearTimeout(LIVE.timer); LIVE.retry = 0; liveConnect(); } });
 /* quiet re-analysis (used by OTO AL-SAT's Binance rescans): no progress screen, just re-render when done */

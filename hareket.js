@@ -79,6 +79,7 @@ function paint(){ clearTimeout(paintT); paintT = setTimeout(() => { for (const [
       + `<button type="button" class="mini${C.ntf ? " on" : ""}" data-mvt="ntf">🔔 ${C.ntf ? "AÇIK" : "KAPALI"}</button><button type="button" class="mini${C.on ? " on" : ""}" data-mvt="on">${C.on ? "AKTİF" : "PASİF"}</button></div></details>`; } }, 120); }
 document.addEventListener("change", e => { const i = e.target.closest && e.target.closest("[data-mvk]"); if (!i) return; const k = i.dataset.mvk, v = +i.value; C[k] = k === "vr15" ? v : v/100; C = H.cfgOf(C); save(); paint(); });
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-mvt]"); if (!b) return; e.preventDefault(); const k = b.dataset.mvt; C[k] = !C[k]; save(); if (k === "on"){ if (C.on){ loadUni().then(open); } else close(); } paint(); });
-loadUni().then(() => { open(); paint(); }); setInterval(loadUni, 3600000);
+{ let st = false; const go = () => { if (st) return; st = true; setTimeout(() => loadUni().then(() => { open(); paint(); }), 1500); }; /* v8.0.2: after page load (max 15 s) */
+  if (document.readyState === "complete") go(); else { window.addEventListener("load", go); setTimeout(go, 15000); } } paint(); setInterval(loadUni, 3600000);
 return { S, bars, get cfg(){ return C; }, paint, _emit: emit };
 })();

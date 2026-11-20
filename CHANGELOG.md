@@ -1,5 +1,11 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.0.2 — 2026-11-20 · açılış takılması
+- **Neden:** açılış ekranını (#boot) yalnızca app.js kaldırıyordu. app.js 47 dosyanın sonlarında yükleniyor; yavaş bağlantıda (ölçüm: 750 kbit/s, 300 ms) açılış ekranı 26 sn kaldı, bir dosya yüklenemez ya da bir başlangıç hatası olursa hiç kalkmıyordu. Ekranda yazan satırlar da sabit ve eskiydi ("v7.18", "OTO AL-SAT KAPALI" — ayarından bağımsız). Ardından gelen "Trading Error" penceresi yalnız BAŞLA ile kapanıyordu (✕ şaka yapıyordu).
+- **Düzeltme:** `appv.js` (ilk betik, düz ES5) açılış ekranını en geç 4 sn'de kaldırır (yavaş ağda sonradan gelirse de); dosya yüklenemezse veya ilk 20 sn'de JS hatası olursa alta "⚠ Uygulama tam yüklenemedi · YENİLE" çubuğu çıkar (YENİLE = Cache Storage + service worker temizliği + ?r= ile yeniden yükleme; localStorage — DEFTER, ayarlar, cüzdan — korunur); version.json daha yeni bir sürüm gösterirse eski kopya bir kez kendiliğinden yenilenir (döngü yok). Açılış ekranı ≈1 sn, güncel sürümü yazar, sabit iddialar kaldırıldı. Trading Error penceresi 4 sn'de kendiliğinden kapanır, ✕ kapatır. Grafik kütüphanesi `<head>`'den çıkarıldı (sayfa önce çizilir); 767 kontrat taraması ve HAREKET sayfa yüklendikten sonra başlar. `<meta Expires 0>`.
+- APK yeniden derlenmedi: uygulama canlı siteyi açar; GitHub Pages sayfayı en çok 10 dk önbellekte tutar, 8.0.2'den sonra eski kopya kendiliğinden yenilenir.
+- Testler: `tests/boot.test.js` (21 kontrol) — 32 dosya.
+
 ## 8.0.1 — 2026-11-20
 **"Sinyal hep hisse veriyor, coinler niye yok" + "Bu coinler yükselmiş niye haberim yok".** Yatırım tavsiyesi değildir.
 - **Neden hisse çıkıyordu (ölçüldü, 48 saat, 767 USDT perp = 519 kripto + 248 hisse/emtia):** listelerdeki tetiklerin %65'i hisseydi (kripto 224, hisse/emtia 421), oysa kontratların yalnız %32'si hisse. Sebep kural yanlılığı, tarama hatası değil: (1) hisse kontratlarında borsa kapalıyken hacim ~0 → 24 saatlik ortalama düşük → "hacim ≥3×" her seans açılışında kendiliğinden tutuyor (hisse mumlarının %7.6'sı vs kripto %4.25; 14–15 UTC = ABD açılışı en yoğun saat); (2) hisse OI'si ince → "OI 1s ≥+%1" kolay (medyan +%3.2 vs kripto +%1.5); (3) hisse funding'i yapısal olarak yüksek → SQUEEZE SHORT'un "funding ≥%0.05" şartı hisselerde hep tutuyor (68'in 68'i).
