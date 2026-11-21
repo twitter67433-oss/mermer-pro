@@ -598,6 +598,7 @@ body.cps-on .cp{display:none}
 body.simple .cps,body.simple .cps-card{display:block!important}
 
 /* v8.2.3 local BİLEŞİK OTO settings */
+form.cp-wrap{margin:0;padding:0;display:block;min-width:0}
 .cp-row{margin:8px 0;padding:6px 0;border-top:1px dotted rgba(127,127,127,.3)}
 .cp-row b{display:block;font-size:11px;margin-bottom:4px}
 .cp-rd{margin-right:10px}

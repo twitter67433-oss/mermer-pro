@@ -1,5 +1,9 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.2.4 — 2026-11-21 · 🧪 ayar radyoları SHORT/LONG'da birbirini bozmuyordu
+- Her yerel panel kendi `<form>`'unda: SHORT ve LONG'daki OTOMATİK / % / $ seçimleri artık aynı `name` grubunu paylaşmıyor (işaretli mod görünür ve KAYDET doğru okur). Davranış 8.2.3 ile aynı.
+
+
 ## 8.2.3 — 2026-11-21 · Yerel 🧪 BİLEŞİK OTO ayarları; 🖥 SUNUCU varsayılan kapalı
 - **Yerel panel (KAYDET):** kaldıraç; işlem tutarı $ veya %; maks. pozisyon; STOP zorunlu — OTOMATİK (sinyal, likidasyon mesafesinin içinde sıkılaştırılır), % veya $ (likidasyonun ötesindeyse reddedilir); TP $ veya % + isteğe bağlı iz-süren; günlük hedef / günlük zarar; başlangıç kasa (yalnız SIFIRLA ile uygulanır). Geçersiz değerler kaydedilmez. Varsayılanlar eskisi gibi: 1000 $, maks. 2, %5, 20×, +7 $ net, OTOMATİK stop.
 - **🖥 SUNUCU:** kutu sunucusu durduruldu (STOP dosyası, süreç yok; state.json duruyor). Panel kodu duruyor ama SHORT/LONG'da yerel 🧪'nin *altında*, varsayılan kapalı bir `<details>`. Eski eşleşme (v8.2.2) bir kez çözülür; eşleşmemişken sunucuya / ntfy'ye istek yok (0 istek). `#comppair=` otomatik eşlemez; BAĞLAN yolu ileride duruyor.

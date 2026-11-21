@@ -101,6 +101,7 @@ const ger = html.match(/<section id="(?:real|gercek|trade)[^>]*>[\s\S]*?<\/secti
 { const S = mk({ tpMode: "pct", tpPct: 1 }); const g = C.enter(S, sig({ side: -1, stop: 103 }), 100, T0, { v: GIR });
   ok("TP % = 1 % of entry (SHORT below entry)", g.ok && g.pos.tp < g.pos.entry && near(g.pos.tp, g.pos.entry*0.99, 0.02), g.pos && g.pos.tp); }
 { const html = fs.readFileSync(path.join(__dirname, "../comp.js"), "utf8");
-  ok("local panel has KAYDET and OTOMATİK / % / $ stop+stake+TP", /data-cp="save">KAYDET</.test(html) && /OTOMATİK/.test(html) && /stakeMode/.test(html) && /tpMode/.test(html) && /slMode/.test(html)); }
+  ok("local panel has KAYDET and OTOMATİK / % / $ stop+stake+TP", /data-cp="save">KAYDET</.test(html) && /OTOMATİK/.test(html) && /stakeMode/.test(html) && /tpMode/.test(html) && /slMode/.test(html));
+  ok("each panel is its own form so SHORT/LONG radios do not share a checked state", /<form class="cp-wrap"/.test(html) && /<\/form>/.test(html)); }
 
 console.log(f ? `\n${f} FAILED` : "\nall passed"); process.exit(f ? 1 : 0);

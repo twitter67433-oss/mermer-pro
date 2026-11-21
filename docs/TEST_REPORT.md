@@ -1,4 +1,7 @@
-# MERMER TERMİNAL — Test Raporu (v8.2.3, 2026-11-21)
+# MERMER TERMİNAL — Test Raporu (v8.2.4, 2026-11-21)
+
+## v8.2.4
+- 36 test dosyası, hepsi geçti. `tests/compound.test.js`: her 🧪 paneli kendi formunda (SHORT/LONG radyo grubu ayrılır).
 
 ## v8.2.3
 - 36 test dosyası, hepsi geçti. `tests/compound.test.js`: varsayılan davranış korunur (OTOMATİK stop, %5 marj, +7 $ TP); validateCfg (boş/varsayılan geçer, kaldıraç 99 ve likidasyon-ötesi stop % reddedilir); sabit $ marj; stop % / $; OTOMATİK stop likidasyon içinde sıkılaşır, kullanıcı stopu reddedilir; TP %; panelde KAYDET + OTOMATİK / % / $. `tests/compsrv.test.js`: eşleşmemiş 🖥 kapalı details (BAĞLAN duruyor), yerel 🧪 üstte, v8.2.2 eşleşmesi bir kez çözülür (mig !== 823), eşleşmemişken poll/discover/ntfy yok, `#comppair=` otomatik eşlemez.
