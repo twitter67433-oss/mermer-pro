@@ -1,5 +1,9 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.2.5 — 2026-11-21 · formda satır içi onsubmit yok (CSP)
+- 8.2.4'teki `onsubmit="return false"` CSP'yi ihlal ediyordu; kaldırıldı, gönderim JS ile `preventDefault` ile durdurulur. Ayarlar aynı.
+
+
 ## 8.2.4 — 2026-11-21 · 🧪 ayar radyoları SHORT/LONG'da birbirini bozmuyordu
 - Her yerel panel kendi `<form>`'unda: SHORT ve LONG'daki OTOMATİK / % / $ seçimleri artık aynı `name` grubunu paylaşmıyor (işaretli mod görünür ve KAYDET doğru okur). Davranış 8.2.3 ile aynı.
 

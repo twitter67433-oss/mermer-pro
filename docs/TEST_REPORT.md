@@ -1,4 +1,7 @@
-# MERMER TERMİNAL — Test Raporu (v8.2.4, 2026-11-21)
+# MERMER TERMİNAL — Test Raporu (v8.2.5, 2026-11-21)
+
+## v8.2.5
+- 36 test dosyası, hepsi geçti. Formda satır içi `onsubmit` yok (CSP).
 
 ## v8.2.4
 - 36 test dosyası, hepsi geçti. `tests/compound.test.js`: her 🧪 paneli kendi formunda (SHORT/LONG radyo grubu ayrılır).
