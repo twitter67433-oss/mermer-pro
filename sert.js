@@ -143,11 +143,27 @@ const mp = x => x === null || !isFinite(x) ? "—" : (x*100).toFixed(2) + "%";
 const W = s => s < 0 ? "SHORT" : "LONG";
 function list(){ const s = new Set(); try { const S = window.SCALP && SCALP.S; if (S && S.sym) s.add(S.sym); if (S && S.wo) for (const x of S.wo.list) s.add(x); } catch(e){}
   try { const c = localStorage.getItem("neon.can.sym"); if (c) s.add(c); } catch(e){} for (const x of R.want) s.add(x); for (const x of R.top) s.add(x); return [...s].slice(0, 70); }
-function livePx(sym){ try { const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.D && S.D.px > 0) return S.D.px; } catch(e){} try { const p = window.PSIMUI && PSIMUI.px[sym]; if (p > 0) return p; } catch(e){} return NaN; }
+function livePx(sym){ try { if (window.AKSIYON && AKSIYON.live){ const p = AKSIYON.live(sym); if (p > 0) return p; } } catch(e){}
+  try { const S = window.SCALP && SCALP.S; if (S && S.sym === sym && S.D && S.D.px > 0) return S.D.px; } catch(e){} try { const p = window.PSIMUI && PSIMUI.px[sym]; if (p > 0) return p; } catch(e){} return NaN; }
+/* v8.1: keep a trigger visible for the 60-min cap (and 8 min after ÇIK) so GİR/BEKLE/ÇIK can be shown — R.L alone is cleared at the next 15m bar */
+const HOLD = new Map(); /* key k|sym → trigger */
+function holdOf(t){ const id = t.k + "|" + t.sym; const p = HOLD.get(id); if (!p || t.close >= (p.close || 0)) HOLD.set(id, t); }
+function oppLive(sym, side){ const now = Date.now(); for (const r of HOLD.values()){ if (r.sym !== sym || r.side === side) continue;
+    if (now - (r.close || r.t) > 60*60000) continue; const px = livePx(sym);
+    const v = window.AKSIYONX ? AKSIYONX.verdict(r, px, now, { cfg: window.AKSIYON && AKSIYON.cfg, opposite: false, squeeze: false, latch: r._latch }) : null;
+    if (!v || v.st !== "CIK") return true; } return false; }
 const sqOn = sym => { const q = window.SQZ && SQZ.peek(sym); return !!(q && q.on); };
 /* live trigger of list k: until the next 15m close, while price has not crossed the stop and DEFTER has not closed it */
-function act(k, sym){ const M = R.L[k], r = M && M.get(sym); if (!r) return null; if (Date.now() > r.until){ M.delete(sym); return null; } const p = livePx(sym); if (p > 0 && (p - r.stop)*r.side <= 0) return null; /* price crossed the stop (SHORT: p ≥ SL, LONG: p ≤ SL) */
-  const j = J.find(x => x.k === k && x.sym === sym && x.t === r.close); if (j && j.res) return null; return r; }
+function axOf(r){ if (!window.AKSIYONX) return null; const squeeze = r.side < 0 && sqOn(r.sym), opposite = oppLive(r.sym, r.side);
+  if (window.AKSIYON) return AKSIYON.ofSig(r, { squeeze, opposite });
+  return AKSIYONX.verdict(r, livePx(r.sym), Date.now(), { squeeze, opposite, latch: r._latch }); }
+function act(k, sym){ const r = HOLD.get(k + "|" + sym) || (R.L[k] && R.L[k].get(sym)); if (!r) return null;
+  const v = axOf(r), on = window.AKSIYON ? AKSIYON.stillOn(r, v) : (window.AKSIYONX ? AKSIYONX.stillOn(r, Date.now(), v) : (Date.now() <= r.until));
+  if (!on){ HOLD.delete(k + "|" + sym); return null; }
+  /* DEFTER already has a result → still show for the linger if ÇIK, else drop */
+  const j = J.find(x => x.k === k && x.sym === sym && x.t === r.close); if (j && j.res && (!v || v.st !== "CIK")) return null;
+  if (v && v.st === "CIK") try { window.AKSIYON && AKSIYON.ntf(r, v); } catch(e){}
+  r._ax = v; return r; }
 const active = sym => act("sert", sym);
 const line = r => `<div class="sg-dline sert-l"><span>giriş <b>${fp(r.entry)}</b></span> · <span>önerilen SL <b class="dn">${fp(r.stop)}</b></span> · <span>çıkış 1×ATR iz / 60dk · stopsuz: TP2 / 60dk</span> <small class="sert-tag">${esc((X.LK[r.k || "sert"] || X.LK.sert).name)} · kanıtlanmadı</small></div>`;
 function big(sym){ const r = active(sym); if (!r || sqOn(sym)) return ""; return `<div class="sert-big dn">GİR SHORT</div>${line(r)}`; }
@@ -172,7 +188,7 @@ async function one(s){ const b = await bars15(s), so = { sess: !!KIND[s] }, f = 
   if (ks.some(X.needX)){ const [oh, on, fq] = await Promise.all([fj(`/futures/data/openInterestHist?symbol=${s}&period=15m&limit=8`).catch(() => []), fj(`/fapi/v1/openInterest?symbol=${s}`).catch(() => null), fj(`/fapi/v1/fundingRate?symbol=${s}&limit=1`).catch(() => [])]);
     const ago = (oh || []).filter(x => +x.timestamp <= cT - 3600000).pop(), oiNow = on ? +on.openInterest : NaN; oi1 = ago && oiNow > 0 ? oiNow/(+ago.sumOpenInterest) - 1 : NaN; fr = fq && fq[0] ? +fq[0].fundingRate : NaN; }
   R.cand = (R.cand || 0) + 1; const T = X.evalAll(b, oi1, fr, ON, so), got = new Set(T.map(t => t.k));
-  for (const t of T){ Object.assign(t, { sym: s, close: cT, until: cT + 900000, t: last.t }); R.L[t.k].set(s, t); }
+  for (const t of T){ Object.assign(t, { sym: s, close: cT, until: cT + 900000, t: last.t }); R.L[t.k].set(s, t); holdOf(t); }
   for (const l of SCAN) if (!got.has(l.k)) R.L[l.k].delete(s); if (T.length) paintLists(); }
 const KIND = (() => { try { return JSON.parse(localStorage.getItem("mermer.kinds") || "{}") || {}; } catch(e){ return {}; } })(); let kindAt = 0, UNI = [], VOL = {}, volAt = 0;
 async function loadKinds(){ if (Date.now() - kindAt < 6*3600000) return; try { const ei = await fj("/fapi/v1/exchangeInfo"); for (const s of ei.symbols){ const k = X.kind(s); if (k) KIND[s.symbol] = k; } UNI = X.universe(ei); kindAt = Date.now(); try { localStorage.setItem("mermer.kinds", JSON.stringify(KIND)); } catch(e){} } catch(e){} }
@@ -219,20 +235,23 @@ const MK = "mermer.sert.mode"; let MODE = (() => { try { return localStorage.get
 function status(){ return !anyOn() ? "tüm listeler PASİF — tarama durdu" : window.SEC && !SEC.on("short") ? "PASİF — tarama durdu" : R.busy ? `taranan ${R.done || 0}/${R.total || "…"}` : `${R.n} kontrat · ${R.scanned ? tm(R.scanned) : "taranıyor…"}${R.br !== null && R.br !== undefined ? ` · genişlik %${(R.br*100).toFixed(1)}` : ""}`; }
 /* v7.33.3: how many triggers this list logged in DEFTER in the last 24 h (+ last time), so "şu an tetik yok" is not mistaken for a dead scanner */
 function last24(k){ const now = Date.now(), L = J.filter(j => (j.k || "sert") === k && now - j.t < 86400000 && vis(j.sym)); return ` <small class="dim hx-24">24s: ${L.length}${L.length ? " · son " + tm(Math.max(...L.map(j => j.t))) : ""}</small>`; }
-function rowsOf(k){ return [...R.L[k].keys()].filter(vis).map(s => act(k, s)).filter(Boolean); }
+function rowsOf(k){ const sy = new Set([...(R.L[k] ? R.L[k].keys() : []), ...[...HOLD.keys()].filter(x => x.startsWith(k + "|")).map(x => x.slice(k.length + 1))]);
+  return [...sy].filter(vis).map(s => act(k, s)).filter(Boolean); }
 function paintLists(){ for (const tab of ["short", "long"]){ const el = $(`#hx-${tab}`); if (!el) continue;
     const sel = SEL[tab]; if (sel && (!act(sel.k, sel.sym) || !vis(sel.sym))) SEL[tab] = null;
     if (!SEL[tab]) for (const l of TABS[tab]){ const r = rowsOf(l.k).find(r => !(r.side < 0 && sqOn(r.sym))); if (r){ SEL[tab] = { k: l.k, sym: r.sym }; break; } }
-    el.innerHTML = `<div class="hx-st dim">${kchip()} ${status()}${hidN()}</div>` + TABS[tab].map(l => { const on = ON[l.k] !== false, rows = on ? rowsOf(l.k) : [];
+    el.innerHTML = `<div class="hx-st dim">${kchip()} ${status()}${hidN()}${window.AKSIYON ? ` · <small title="GİR: fiyat girişe yakın (≤0.3R yönünde, stop vurmadı). BEKLE: geç kaldın / squeeze / fiyat yok. ÇIK: stop, hedef2, 60dk, ters sinyal. KÂR AL: hedef1 — stop girişi taşı. Yönlendirme, kanıtlanmadı.">${esc(AKSIYON.hint())}</small>` : ""}</div>` + TABS[tab].map(l => { const on = ON[l.k] !== false, rows = on ? rowsOf(l.k) : [];
       return `<div class="hx-l${on ? "" : " off"}"><div class="hx-lh"><b class="${l.side < 0 ? "dn" : "up"}">${esc(l.name)}</b> <small class="dim">kanıtlanmadı</small>${last24(l.k)}<button type="button" class="sec-tg hx-tg${on ? "" : " off"}" data-hxon="${l.k}">${on ? "AKTİF" : "PASİF"}</button></div>
         <div class="hx-sub dim">${esc(l.sub)} · ${esc(l.bt)}</div>`
         + (!on ? "" : rows.length ? rows.map(r => { const q = r.side < 0 && sqOn(r.sym), opened = window.PSIMUI && PSIMUI.st.pos.some(p => p.rule === r.k && p.sym === r.sym), L = X.levels(r.entry, r.stop, r.side), on2 = SEL[tab] && SEL[tab].k === r.k && SEL[tab].sym === r.sym, lq = r.k[0] === "d" ? liqTxt(r.sym) : "";
-          return `<div class="sert-r${on2 ? " on" : ""}" data-hxgo="${r.k}|${esc(r.sym)}" role="button" tabindex="0"><b class="${q ? "y" : r.side < 0 ? "dn" : "up"}">${esc(r.sym.replace("USDT", ""))}${ktag(r.sym)}</b><span>${q ? "SHORT GİRME · squeeze" : `giriş ${fp(r.entry)} · SL ${fp(r.stop)} · TP1 ${fp(L.tp1)} · TP2 ${fp(L.tp2)}${lq ? ` · ${lq}` : ""}`}</span>${q ? "" : opened ? `<small class="dim">simde</small>` : `<button type="button" class="mini" data-hxsim="${r.k}|${esc(r.sym)}">SİMDE AÇ</button>`}</div>`; }).join("")
+          return `<div class="sert-r${on2 ? " on" : ""}" data-hxgo="${r.k}|${esc(r.sym)}" role="button" tabindex="0"><b class="${q ? "y" : r.side < 0 ? "dn" : "up"}">${esc(r.sym.replace("USDT", ""))}${ktag(r.sym)}</b>${(window.AKSIYON && r._ax) ? AKSIYON.badge(r._ax) : ""}<span>${q ? "SHORT GİRME · squeeze" : `giriş ${fp(r.entry)} · SL ${fp(r.stop)} · TP1 ${fp(L.tp1)} · TP2 ${fp(L.tp2)}${lq ? ` · ${lq}` : ""}`}</span>${q ? "" : opened ? `<small class="dim">simde</small>` : `<button type="button" class="mini" data-hxsim="${r.k}|${esc(r.sym)}">SİMDE AÇ</button>`}</div>`; }).join("")
           : `<div class="dim hx-none">şu an tetik yok</div>`) + `</div>`; }).join(""); } }
 function tpLine(r){ const L = X.levels(r.entry, r.stop, r.side); return `<div class="sg-dline sert-tp">Önerilen <span>SL <b class="dn">${fp(r.stop)}</b></span> · <span>TP1 <b class="up">${fp(L.tp1)}</b></span> · <span>TP2 <b class="up">${fp(L.tp2)}</b></span> <small class="dim">veya 1×ATR iz / 60dk</small></div>`; }
 function paintDet(tab){ const el = $(`#hx-det-${tab}`); if (!el) return; const s = SEL[tab], r = s && act(s.k, s.sym);
   if (!r){ el.innerHTML = ""; el.hidden = true; return; } el.hidden = false; const q = r.side < 0 && sqOn(r.sym), c = r.sym.replace("USDT", ""), l = X.LK[r.k], lq = liqTxt(r.sym);
-  el.innerHTML = `<div class="sert-coin">${esc(c)}${ktag(r.sym)} <small class="dim">${esc(l.name)} · 15dk · ${tm(r.close)} · kanıtlanmadı</small></div>` + (q ? `<div class="sert-big y">SHORT GİRME</div>${window.SQZ ? SQZ.html(r.sym) : ""}` : `<div class="sert-big ${r.side < 0 ? "dn" : "up"}">GİR ${W(r.side)}</div>${line(r)}${tpLine(r)}`)
+  const v = r._ax || axOf(r), lab = q ? "SHORT GİRME" : (v && v.st === "GIR" ? ("GİR " + W(r.side)) : v ? (v.label + (v.sub ? " · " + v.sub : "")) : ("GİR " + W(r.side)));
+  const cls = q ? "y" : (v && v.st === "CIK") ? "dn" : (v && v.st === "BEKLE") ? "y" : r.side < 0 ? "dn" : "up";
+  el.innerHTML = `<div class="sert-coin">${esc(c)}${ktag(r.sym)}${(window.AKSIYON && v) ? AKSIYON.badge(v) : ""} <small class="dim">${esc(l.name)} · 15dk · ${tm(r.close)} · yönlendirme, kanıtlanmadı</small></div>` + (q ? `<div class="sert-big y">SHORT GİRME</div>${window.SQZ ? SQZ.html(r.sym) : ""}` : `<div class="sert-big ${cls}">${esc(lab)}</div>${line(r)}${tpLine(r)}`)
     + `<div class="hx-why dim">${esc(r.why)}${lq ? " · " + lq : ""}</div><canvas id="hx-cv-${tab}" class="az-cv" aria-label="15dk mum grafiği: giriş, stop, iz"></canvas>`;
   chartFor(r, tab); }
 async function chartFor(r, tab){ if (CH.sym !== r.sym || Date.now() - CH.at > 30000){ try { const k = await fj(`/fapi/v1/klines?symbol=${r.sym}&interval=15m&limit=48`); CH = { sym: r.sym, at: Date.now(), b: k.map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c: +x[4] })) }; } catch(e){ return; } }
@@ -301,5 +320,5 @@ function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el
   window.addEventListener("themechange", () => { const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 async function push(r){ if (!R.L[r.k] || ON[r.k] === false || !/USDT$/.test(r.sym || "")) return; r.sym = r.sym; R.L[r.k].set(r.sym, r); if (!J.some(j => j.k === r.k && j.sym === r.sym && j.t === r.close)){ const g = await fresh(r); if (g) alertAll([g]); } paint(); } /* v7.33 external lists (TOPLAMA / DAĞITIM) */
-return { R, ON, push, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
+return { R, ON, push, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, get _sel(){ return SEL; }, HOLD, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
 })();

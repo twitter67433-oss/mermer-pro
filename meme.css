@@ -561,3 +561,11 @@ body.simple .agg-det{display:none}
 .mv-r small{flex-basis:100%;font-size:10.5px}
 .mv-cfg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:10.5px}
 .mv-cfg input{width:48px;margin-left:3px;font-size:11px;padding:1px 3px}
+/* v8.1 AKSİYON badges (GİR / BEKLE / ÇIK / KÂR AL) — compact, next to the coin name */
+.ax{display:inline-block;font:700 10px/1.2 system-ui,sans-serif;letter-spacing:.04em;padding:2px 5px;border-radius:3px;vertical-align:middle;margin-left:6px;white-space:nowrap}
+.ax small{font-weight:600;letter-spacing:0;margin-left:4px;opacity:.85;font-size:9px}
+.ax-gir{background:#0f6b45;color:#f3eee4}
+.ax-bekle{background:#9a7432;color:#f3eee4}
+.ax-cik{background:#9b1c31;color:#f3eee4}
+.ax-kar{background:#1e5a40;color:#f3eee4;border:1px solid #0f6b45}
+.sert-r .ax,.sert-coin .ax,.mv-r .ax{margin-top:-1px}

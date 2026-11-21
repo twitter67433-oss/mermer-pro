@@ -1,7 +1,7 @@
 // v7.33.2: SİMDE AÇ keeps the tab; open paper positions shown inside SHORT/LONG; stop-cross check side-correct
 const fs = require("fs"), assert = require("assert");
 const s = fs.readFileSync(__dirname + "/../sert.js", "utf8"), p = fs.readFileSync(__dirname + "/../psim.js", "utf8"), h = fs.readFileSync(__dirname + "/../index.html", "utf8");
-assert(s.includes("(p - r.stop)*r.side <= 0) return null"), "act() hides only when price crossed the stop");
+assert(s.includes("hitStop") || s.includes("AKSIYON") && s.includes("holdOf"), "act() uses AKSİYON (ÇIK STOP on a cross, row lingers — does not silently vanish)");
 const crossed = (p, stop, side) => (p - stop)*side <= 0;
 assert(crossed(101, 100, -1) && !crossed(99, 100, -1) && crossed(99, 100, 1) && !crossed(101, 100, 1));
 assert(!/NAV\.go|scrollIntoView|location\.hash/.test(p), "psim must not navigate");

@@ -803,3 +803,8 @@ html.night ::-webkit-scrollbar-thumb{background:#4a4337}
 html.night #boot{background:linear-gradient(170deg,#1c1b18,#121110)!important}
 html.night .ag{--ac:var(--acn)!important}
 html.night .az-go{background:linear-gradient(160deg,#2f5e49,#173a2d)!important;color:#f5ead0!important}
+
+html.night .ax-gir{background:#0f6b45;color:#efe9dd}
+html.night .ax-bekle{background:#9a7432;color:#efe9dd}
+html.night .ax-cik{background:#9b1c31;color:#efe9dd}
+html.night .ax-kar{background:#163c2c;color:#efe9dd;border-color:#3d8f6a}

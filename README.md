@@ -1,5 +1,8 @@
 # MERMER TERMİNAL (eski adı NEON//TERMINAL) — mobil · v8.0
 
+## v8.1
+- SHORT / LONG listeleri ve HAREKET satırlarında canlı **GİR / BEKLE / ÇIK** (hedef1'de KÂR AL). Yönlendirme, kanıtlanmadı; emir yok.
+
 ## v8.0.1
 - SHORT / LONG listeleri varsayılan **KRİPTO** (üstteki KRİPTO · HİSSE · HEPSİ düğmesi). Hisseler silinmedi.
 - **HAREKET**: kripto coin 1 saatte ±%8, 24 saatte ±%15 ya da 15dk'da ±%4 + hacim ≥3× hareket edince liste + telefon bildirimi (coin başına bir kez, squeeze riski satırıyla). Sinyal; emir yok.

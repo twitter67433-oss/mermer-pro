@@ -1,4 +1,10 @@
-# MERMER TERMİNAL — Test Raporu (v8.0.1, 2026-11-20)
+# MERMER TERMİNAL — Test Raporu (v8.1.0, 2026-11-21)
+
+## v8.1.0
+- 33 test dosyası, hepsi geçti. Yeni: `tests/aksiyon.test.js` (47 kontrol: GİR bölgesi 0.3R, stop-önce, boşlukta seviye vurulmuş sayılır, TP1/TP2, 60 dk, ters sinyal, squeeze yalnız SHORT, mandal, linger, eşikler, HAREKET tutma/dönüş/kovalama, rozet HTML, emir/anahtar yok, bağlama).
+- Canlı doğrulama teslim notunda.
+
+## v8.0.1
 
 ## v8.0.1
 - 31 test dosyası, hepsi geçti. Yeni: `tests/hareket.test.js` (39 kontrol: 1s/24s/15dk eşikleri, coin+pencere başına tek uyarı, yön, risk satırı, yalnız kripto, emir/anahtar/cüzdan yok, KRİPTO/HİSSE/HEPSİ, kripto önce tarama, hisse seans hacim tabanı, eski fstream yolu yok).

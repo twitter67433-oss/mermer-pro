@@ -56,3 +56,7 @@
 - SERT defterindeki iyimser stop dolumu düzeltildi (boşlukta açılıştan dolum); yeniden hesap BACKTEST_REPORT.md §v8.0.
 - Vadeli SİM (PSIM) dolumu artık emir defteri derinliği + spread + kayma + gecikme ile; sinyal istatistikleri ile SİM sonuçları bu yüzden doğrudan karşılaştırılmamalı (SİM daha gerçekçi/kötümser).
 - Hiçbir sinyal otomatik alım tetiklemez.
+
+
+## v8.1 — AKSİYON rozeti
+Canlı yönlendirme (GİR / BEKLE / ÇIK / KÂR AL). Karar motoru değişmedi; rozet, önerilen SL/TP1/TP2, yaş ve 60 dk tavanına bakarak bir kelime yazar. İspatlanmış avantaj değildir. Ayrıntı CHANGELOG 8.1.0 ve `aksiyon.js`.

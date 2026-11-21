@@ -22,13 +22,13 @@ function ch1h(S, sym, t){ const a = S.px.get(sym); if (!a || a.length < 2) retur
 function okSend(S, key, t, cd){ const l = S.sent.get(key); if (l && (cd === 0 || t - l < cd)) return false; S.sent.set(key, t); return true; }
 /* ticker check: ch24 = 24 h change (fraction). Returns new events */
 function check(S, sym, t, ch24, c){ c = cfgOf(c); const out = [], h = ch1h(S, sym, t);
-  if (fin(h) && Math.abs(h) >= c.h1){ const d = h > 0 ? 1 : -1; if (okSend(S, `${sym}|1s|${d}`, t, CD["1s"])) out.push({ sym, w: "1s", ch: h, dir: d, t }); }
-  if (fin(ch24) && Math.abs(ch24) >= c.h24){ const d = ch24 > 0 ? 1 : -1; if (okSend(S, `${sym}|24s|${d}`, t, CD["24s"])) out.push({ sym, w: "24s", ch: ch24, dir: d, t }); }
+  if (fin(h) && Math.abs(h) >= c.h1){ const d = h > 0 ? 1 : -1; if (okSend(S, `${sym}|1s|${d}`, t, CD["1s"])) out.push({ sym, w: "1s", ch: h, dir: d, t, px: (S.px.get(sym) || []).slice(-1)[0] ? (S.px.get(sym).slice(-1)[0][1]) : NaN }); }
+  if (fin(ch24) && Math.abs(ch24) >= c.h24){ const d = ch24 > 0 ? 1 : -1; if (okSend(S, `${sym}|24s|${d}`, t, CD["24s"])) out.push({ sym, w: "24s", ch: ch24, dir: d, t, px: (S.px.get(sym) || []).slice(-1)[0] ? (S.px.get(sym).slice(-1)[0][1]) : NaN }); }
   return out; }
 /* closed 15m bar from the scanner: f = SERTX.feat(b) (r15 = bar move, vr = volume / 24 h avg) */
 function check15(S, sym, f, c){ c = cfgOf(c); if (!f || !f.x) return []; const r = f.r15, v = f.vr;
   if (!(fin(r) && Math.abs(r) >= c.m15 && fin(v) && v >= c.vr15)) return []; const d = r > 0 ? 1 : -1;
-  return okSend(S, `${sym}|15dk|${f.x.t}`, f.x.t + 900000, 0) ? [{ sym, w: "15dk", ch: r, dir: d, vr: v, t: f.x.t + 900000 }] : []; }
+  return okSend(S, `${sym}|15dk|${f.x.t}`, f.x.t + 900000, 0) ? [{ sym, w: "15dk", ch: r, dir: d, vr: v, t: f.x.t + 900000, px: f.x.c }] : []; }
 /* risk line: pump + squeeze module ON → short squeeze; pump with negative funding → shorts paying, squeeze fuel; dump with high funding → long liquidations */
 function risk(dir, fr, sq){ if (dir > 0 && sq && sq.on) return "⚠ SQUEEZE RİSKİ (short sıkışması) — SHORT açma";
   if (dir > 0 && fin(fr) && fr < 0) return "⚠ squeeze riski: funding negatif, shortlar ödüyor — SHORT riskli";
@@ -70,7 +70,8 @@ function open(){ if (!C.on || (ws && ws.readyState < 2)) return; try { ws = new 
 function close(){ clearTimeout(wsT); try { ws && ws.close(); } catch(e){} ws = null; }
 /* called by the SHORT/LONG scanner for every closed 15m bar set */
 function bars(sym, b, f){ if (!C.on || !CRY.has(sym)) return; H.seed(S, sym, b); const E = H.check15(S, sym, f, C); if (E.length) emit(E); }
-function row(e){ return `<div class="mv-r ${e.dir > 0 ? "up" : "dn"}"><b>${e.dir > 0 ? "↑" : "↓"} ${esc(e.sym.replace("USDT", ""))}</b> <span>${pc(e.ch)} · ${e.w === "15dk" ? `15dk mum · hacim ${e.vr.toFixed(1)}×` : e.w === "1s" ? "1 saatte" : "24 saatte"} · ${tm(e.t)}</span><small class="${/⚠/.test(e.risk) ? "y" : "dim"}">${esc(e.risk)}</small></div>`; }
+function row(e){ const v = window.AKSIYON ? AKSIYON.ofMove(e) : null; if (v && v.st === "CIK") try { AKSIYON.ntf(e, v); } catch(x){}
+  return `<div class="mv-r ${e.dir > 0 ? "up" : "dn"}"><b>${e.dir > 0 ? "↑" : "↓"} ${esc(e.sym.replace("USDT", ""))}</b>${v && window.AKSIYON ? AKSIYON.badge(v) : ""} <span>${pc(e.ch)} · ${e.w === "15dk" ? `15dk mum · hacim ${e.vr.toFixed(1)}×` : e.w === "1s" ? "1 saatte" : "24 saatte"} · ${tm(e.t)}</span><small class="${/⚠/.test(e.risk) ? "y" : "dim"}">${esc(e.risk)}</small></div>`; }
 function paint(){ clearTimeout(paintT); paintT = setTimeout(() => { for (const [tab, d] of [["long", 1], ["short", -1]]){ const el = document.getElementById("mv-" + tab); if (!el) continue;
     const L = S.ev.filter(e => e.dir === d).slice(0, 8);
     el.innerHTML = `<details class="mv-d"${L.length ? " open" : ""}><summary><b class="${d > 0 ? "up" : "dn"}">HAREKET ${d > 0 ? "↑ POMPA" : "↓ DÜŞÜŞ"}</b> <small class="dim">yalnız kripto · ${C.on ? `${L.length} uyarı` : "KAPALI"} · sinyal, emir yok</small></summary>`

@@ -24,8 +24,8 @@ function env(o = {}){ const T = []; let now = 0; const els = {}, L = {}, ss = {}
   { const e = env(); e.L.error({ target: { tagName: "SCRIPT", src: "https://cdn.other.com/x.js" } }); await e.tick(10); ok(!e.els["boot-err"], "foreign script failure ignored"); }
   { const e = env(); e.L.error({ target: e.ctx, filename: "https://x.io/app/meme.js", message: "x" }); await e.tick(10); ok(e.els["boot-err"], "startup JS error → bar"); }
   { const e = env(); await e.tick(25000); e.L.error({ target: e.ctx, filename: "https://x.io/app/meme.js", message: "x" }); await e.tick(10); ok(!e.els["boot-err"], "later runtime error → no bar (no noise)"); }
-  { const e = env({ v: "8.0.3" }); await e.tick(10); await e.tick(10); ok(e.replaced.length === 1 && e.ss["mermer.autoref"] === "8.0.3", "newer version.json → one automatic hard reload");
-    const e2 = env({ v: "8.0.3" }); e2.ss["mermer.autoref"] = "8.0.3"; await e2.tick(10); ok(e2.replaced.length === 0, "already tried this version → no loop"); }
+  { const e = env({ v: "9.9.9" }); await e.tick(10); await e.tick(10); ok(e.replaced.length === 1 && e.ss["mermer.autoref"] === "9.9.9", "newer version.json → one automatic hard reload");
+    const e2 = env({ v: "9.9.9" }); e2.ss["mermer.autoref"] = "9.9.9"; await e2.tick(10); ok(e2.replaced.length === 0, "already tried this version → no loop"); }
   { const e = env({ v: "8.0.1" }); await e.tick(10); ok(e.replaced.length === 0, "older version.json (CDN lag) → no reload"); }
   { const e = env({ fetch: async () => { throw new Error("offline"); } }); await e.tick(5000); ok(e.replaced.length === 0 && !e.els.boot, "offline: no reload, boot still removed"); }
   { const e = env({ fetch: () => new Promise(() => {}) }); await e.tick(5000); ok(!e.els.boot, "hanging version.json never blocks"); }

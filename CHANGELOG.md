@@ -1,5 +1,13 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.1.0 — 2026-11-21 · GİR / BEKLE / ÇIK
+- Her SHORT/LONG listesi (7 kural) ve HAREKET satırının yanında canlı tek kelimelik yönlendirme: **GİR**, **BEKLE**, **ÇIK** (neden: STOP / HEDEF2 / SÜRE DOLDU / TERS SİNYAL), hedef1'de **KÂR AL · STOP GİRİŞE**. "yönlendirme, kanıtlanmadı" — ispatlanmış avantaj değil.
+- Eşikler (varsayılan, `mermer.aksiyon` veya `AKSIYON.setCfg`): GİR, fiyat girişe ≤**0.3R** mesafede ve stop vurmamışken; 60 dk tavan (DEFTER / sim ile aynı); ÇIK satırı 8 dk daha görünür. Stop-önce (aynı anda stop ve hedef → STOP). Boşluk: fiyat seviyeyi geçmişse vurulmuş sayılır (gapX ile aynı fikir). Canlı rozet önerilen SL/TP kullanır, DEFTER'deki 1×ATR izi değil.
+- HAREKET (SL/TP yok): 15dk/1s — hareket durduğu sürece GİR; %50'sinden fazlası geri verildiyse BEKLE; başlangıca döndüyse ÇIK; 24s 30 dk sonra BEKLE KOVALAMA.
+- İsteğe bağlı telefon bildirimi: SİM'de açtığın veya izlediğin bir sinyal ÇIK olunca, coin+neden başına bir kez.
+- Sinyal; emir yok, otomatik alım yok, GERÇEK değişmedi.
+- Testler: `tests/aksiyon.test.js` (47 kontrol) — 33 dosya.
+
 ## 8.0.2 — 2026-11-20 · açılış takılması
 - **Neden:** açılış ekranını (#boot) yalnızca app.js kaldırıyordu. app.js 47 dosyanın sonlarında yükleniyor; yavaş bağlantıda (ölçüm: 750 kbit/s, 300 ms) açılış ekranı 26 sn kaldı, bir dosya yüklenemez ya da bir başlangıç hatası olursa hiç kalkmıyordu. Ekranda yazan satırlar da sabit ve eskiydi ("v7.18", "OTO AL-SAT KAPALI" — ayarından bağımsız). Ardından gelen "Trading Error" penceresi yalnız BAŞLA ile kapanıyordu (✕ şaka yapıyordu).
 - **Düzeltme:** `appv.js` (ilk betik, düz ES5) açılış ekranını en geç 4 sn'de kaldırır (yavaş ağda sonradan gelirse de); dosya yüklenemezse veya ilk 20 sn'de JS hatası olursa alta "⚠ Uygulama tam yüklenemedi · YENİLE" çubuğu çıkar (YENİLE = Cache Storage + service worker temizliği + ?r= ile yeniden yükleme; localStorage — DEFTER, ayarlar, cüzdan — korunur); version.json daha yeni bir sürüm gösterirse eski kopya bir kez kendiliğinden yenilenir (döngü yok). Açılış ekranı ≈1 sn, güncel sürümü yazar, sabit iddialar kaldırıldı. Trading Error penceresi 4 sn'de kendiliğinden kapanır, ✕ kapatır. Grafik kütüphanesi `<head>`'den çıkarıldı (sayfa önce çizilir); 767 kontrat taraması ve HAREKET sayfa yüklendikten sonra başlar. `<meta Expires 0>`.

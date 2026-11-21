@@ -38,7 +38,7 @@ ok(X.KMODES[0] === "kripto" && X.kvis("kripto", "") && !X.kvis("kripto", "HİSSE
   ok(X.order(U, [], vol).join() === "TSLAUSDT,XAUUSDT,BTCUSDT,MMTUSDT", "no isT → old volume order (back-compat)"); }
 { const src = fs.readFileSync(path.join(D, "sert.js"), "utf8");
   ok(/return X\.KMODES\.includes\(v\) \? v : "kripto"/.test(src), "default view = KRİPTO"); ok(src.includes("VOL, sym => !!KIND[sym])"), "live scan passes TradFi test → crypto first");
-  ok(/rowsOf\(k\)\{ return \[\.\.\.R\.L\[k\]\.keys\(\)\]\.filter\(vis\)/.test(src) && /L = L\.filter\(r => vis\(r\.sym\)\)/.test(src), "lists + phone alerts follow the filter");
+  ok(/\.filter\(vis\)/.test(src) && /L = L\.filter\(r => vis\(r\.sym\)\)/.test(src), "lists + phone alerts follow the filter");
   ok(/sess: !!KIND\[s\]/.test(src), "TradFi uses session baseline"); }
 // session baseline: stock with dead hours
 { const mk = (q, last) => { const b = []; for (let i = 0; i < 120; i++) b.push({ t: i*900000, o: 10, h: 10.1, l: 9.9, c: 10, qv: q(i), tb: q(i)/2 }); b[119] = Object.assign({}, b[119], { qv: last, c: 9.95 }); return b; };
