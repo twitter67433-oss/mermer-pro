@@ -60,3 +60,7 @@
 
 ## v8.1 — AKSİYON rozeti
 Canlı yönlendirme (GİR / BEKLE / ÇIK / KÂR AL). Karar motoru değişmedi; rozet, önerilen SL/TP1/TP2, yaş ve 60 dk tavanına bakarak bir kelime yazar. İspatlanmış avantaj değildir. Ayrıntı CHANGELOG 8.1.0 ve `aksiyon.js`.
+
+
+## v8.2.0 notu — BİLEŞİK OTO
+Sinyal motorlarına dokunulmadı. Yeni: `comp.js` SERT listelerinin tetiklerini (`SERTS.all()`), yalnız AKSİYON **GİR** iken, **sanal** kasada işler. Sinyallerin kendisi değişmedi. 29 günlük replay (docs/BACKTEST_REPORT.md): 5895 tetik; bu tetiklerle +7 $ sabit hedef / stoplu kural seti işlem başına −2.68 $ (maliyet öncesi −0.98 $) → **sinyallerin avantajı kanıtlanmadı**. sig8 bu moda bağlı değil.

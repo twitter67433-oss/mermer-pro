@@ -87,3 +87,10 @@ Yöntem: tüm JS için `node --check` (0 sözdizimi hatası), mevcut 23 testin t
 |---|---|---|
 | YÜKSEK | Açılış ekranını yalnız app.js kaldırıyordu → yavaş ağda uzun süre (ölçüm 26 sn), dosya/JS hatasında sonsuza dek açılış ekranı; satırlar sabit ve eski ("v7.18", "OTO AL-SAT KAPALI") | Düzeltildi: appv.js 4 sn koruması + YENİLE çubuğu + eski kopya otomatik yenileme; açılış ≈1 sn ve güncel |
 | ORTA | Bozuk/eski localStorage değerleri bazı modülleri başlangıçta düşürebiliyor (fuzz: copy.js `WL.some`, auto.js, sinyal.js, remote.js) → zincirleme "X is not defined" | Kısmen: uygulama artık açılır ve YENİLE çubuğu gösterir; modül bazında doğrulama sonraki iş (gerçek kullanıcı verisiyle tekrarlanmadı) |
+
+
+## v8.2.0 — bilinen sınırlar (BİLEŞİK OTO)
+- (DÜŞÜK) Canlı fiyat 3 sn'de bir okunur (public ticker); mum içi tepe/dip bilinmez → stop çok hızlı bir iğnede bir sonraki okumada, o fiyattan (boşluk gibi) dolar.
+- (DÜŞÜK) SQUEEZE rozeti (SHORT) canlıda GİR'i engeller; geçmiş replay'de yeniden üretilemedi → replay bu filtreyi uygulamaz.
+- (BİLGİ) Replay maliyet modeli: spread + kayma + gecikme (emir defteri derinliği yok). Ayrıntı docs/BACKTEST_REPORT.md.
+- Sekme PASİF yapılırsa (SHORT/LONG tarayıcı) yeni sinyal gelmez; açık sanal pozisyonlar stop/hedef/ÇIK ile yönetilmeye devam eder.

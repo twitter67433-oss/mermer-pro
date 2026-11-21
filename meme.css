@@ -569,3 +569,16 @@ body.simple .agg-det{display:none}
 .ax-cik{background:#9b1c31;color:#f3eee4}
 .ax-kar{background:#1e5a40;color:#f3eee4;border:1px solid #0f6b45}
 .sert-r .ax,.sert-coin .ax,.mv-r .ax{margin-top:-1px}
+/* v8.2 BİLEŞİK OTO (SİM) panel — minimal */
+.cp{margin:0 0 8px}
+.cp-d>summary{cursor:pointer;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.cp-st{font:700 10px/1.2 system-ui,sans-serif;padding:2px 6px;border-radius:3px;background:rgba(127,127,127,.25)}
+.cp-st.on{background:#0f6b45;color:#f3eee4}.cp-st.tp{background:#1e5a40;color:#f3eee4}.cp-st.warn{background:#9a7432;color:#f3eee4}
+.cp-b{padding:6px 0;font-size:12px}
+.cp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 8px}.cp-grid small{display:block;font-size:9.5px;opacity:.7}.cp-grid b{font-size:14px}
+.cp-prog{height:6px;border-radius:3px;background:rgba(127,127,127,.25);margin:8px 0 2px;overflow:hidden}.cp-prog i{display:block;height:100%;background:#0f6b45}
+.cp-pl,.cp-h,.cp-n,.cp-w{font-size:10.5px;margin:3px 0}
+.cp-act{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.cp-act .mini.on{font-weight:700;border-color:currentColor}
+.cp-pos{padding:4px 0;border-bottom:1px dotted rgba(127,127,127,.3)}.cp-pos small{display:block;font-size:10.5px}
+.cp-f{display:flex;flex-wrap:wrap;gap:6px 10px;margin:6px 0;font-size:10.5px}.cp-f label{display:flex;flex-direction:column;gap:1px}.cp-f input[type=number]{width:84px;font-size:11px;padding:2px 4px}.cp-f .cp-ck{flex-direction:row;align-items:center;gap:4px}
+.cp-set>summary{cursor:pointer;font-size:11px;margin-top:4px}

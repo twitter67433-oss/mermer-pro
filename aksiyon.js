@@ -75,6 +75,7 @@ function ofMove(e){ const latch = e._latch, sq = !!(e.sq && e.sq.on) || (e.risk 
   const v = X.moveVerdict(e, live(e.sym), Date.now(), { cfg: C, latch, squeeze: sq });
   if (v.st === "CIK" && !e._cikAt) e._cikAt = Date.now(); if (v.st === "CIK") e._latch = { st: "CIK", why: v.why, sub: v.sub }; e._ax = v; return v; }
 function tracked(r){ try { if (window.PSIMUI && PSIMUI.st && PSIMUI.st.pos.some(p => p.sym === r.sym && (!p.rule || p.rule === r.k))) return "sim"; } catch(e){}
+  try { if (window.COMP && COMP.has(r.sym)) return "sim"; } catch(e){}
   try { if (window.SERTS && SERTS.R && SERTS.R.want && SERTS.R.want.has(r.sym)) return "izle"; } catch(e){}
   try { const S = window.SERTS && SERTS; if (S && ((S._sel && S._sel.sym === r.sym) || (window.SCALP && SCALP.S && SCALP.S.sym === r.sym))) return "sec"; } catch(e){}
   return ""; }

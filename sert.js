@@ -320,5 +320,8 @@ function init(){ for (const id of ["#short", "#long"]){ const el = $(id); if (el
   window.addEventListener("themechange", () => { const pg = document.body.dataset.pg; if (pg === "short" || pg === "long") paintDet(pg); }); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 async function push(r){ if (!R.L[r.k] || ON[r.k] === false || !/USDT$/.test(r.sym || "")) return; r.sym = r.sym; R.L[r.k].set(r.sym, r); if (!J.some(j => j.k === r.k && j.sym === r.sym && j.t === r.close)){ const g = await fresh(r); if (g) alertAll([g]); } paint(); } /* v7.33 external lists (TOPLAMA / DAĞITIM) */
-return { R, ON, push, scan, active, act, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, get _sel(){ return SEL; }, HOLD, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
+/* v8.2: every live trigger of every scanner list (for the SİM-only BİLEŞİK OTO). stocks=false → crypto only. Read-only: no orders. */
+function all(stocks){ const out = []; for (const l of SCAN){ if (ON[l.k] === false) continue; const sy = new Set([...R.L[l.k].keys(), ...[...HOLD.keys()].filter(x => x.startsWith(l.k + "|")).map(x => x.slice(l.k.length + 1))]);
+    for (const s of sy){ if (!stocks && KIND[s]) continue; const r = act(l.k, s); if (r) out.push(r); } } return out; }
+return { R, ON, push, scan, active, act, all, opp: oppLive, big, line, sqOn, paint, paintList, show, resolve, liq, setOn, select: (s, k = "sert") => { SEL[X.LK[k].tab] = { k, sym: s }; paint(); }, get _sel(){ return SEL; }, HOLD, _fresh: fresh, want: s => { if (s) R.want.add(s); }, get J(){ return J; }, liveLine };
 })();

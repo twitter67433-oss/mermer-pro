@@ -1,4 +1,8 @@
-# MERMER TERMİNAL — Test Raporu (v8.1.0, 2026-11-21)
+# MERMER TERMİNAL — Test Raporu (v8.2.0, 2026-11-21)
+
+## v8.2.0
+- 34 test dosyası. Yeni: `tests/compound.test.js` (74 kontrol): varsayılanlar (1000 $ / 2 poz / %5 / 20× / +7 $ / 2000 $ / −%10) ve ayar sınırları, marj 50 → 60 → 70 → 80 ve kayıpta küçülme, +7 $ net hedef (LONG/SHORT × maliyet açık/kapalı → +7.00 $), zorunlu stop (stopsuz / ters taraf reddedilir), yalnız GİR rozeti (BEKLE/ÇIK/KÂR AL/yok → işlem yok), maks. 2 pozisyon + coin başına bir, kapalı / kill switch, boşlukta stop açılıştan dolar, stop+hedef aynı mumda → stop, 2 ardışık zarar → bekleme → devam, günlük hedef / günlük zarar (+açıkları kapatma) / Berlin günü sıfırlama, iz-süren çıkış, ÇIK (ters sinyal, 60 dk), **cross likidasyon (hepsi likide, kasa gider)**, cross likidasyon uzaklığı, manuel SİM'in izole kuralı değişmedi, JSON gidiş-dönüş, **kaynak taraması: emir uç noktası / anahtar / GERÇEK modülü yok, tek depolama anahtarı `mermer.comp`, GERÇEK modüllerinde COMP referansı yok**, panel yalnız SHORT/LONG.
+- Geriye dönük: psim.test (manuel SİM) ve aksiyon.test değişmeden geçti.
 
 ## v8.1.0
 - 33 test dosyası, hepsi geçti. Yeni: `tests/aksiyon.test.js` (47 kontrol: GİR bölgesi 0.3R, stop-önce, boşlukta seviye vurulmuş sayılır, TP1/TP2, 60 dk, ters sinyal, squeeze yalnız SHORT, mandal, linger, eşikler, HAREKET tutma/dönüş/kovalama, rozet HTML, emir/anahtar yok, bağlama).

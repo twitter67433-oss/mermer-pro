@@ -1,3 +1,47 @@
+# v8.2.0 — BİLEŞİK OTO (SİM) geçmiş-veri replay'i · 29 gün, gün gün
+
+**Bu bir geçmiş testtir; canlı performans değildir. Sonuç: bu kural seti 1000 $'ı bir günde 2000 $'a çıkarmadı — 29 günün 0'ında. Avantaj kanıtı yok; tersine ölçüm eksi çıktı.**
+
+## Ne ölçüldü
+- **Veri (gerçek):** Binance USDⓈ-M, **519 kripto perp** (bugün listede olanların tamamı), 15dk mumlar + 15dk açık faiz geçmişi + funding geçmişi. **29 Berlin günü**: 2026-10-22 23:00Z → 2026-11-20 23:00Z (= 23 Eki 01:00 → 21 Kas 00:00 Berlin; ilk gün 23 saat, 25 Eki 25 saatlik DST günü; 23 Eki … 20 Kas arası 29 gün). Veri: `tools/compound820/fetch.js`.
+- **Sinyaller:** uygulamadaki aynı kod (`SERTX.evalAll`, 7 kural listesi: SERT, SQS, DVS, LNG, SQL, KAP, DVL) her 15dk kapanışında: **5895 tetik** (lng 1556, sert 1467, kap 1329, sql 510, dvs 474, sqs 437, dvl 122). sig8 (SİNYAL sekmesi) bu moda bağlı değil → ölçülmedi.
+- **Kural seti (aynı kod, `comp.js` + `psim.js` + `aksiyon.js`):** yalnız AKSİYON **GİR** rozetli sinyal, sinyal yönünde; kasa 1000 $, maks. 2 pozisyon, marj = kasa × %5 (50 $), 20×, cross; **net +7 $** hedef (ücret + kayma sonrası; ölçülen TP işlemlerinin tamamı +7.00 $ net); her işlemde sinyalin stopu zorunlu; ÇIK rozetleri (HEDEF2, 60 dk, ters sinyal) ve 60 dk tavanında kapanış; 2 ardışık zarar → 60 dk bekleme; günlük hedef 2000 $ (ulaşınca gün biter), günlük zarar −%10 (açık pozisyonlar kapatılır, gün biter); gün sonunda piyasa fiyatından kapanış.
+- **Maliyet:** taker %0.05 giriş + çıkış, spread %0.01, kayma %0.02/taraf, gecikme %0.01, stop çıkışında kayma ×2; 15dk mum açılışı stopun ötesindeyse boşluk dolumu açılıştan. Ortalama işlem başına ücret 0.97 $ + kayma/spread ≈ 0.73 $.
+- **Gün gün:** her Berlin günü **1000 $ ile taze başlar** ("bir günde 1000 → 2000" sorusu). Ayrıca 29 günü kesintisiz zincirleyen koşu (bileşik).
+
+## Sonuç (her satır 29 gün, her gün 1000 $ ile başlar)
+| koşu | 2000 $'a ulaşan gün | gün sonu medyan | ortalama | en kötü gün | en iyi gün | −%10 limiti dolan gün | likidasyon | işlem | kazanma | işlem başına net |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **A · varsayılan** (giriş sinyal kapanışında, +7 $, 20×) | 0/29 | 897 $ | 910 $ | 878 $ (2026-11-16) | 1014 $ | 22 | 0 | 977 | %49 | -2.68 $ |
+| B · 15 dk gecikmeli giriş (hâlâ GİR ise) | 0/29 | 923 $ | 926 $ | 880 $ (2026-11-16) | 981 $ | 12 | 0 | 891 | %42 | -2.41 $ |
+| A + iz-süren çıkış | 0/29 | 896 $ | 929 $ | 877 $ (2026-10-26) | 1153 $ | 20 | 0 | 783 | %40 | -2.62 $ |
+| B + iz-süren çıkış | 0/29 | 918 $ | 925 $ | 883 $ (2026-11-10) | 1013 $ | 9 | 0 | 828 | %37 | -2.61 $ |
+| A · 10× | 0/29 | 952 $ | 955 $ | 892 $ (2026-10-25) | 1063 $ | 4 | 0 | 1091 | %42 | -1.20 $ |
+| A · hedef +5 $ | 0/29 | 896 $ | 907 $ | 877 $ (2026-11-14) | 977 $ | 22 | 0 | 1050 | %55 | -2.56 $ |
+| A · hedef +10 $ | 0/29 | 898 $ | 928 $ | 868 $ (2026-11-08) | 1064 $ | 16 | 0 | 966 | %46 | -2.17 $ |
+
+**Varsayılan (A):** 29 günün **0'ında 2000 $**; en yüksek gün içi realize kasa 1051 $ (hiçbir gün 1100 $'ı bile görmedi: en iyi gün sonu 1014 $). **28 gün zararla, 1 gün kârla** bitti; **22 günde günlük −%10 limiti doldu**. Gün sonu medyanı **897 $**, en kötü gün **878 $** (2026-11-16). **Likidasyon: 0** (cross: her işlemde stop var, stop likidasyon fiyatından çok önce; kaldıraç 20× iken cross likidasyon fiyatı panelde gösterilir; >%30 uzakta).
+- İşlem: 977 · kazanma **%49.3** · ort. kazanç +6.42 $ · ort. kayıp -11.55 $ · **işlem başı ort. -2.68 $**. Başabaş için kazanma oranı **%64** gerekirdi; ölçülen %49. Maliyetten önce de işlem başı −0.98 $ (kuralın kendisi eksi, sadece masraf değil).
+- Çıkış nedenleri: hedef 423 (+7.00 $ net, hepsi kâr), süre/60 dk 281 (ort. −4.92 $), stop 242 (ort. −16.38 $), günlük zarar 24, gün sonu 7.
+- Liste bazında net (A): lng -1275 $ (413 işlem, %45 kazanç), sert -266 $, sql -599 $, kap -102 $, sqs -200 $, dvs -132 $, dvl -49 $ — hiçbiri artıda değil.
+- **Kesintisiz 29 gün (bileşik, aynı kurallar, A):** 1000 $ → **126 $**, en büyük düşüş %88, en düşük 118 $, likidasyon 0, 836 işlem. Gecikmeli giriş (B): 1000 $ → 182 $.
+
+## Neden böyle? (aritmetik)
+- +7 $ hedefi için 1000 $'lık pozisyonda fiyatın ≈ %0.86 gitmesi gerekir (ücret + kayma dahil); sinyallerin stopu girişten ≤%3 (sert, lng) ya da ≤%5 (diğerleri) uzakta → ölçülen stop kaybı −$2.85…−$51.80, ort. −$16.38. Kâr/zarar oranı ≈ 0.4 : 1 → ~%64 kazanma gerekir; ölçülen %49.
+- 1000 → 2000 $, +7 $'lık kazançlarla ~140 net kazanç demek (marj büyüdükçe hedef $ sabit kalır); gün başına ~34 işlem açıldı. Bileşik büyüme tek başına bunu sağlamaz; kazanma oranı başabaşın altındayken marjı büyütmek **kaybı da büyütür** (kesintisiz koşuda −%87).
+- Kaldıraç yalnızca $ büyüklüğünü ve hedefe gereken fiyat hareketini değiştirir, avantaj yaratmaz: 20× → işlem başı −2.68 $, 10× → −1.20 $ (daha küçük pozisyon = daha küçük mutlak kayıp; ikisi de eksi). Yüksek kaldıraç (50×'e kadar ayarlanabilir) likidasyon mesafesini kısaltır; stop her zaman zorunlu.
+
+## Sınırlar (dürüst)
+1. **15dk mum çözünürlüğü:** bir mumda hem stop hem hedef değerse STOP sayılır (muhafazakâr); mum içi sıra bilinmez. Canlıda fiyat 3 sn'de bir okunur.
+2. **A = sıfır gecikme** (iyimser), **B = 15 dk gecikme** (kötümser). Gerçek tarama gecikmesi (≈1–4 dk) ikisinin arasında; sonuç ikisinde de aynı yönde (0/29 gün).
+3. **SQUEEZE rozeti** (canlı long/short verisi) geçmişte yeniden üretilemez → BEKLE'ye düşürülen bazı SHORT'lar burada işlem olarak göründü.
+4. **Evren:** bugün listede olan perpler (hayatta kalma yanlılığı); delist olanlar yok. Emir defteri derinliği yok (model dolum: spread + kayma + gecikme).
+5. **Cross likidasyon kontrolü** muhafazakâr: bir mumda tüm açık pozisyonlar kendi ters uç noktasında eşzamanlı sayılır. Likidasyon 0 çıktı çünkü her işlem stoplu.
+6. 29 gün tek rejim (Eki–Kas 2026); farklı piyasada farklı çıkabilir. Bu sonuç bir **ölçümdür**, "bu hiç çalışmaz" kanıtı da değildir — ama "çalışıyor" iddiasına dayanak yoktur.
+7. Tekrar üretmek: `node tools/compound820/fetch.js 29 /workspace/r820/data && node tools/compound820/backtest.js /workspace/r820/data tools/compound820/result.json` (ham çıktı: `tools/compound820/result.json`).
+
+---
+
 # Geçmiş Test Raporu — v7.50 (FAZ 3, 15dk) + v7.51 (FAZ 3b, 1s / 4s)
 
 **Bu rapor geçmiş testtir, canlı performans değildir.** Kârlılık garantisi yoktur.

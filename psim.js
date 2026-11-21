@@ -33,10 +33,10 @@ function open(st, o){ const side = o.side > 0 ? 1 : -1, margin = +o.margin, lev 
   const f = fillPx(side, px, margin*lev/px, o.book, { t: o.t }), entry = f.px, fm = margin*f.filled; /* partial fill → only the filled part becomes margin */
   if (f.filled < 0.999 && !(o.partialOk ?? true)) throw new Error("defter derinliği yetmiyor");
   const notional = fm*lev, fee = notional*FEE; if (fm + fee > free(st) + 1e-9) throw new Error(`serbest bakiye yetmiyor (${free(st).toFixed(2)} USDT)`);
-  const liq = liqPx(side, entry, lev); if (stop !== null && (stop - liq)*side <= 0) throw new Error("stop likidasyon fiyatının ötesinde — kaldıracı düşür");
+  const liq = o.cross ? (side > 0 ? 0 : 1e15) : liqPx(side, entry, lev); /* v8.2: cross margin → no per-position liquidation price (sentinel); the account-level check lives in comp.js */ if (stop !== null && (stop - liq)*side <= 0) throw new Error("stop likidasyon fiyatının ötesinde — kaldıracı düşür");
   const trail = +o.trail > 0 ? +o.trail : 0, tmax = +o.tmax > 0 ? +o.tmax : 0;
   if ((stop !== null && (stop - entry)*side >= 0)) throw new Error("dolum fiyatı stopu geçti (kayma) — açılmadı");
-  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin: fm, lev, entry, px0: px, fillVia: f.via, filled: f.filled, slipIn: Math.abs(entry - px)*notional/entry, qty: notional/entry, stop, tp, liq, feeIn: fee, t: fin(o.t) ? o.t : Date.now(), sig: o.sig || null, rule: o.rule || null, trail, tmax, best: px }; st.pos.push(p); return p; }
+  st.bal -= fee; const p = { id: ++st.id, sym: o.sym, side, margin: fm, lev, entry, px0: px, fillVia: f.via, filled: f.filled, slipIn: Math.abs(entry - px)*notional/entry, qty: notional/entry, stop, tp, liq, feeIn: fee, t: fin(o.t) ? o.t : Date.now(), sig: o.sig || null, rule: o.rule || null, cross: !!o.cross, trail, tmax, best: px }; st.pos.push(p); return p; }
 /* px = trigger / decision price; o.book = fresh order book (manual close), o.raw = true → fill exactly at px (legacy / tests) */
 function close(st, id, px, why, t, o = {}){ const i = st.pos.findIndex(p => p.id === id); if (i < 0) return null; const p = st.pos[i]; st.pos.splice(i, 1); const px0 = px;
   if (why !== "likidasyon" && !o.raw) px = fillPx(-p.side, px, p.qty, o.book, { stop: why === "stop", full: true, t }).px;
