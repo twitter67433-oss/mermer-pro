@@ -2,6 +2,7 @@
 
 ## v8.2
 - **BİLEŞİK OTO (yalnız SİM/TEST):** SHORT ve LONG sekmesinde 🧪 panel. GİR rozetli sinyalleri sanal kasada (1000 $, maks. 2 pozisyon, marj %5 = 50 $ → 60/70/80, 20×, cross, net +7 $ kâr al, zorunlu stop, günlük hedef 2000 $ / zarar −%10) otomatik açar. **Gerçek emir yok; GERÇEK sekmesine dokunmaz.** Ölçüm: 29 günlük gerçek-veri replay'inde 2000 $'a ulaşan gün **0/29**, gün sonu medyanı 897 $ (docs/BACKTEST_REPORT.md) — avantaj kanıtı yok.
+- **🖥 SUNUCU (v8.2.1, yalnız SİM):** BİLEŞİK OTO uygulama kapalıyken de çalışsın diye `server/comp-server.mjs` (Node, halka açık Binance verisi, anahtar/cüzdan/emir yok) aynı motoru 7/24 çalıştırır; telefonda SHORT/LONG sekmesindeki 🖥 SUNUCU paneli durumu gösterir ve ayarları sunucuya yollar (eşleşme linki + token). Bkz. [server/README.md](server/README.md).
 
 ## v8.1
 - SHORT / LONG listeleri ve HAREKET satırlarında canlı **GİR / BEKLE / ÇIK** (hedef1'de KÂR AL). Yönlendirme, kanıtlanmadı; emir yok.

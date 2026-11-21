@@ -582,3 +582,6 @@ body.simple .agg-det{display:none}
 .cp-pos{padding:4px 0;border-bottom:1px dotted rgba(127,127,127,.3)}.cp-pos small{display:block;font-size:10.5px}
 .cp-f{display:flex;flex-wrap:wrap;gap:6px 10px;margin:6px 0;font-size:10.5px}.cp-f label{display:flex;flex-direction:column;gap:1px}.cp-f input[type=number]{width:84px;font-size:11px;padding:2px 4px}.cp-f .cp-ck{flex-direction:row;align-items:center;gap:4px}
 .cp-set>summary{cursor:pointer;font-size:11px;margin-top:4px}
+/* v8.2.1 🖥 SUNUCU (BİLEŞİK OTO 7/24, SİM): while paired the local panel is stopped and hidden */
+.cps{margin:0 0 8px}.cps-d>summary{cursor:pointer;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}.cps .cp-f input[type=text]{width:100%;min-width:220px;font-size:11px;padding:3px 4px}
+body.cps-on .cp{display:none}
