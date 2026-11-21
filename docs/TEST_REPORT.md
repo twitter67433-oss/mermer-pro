@@ -1,4 +1,7 @@
-# MERMER TERMİNAL — Test Raporu (v8.2.1, 2026-11-21)
+# MERMER TERMİNAL — Test Raporu (v8.2.2, 2026-11-21)
+
+## v8.2.2
+- 36 test dosyası. `tests/compsrv.test.js`: eşleşmemiş kart her zaman açık (BAĞLAN + yapıştırma kutusu, kapalı details yok), panel SHORT/LONG'da 🧪'nin üstünde, MEME kutusundaki `#comppair=` yönlendirmesi, anında boyama. GERÇEK / sinyal dosyalarına referans yok.
 
 ## v8.2.1
 - 36 test dosyası, hepsi geçti. Yeni: `tests/compserver.test.js` (sunucu motoru: tarama → GİR → SİM işlem, varsayılanlar, +7 $ net, maks. 2, zorunlu stop, GEÇ KALDIN → işlem yok, 2 zarar → bekleme, ÇIK, telefon ayarları beyaz liste, yeniden başlatmada durum; **ağ kanıtı:** kaydedilen tüm istekler halka açık GET, anahtar/imza/emir kodu yok, izin listesi 8 yol; token'sız 401, dosya modları 700/600) ve `tests/compsrv.test.js` (telefon paneli: eşleşme linki, yalnız sunucu + ntfy fetch, yalnız SİM uç noktaları, GERÇEK modüllerinde referans yok).

@@ -46,7 +46,7 @@ const srvMeta = () => ({ uptime: Math.round((Date.now() - T0)/1000), pid: proces
 let tickN = 0; const OFFLINE = process.env.COMP_OFFLINE === "1"; /* tests: no market loops */
 if (!OFFLINE) setInterval(async () => { try { await E.step(); if (++tickN % 2 === 0) saveState(); } catch(e){ err("döngü: " + e.message); } }, 3000);
 if (!OFFLINE){ setInterval(() => { E.scan().catch(e => err("tarama: " + e.message)); }, 20000); setTimeout(() => E.scan().catch(() => {}), 1500); }
-setInterval(() => { if (E.pxT && Date.now() - E.pxT < 20000) fs.writeFile(F("heartbeat"), String(Date.now()), { mode: 0o600 }, () => {}); }, 10000);
+setInterval(() => { fs.writeFile(F("heartbeat"), String(Date.now()), { mode: 0o600 }, () => {}); }, 10000); /* alive even if a price fetch is briefly stale — otherwise the supervisor kills a healthy process */
 
 /* ---------------- HTTP API (token on every call except /api/ping) ---------------- */
 const send = (res, code, o) => { const b = JSON.stringify(o); res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }); res.end(b); };

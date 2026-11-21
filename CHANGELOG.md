@@ -1,5 +1,10 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.2.2 — 2026-11-21 · 🖥 SUNUCU paneli SHORT/LONG üstünde, her zaman görünür
+- **Düzeltme:** v8.2.1'de eşleşmemiş 🖥 SUNUCU paneli kapalı bir `<details>` idi ve yerel 🧪 BİLEŞİK OTO'nun *altında* duruyordu. Telefonda (412×915) 🧪 paneli ilk ekranı doldurduğu için 🖥 satırı ya katlanmış bir özet olarak kalıyor ya da kaydırınca bile yapıştırma kutusu görünmüyordu. Panel artık SHORT ve LONG'un *en üstünde*, her zaman açık bir kart: yapıştırma kutusu + **BAĞLAN** düğmesi.
+- MEME sekmesindeki "Gelişmiş · SUNUCU" kutusuna BİLEŞİK (`#comppair=`) linki yapıştırılırsa ipucu çıkar: "Bu link SHORT sekmesindeki 🖥 SUNUCU için"; **SHORT'A GİT VE BAĞLAN** (veya o kutudaki bağlan düğmesi) paneli SHORT'a yönlendirir. MEME `#pair=` linkleri eskisi gibi çalışır; GERÇEK ve sinyal motoruna dokunulmadı.
+- Sunucu heartbeat'i fiyat bayatsa da yazılır (kısa kopuklukta sürecin ölmesini önler).
+
 ## 8.2.1 — 2026-11-21 · 🖥 SUNUCU: BİLEŞİK OTO 7/24 (yalnız SİM / TEST)
 - **Yeni:** BİLEŞİK OTO artık uygulama kapalıyken de çalışabilir: `server/comp-server.mjs` (Node, tarayıcı yok) aynı motor dosyalarını değiştirmeden kullanır — `sert.js` (sinyaller), `aksiyon.js` (GİR / ÇIK), `psim.js` (dolum, masraf, cross), `comp.js` (marj, +net-$ hedef, günlük hedef/zarar, 2 zarar → bekleme), `squeeze.js`. Varsayılanlar aynı: 1000 $, maks. 2, %5 marj, 20×, +7 $ net, zorunlu stop, yalnız GİR. Yalnız kripto (ayardan hisse/emtia eklenir).
 - **Yalnız halka açık Binance USD-M piyasa verisi (GET).** Sunucuda API anahtarı, imza, cüzdan, emir/hesap uç noktası YOK; ağ katmanı 8 halka açık yol dışında her isteği reddeder. `tests/compserver.test.js` istekleri kaydeder + kaynak taraması yapar.

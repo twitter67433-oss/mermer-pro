@@ -1,4 +1,4 @@
-/* MERMER TERMİNAL v8.2.1 — 🖥 SUNUCU panel for BİLEŞİK OTO (SİM / TEST ONLY). The compounding paper-trader can run 24/7 on the always-on server (server/comp-server.mjs, Node, public market data only),
+/* MERMER TERMİNAL v8.2.2 — 🖥 SUNUCU panel for BİLEŞİK OTO (SİM / TEST ONLY). The compounding paper-trader can run 24/7 on the always-on server (server/comp-server.mjs, Node, public market data only),
    so it keeps opening / closing SIMULATED trades while this app is closed. This file only talks to that server (state read + SİM settings) and to ntfy.sh (encrypted address lookup).
    It never touches the GERÇEK tab, trade.js, auto.js, exec.js, API keys or wallets and sends no order anywhere. Pairing: link …#comppair=<url>|<token> (kept only in this device's localStorage: mermer.compsrv).
    While paired the LOCAL BİLEŞİK OTO panel is stopped and hidden (one account, not two); unpair brings it back. */
@@ -21,7 +21,7 @@ const fp = v => !isFinite(v) ? "—" : v >= 1000 ? v.toFixed(1) : v >= 10 ? v.to
 const tm = t => new Date(t).toLocaleTimeString("tr-TR", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 /* pairing link in the address bar: store, then strip it so the token does not stay in the URL / history */
 (() => { const h = location.hash; if (!h.startsWith("#comppair=")) return; const p = X.parsePair(h); history.replaceState(null, "", location.pathname + location.search);
-  if (p){ P = { url: p.url, token: p.token, at: Date.now() }; try { localStorage.setItem(X.K, JSON.stringify(P)); } catch(e){} setTimeout(() => { stopLocal(); toast("✔ BİLEŞİK OTO sunucusu eşlendi", "good"); }, 1200); } else setTimeout(() => toast("✖ sunucu eşleşme linki geçersiz", "bad"), 1200); })();
+  if (p){ P = { url: p.url, token: p.token, at: Date.now() }; try { localStorage.setItem(X.K, JSON.stringify(P)); } catch(e){} setTimeout(() => { stopLocal(); try { window.NAV && NAV.go("short"); } catch(e){} toast("✔ BİLEŞİK OTO sunucusu eşlendi", "good"); }, 400); } else setTimeout(() => toast("✖ sunucu eşleşme linki geçersiz", "bad"), 800); })();
 /* CORS-"simple" requests (POST text/plain, token inside the JSON body): no preflight */
 async function api(path, body, to = 15000){ if (!P) throw new Error("eşli sunucu yok"); const ac = new AbortController(), tt = setTimeout(() => ac.abort(), to);
   try { const r = await fetch(P.url + path, { method: "POST", headers: { "content-type": "text/plain;charset=UTF-8" }, body: JSON.stringify(Object.assign({}, body || {}, { t: P.token })), cache: "no-store", signal: ac.signal });
@@ -49,10 +49,11 @@ function openHtml(j){ if (!j.open.length) return `<div class="cp-e dim">açık p
   return j.open.map(p => `<div class="cp-pos"><b>${esc(p.sym.replace("USDT", ""))}</b> <span class="${p.side > 0 ? "up" : "dn"}">${p.side > 0 ? "LONG" : "SHORT"}</span> <small>${p.lev}× · marj $${p.margin.toFixed(2)} · giriş ${fp(p.entry)}</small> <span class="${p.net >= 0 ? "up" : "dn"}">${sg(p.net)}</span>
     <small class="dim">stop ${fp(p.stop)} · hedef ${p.armed ? "iz-süren" : "+$" + j.cfg.tp + " net"} · likidasyon ≈ ${fp(p.liq)} (%${isFinite(p.liqDist) ? (p.liqDist*100).toFixed(0) : "—"} uzakta, cross)</small></div>`).join(""); }
 function html(){
-  if (!P) return `<details class="cp-d cps-d"><summary><b>🖥 SUNUCU</b> <small>BİLEŞİK OTO 7/24 · uygulama kapalıyken de çalışır · SİM</small> <span class="cp-st">EŞLİ DEĞİL</span></summary>
-    <div class="cp-b"><small class="dim">Sunucu çalışırken oluşan eşleşme linkini buraya yapıştır (yalnız bu cihazda saklanır). Eşleşince bu uygulamadaki yerel BİLEŞİK OTO durur; kasa ve işlemler sunucudan gösterilir. Gerçek emir yok.</small>
-    <div class="cp-f"><label>eşleşme linki<input type="text" data-cs-in="link" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="…#comppair=…"></label></div><div class="cp-act"><button type="button" class="mini" data-cs="pair">EŞLE</button></div>${S.note ? `<div class="cp-n dim">${esc(S.note)}</div>` : ""}</div></details>`;
-  const j = S.j; if (!j) return `<details class="cp-d cps-d" open><summary><b>🖥 SUNUCU</b> <small>BİLEŞİK OTO 7/24 · SİM</small> <span class="cp-st warn">${S.conn === "err" ? "ULAŞILAMIYOR" : "BAĞLANIYOR"}</span></summary><div class="cp-b"><small class="dim">${esc(S.err || "bağlanılıyor…")}</small><div class="cp-act"><button type="button" class="mini" data-cs="unpair">EŞLEMEYİ KALDIR</button></div></div></details>`;
+  if (!P) return `<div class="cps-card cps-unpaired"><div class="cps-hd"><b>🖥 SUNUCU</b> <small>BİLEŞİK OTO 7/24 · uygulama kapalıyken de çalışır · SİM</small> <span class="cp-st">EŞLİ DEĞİL</span></div>
+    <p class="cps-help">Eşleşme linkini buraya yapıştır, sonra <b>BAĞLAN</b>'a bas. Link yalnız bu telefonda saklanır. Eşleşince yerel BİLEŞİK OTO durur; kasa ve işlemler sunucudan gösterilir. Gerçek emir yok.</p>
+    <div class="cp-f"><label>eşleşme linki<input type="text" data-cs-in="link" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url" placeholder="…#comppair=…"></label></div>
+    <div class="cp-act"><button type="button" class="mini on" data-cs="pair">BAĞLAN</button></div>${S.note ? `<div class="cp-n dim">${esc(S.note)}</div>` : ""}</div>`;
+  const j = S.j; if (!j) return `<div class="cps-card"><div class="cps-hd"><b>🖥 SUNUCU</b> <small>BİLEŞİK OTO 7/24 · SİM</small> <span class="cp-st warn">${S.conn === "err" ? "ULAŞILAMIYOR" : "BAĞLANIYOR"}</span></div><p class="cps-help dim">${esc(S.err || "bağlanılıyor…")}</p><div class="cp-act"><button type="button" class="mini" data-cs="unpair">EŞLEMEYİ KALDIR</button></div></div>`;
   const st = j.status, c = j.cfg, d = st.day, age = Math.round((Date.now() - S.at)/1000), cls = st.state === "AÇIK" ? "on" : /HEDEF/.test(st.state) ? "tp" : st.state === "KAPALI" ? "" : "warn", stale = S.conn === "err" || age > 30;
   const hist = j.hist.slice(0, 6).map(r => `<span class="${r.net >= 0 ? "up" : "dn"}" title="${esc(r.why)}">${esc(r.sym.replace("USDT", ""))} ${sg(r.net)}</span>`).join(" · ") || "—";
   const sc = j.scan, scTxt = sc.busy ? `taranıyor ${sc.done}/${sc.total}` : sc.at ? `son tarama ${tm(sc.at)} · ${sc.total} coin · ${Math.round(sc.dur/1000)} sn` : "tarama bekleniyor";
@@ -69,17 +70,33 @@ function paint(){ const els = $$(".cps"); if (!els.length) return; const ae = do
   if (!P && els.some(e => { const i = e.querySelector("[data-cs-in]"); return i && i.value; })) return; /* never wipe a pasted link */
   const open = els.map(e => { const d = e.querySelector(".cps-d"), s = e.querySelector(".cp-set"); return [d && d.open, s && s.open]; }); const h = html();
   els.forEach((e, i) => { e.innerHTML = h; const d = e.querySelector(".cps-d"), s = e.querySelector(".cp-set"); if (d && open[i][0] !== undefined && open[i][0] !== null && e.dataset.init) d.open = open[i][0]; if (s && open[i][1]) s.open = true; e.dataset.init = "1"; }); }
+function pairFrom(s){ const p = X.parsePair(s); if (!p) return false;
+  P = { url: p.url, token: p.token, at: Date.now() }; try { localStorage.setItem(X.K, JSON.stringify(P)); } catch(err){}
+  S.j = null; S.conn = "conn"; S.note = ""; S.err = ""; stopLocal();
+  try { window.NAV && NAV.go("short"); } catch(e){}
+  toast("✔ BİLEŞİK OTO sunucusu eşlendi", "good"); paint(); poll(); return true; }
 function click(e){ const b = e.target.closest("[data-cs]"); if (!b) return; const a = b.dataset.cs;
-  if (a === "pair"){ const el = b.closest(".cps").querySelector('[data-cs-in="link"]'), p = X.parsePair(el && el.value); if (!p){ S.note = "✖ link geçersiz (…#comppair=adres|token)"; return paint(); }
-    P = { url: p.url, token: p.token, at: Date.now() }; try { localStorage.setItem(X.K, JSON.stringify(P)); } catch(err){} S.j = null; S.conn = "conn"; S.note = ""; stopLocal(); paint(); poll(); }
+  if (a === "pair"){ const el = b.closest(".cps").querySelector('[data-cs-in="link"]'); if (!pairFrom(el && el.value)){ S.note = "✖ link geçersiz (…#comppair=adres|token)"; paint(); } }
   else if (a === "unpair"){ P = null; S.j = null; S.conn = "off"; S.note = ""; try { localStorage.removeItem(X.K); } catch(err){} document.body.classList.remove("cps-on"); paint(); }
   else if (a === "toggle") cmd("/api/toggle", { on: !(S.j && S.j.cfg.on) }, S.j && S.j.cfg.on ? "durduruldu" : "başlatıldı");
-  else if (a === "kill") cmd("/api/kill", {}, "HEPSİ DURDURULDU");
+  else if (a === "kill") cmd("/api/kill", {}, "HEPSİNİ DURDURULDU");
   else if (a === "reset"){ const go = () => cmd("/api/reset", { confirm: "SIFIRLA" }, "sıfırlandı");
     if (window.CONN && CONN.typedConfirm) CONN.typedConfirm("SUNUCU BİLEŞİK OTO SIFIRLA", "Sunucudaki sanal kasa başlangıç değerine döner; sanal pozisyonlar ve geçmiş silinir. Gerçek hesap etkilenmez.", "SIFIRLA").then(ok => ok && go()); else if (confirm("Sunucudaki bileşik SİM sıfırlansın mı?")) go(); } }
 function change(e){ const i = e.target.closest("[data-cs-f]"); if (!i) return; const k = i.dataset.csF; cmd("/api/cfg", { cfg: { [k]: i.type === "checkbox" ? i.checked : i.value } }, "ayar sunucuya kaydedildi"); }
+/* If a COMP pair link is pasted into the MEME tab's "Gelişmiş · SUNUCU" box, do not feed it to the MEME bot: show a hint and route it here. #pair= MEME links are left alone. */
+function memeHint(on, el){ let h = document.getElementById("cps-meme-hint");
+  if (!on){ if (h) h.remove(); return; }
+  if (!h){ h = document.createElement("div"); h.id = "cps-meme-hint"; h.className = "cps-hint"; h.setAttribute("role", "status");
+    const mount = (el && (el.closest("label") || el.parentNode)) || document.getElementById("srv-box"); if (!mount) return; mount.insertAdjacentElement("afterend", h);
+    h.addEventListener("click", ev => { if (!ev.target.closest("[data-cs-memeroute]")) return; pairFrom((document.getElementById("sv-link") || {}).value); }); }
+  h.innerHTML = `Bu link SHORT sekmesindeki 🖥 SUNUCU için. MEME botuna ait değil.<br><button type="button" class="mini on" data-cs-memeroute="1">SHORT'A GİT VE BAĞLAN</button>`; }
 function init(){ document.addEventListener("click", ev => { if (ev.target.closest(".cps")) click(ev); }); document.addEventListener("change", ev => { if (ev.target.closest(".cps")) change(ev); });
-  if (P) document.body.classList.add("cps-on"); setInterval(poll, 5000); document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); }); setTimeout(() => { paint(); poll(); }, 1500); setInterval(paint, 4000); }
+  document.addEventListener("input", ev => { if (ev.target && ev.target.id === "sv-link") memeHint(!!X.parsePair(ev.target.value), ev.target); }, true);
+  document.addEventListener("paste", ev => { if (!(ev.target && ev.target.id === "sv-link")) return; setTimeout(() => memeHint(!!X.parsePair(ev.target.value), ev.target), 0); }, true);
+  document.addEventListener("click", ev => { const b = ev.target.closest && ev.target.closest("#sv-pair"); if (!b) return; const v = (document.getElementById("sv-link") || {}).value; if (!X.parsePair(v)) return;
+    ev.preventDefault(); ev.stopPropagation(); pairFrom(v); }, true);
+  if (P) document.body.classList.add("cps-on"); setInterval(poll, 5000); document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+  paint(); setTimeout(poll, 300); setInterval(paint, 4000); }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
-return { get P(){ return !!P; }, get S(){ return S; }, poll, paint };
+return { get P(){ return !!P; }, get S(){ return S; }, poll, paint, pairFrom, parsePair: X.parsePair };
 })();

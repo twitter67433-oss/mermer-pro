@@ -583,5 +583,16 @@ body.simple .agg-det{display:none}
 .cp-f{display:flex;flex-wrap:wrap;gap:6px 10px;margin:6px 0;font-size:10.5px}.cp-f label{display:flex;flex-direction:column;gap:1px}.cp-f input[type=number]{width:84px;font-size:11px;padding:2px 4px}.cp-f .cp-ck{flex-direction:row;align-items:center;gap:4px}
 .cp-set>summary{cursor:pointer;font-size:11px;margin-top:4px}
 /* v8.2.1 🖥 SUNUCU (BİLEŞİK OTO 7/24, SİM): while paired the local panel is stopped and hidden */
-.cps{margin:0 0 8px}.cps-d>summary{cursor:pointer;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}.cps .cp-f input[type=text]{width:100%;min-width:220px;font-size:11px;padding:3px 4px}
+.cps{margin:0 0 10px;display:block!important}
+.cps-d>summary{cursor:pointer;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.cps .cp-f input[type=text],.cps-unpaired input[type=text]{width:100%;min-width:0;box-sizing:border-box;font-size:14px;padding:8px 10px}
 body.cps-on .cp{display:none}
+/* v8.2.2: unpaired card is always open at the top of SHORT/LONG — not a collapsed <details> */
+.cps-card{margin:0 0 10px;padding:10px 12px;border:1.5px solid #b8975a;border-radius:10px;background:rgba(184,151,90,.10)}
+.cps-hd{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;font-size:13px}
+.cps-hd b{font-size:14px}
+.cps-help{font-size:12px;line-height:1.45;margin:8px 0}
+.cps-unpaired .cp-act .mini{font-weight:700;padding:8px 16px}
+.cps-hint{margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid #9a7432;background:rgba(154,116,50,.14);color:inherit;font-size:12.5px;line-height:1.4}
+.cps-hint button{margin-top:6px}
+body.simple .cps,body.simple .cps-card{display:block!important}
