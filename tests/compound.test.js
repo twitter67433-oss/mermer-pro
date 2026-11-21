@@ -76,4 +76,31 @@ ok("fetches only the public ticker price", (code.match(/fetch\(([^)]*)\)/g) || [
 for (const fl of ["trade.js", "auto.js", "exec.js", "bkeys.js", "bfxsafe.js", "copy.js", "remote.js", "meme.js", "pump.js"]){ const s = fs.readFileSync(path.join(__dirname, "..", fl), "utf8"); ok(`${fl}: no BİLEŞİK / COMP reference (test-only settings cannot leak into GERÇEK)`, !/COMPX|window\.COMP\b|mermer\.comp/.test(s)); }
 const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8"); ok("index.html loads comp.js after psim.js and has the panel in SHORT + LONG", html.indexOf("comp.js") > html.indexOf("psim.js") && /id="cp-short"/.test(html) && /id="cp-long"/.test(html));
 const ger = html.match(/<section id="(?:real|gercek|trade)[^>]*>[\s\S]*?<\/section>/i); ok("no panel inside a GERÇEK section", !ger || !/class="cp"/.test(ger[0]));
+
+/* v8.2.3: manual settings ($, %, auto stop) + validation */
+{ const c = C.cfgOf({}); ok("v8.2.3 defaults keep auto stop, % stake, $7 TP (old behaviour)", c.slMode === "auto" && c.stakeMode === "pct" && c.tpMode === "usd" && c.tp === 7 && c.stakePct === 5);
+  const v = C.validateCfg({}); ok("empty / default settings validate", v.ok && !v.errs.length);
+  ok("leverage 99 is rejected", !C.validateCfg({ lev: 99 }).ok);
+  ok("stop % past liquidation is rejected (20× max ~4.1 %)", !C.validateCfg({ slMode: "pct", slPct: 10, lev: 20 }).ok && /likidasyon/.test(C.validateCfg({ slMode: "pct", slPct: 10, lev: 20 }).errs.join()));
+  ok("1 % stop at 20× is inside the cap", C.validateCfg({ slMode: "pct", slPct: 1, lev: 20 }).ok);
+  ok("daily target ≤ start is rejected", !C.validateCfg({ start: 1000, target: 1000 }).ok);
+  ok("stake $ larger than the vault is rejected", !C.validateCfg({ stakeMode: "usd", stakeUsd: 2000, start: 1000 }).ok); }
+{ const S = mk({ stakeMode: "usd", stakeUsd: 80 }); ok("fixed $ stake is 80, not 5 % of 1000", C.stake(S) === 80);
+  const g = C.enter(S, sig(), 100, T0, { v: GIR }); ok("usd-stake trade opens with 80 $ margin", g.ok && near(g.pos.margin, 80)); }
+{ const S = mk({ slMode: "pct", slPct: 1 }); const g = C.enter(S, sig({ stop: 103 }), 100, T0, { v: GIR });
+  ok("stop % = 1 % below/above entry (SHORT → 101)", g.ok && near(g.pos.stop, 101, 0.02), g.pos && g.pos.stop);
+  const S2 = mk({ slMode: "pct", slPct: 1 }); const g2 = C.enter(S2, sig({ stop: undefined }), 100, T0, { v: GIR });
+  ok("pct stop does not need a signal SL", g2.ok && near(g2.pos.stop, 101, 0.02)); }
+{ const S = mk({ slMode: "usd", slUsd: 10 }); const g = C.enter(S, sig(), 100, T0, { v: GIR });
+  const loss = g.pos.side*(g.pos.entry - g.pos.stop)*g.pos.qty;
+  ok("stop $ ≈ 10 $ loss (fill slippage allowed)", g.ok && g.pos.stop > g.pos.entry && near(loss, 10, 0.5), g.pos && loss); }
+{ const S = mk({ slMode: "pct", slPct: 10, lev: 20 }); const g = C.enter(S, sig({ stop: 103 }), 100, T0, { v: GIR });
+  ok("user stop past liq is refused", !g.ok && /likidasyon/.test(g.why), g.why); }
+{ const far = 100 + 20; /* 20 % away, far past 20× liq */ const S = mk({ slMode: "auto" }); const g = C.enter(S, sig({ side: -1, stop: far }), 100, T0, { v: GIR });
+  const cap = 100 * C.maxSlPct(20)/100; ok("OTOMATİK stop past liq is tightened inside the cap, not refused", g.ok && g.tightened && g.pos.stop <= 100 + cap + 1e-9 && g.pos.stop > 100, g.pos && g.pos.stop); }
+{ const S = mk({ tpMode: "pct", tpPct: 1 }); const g = C.enter(S, sig({ side: -1, stop: 103 }), 100, T0, { v: GIR });
+  ok("TP % = 1 % of entry (SHORT below entry)", g.ok && g.pos.tp < g.pos.entry && near(g.pos.tp, g.pos.entry*0.99, 0.02), g.pos && g.pos.tp); }
+{ const html = fs.readFileSync(path.join(__dirname, "../comp.js"), "utf8");
+  ok("local panel has KAYDET and OTOMATİK / % / $ stop+stake+TP", /data-cp="save">KAYDET</.test(html) && /OTOMATİK/.test(html) && /stakeMode/.test(html) && /tpMode/.test(html) && /slMode/.test(html)); }
+
 console.log(f ? `\n${f} FAILED` : "\nall passed"); process.exit(f ? 1 : 0);

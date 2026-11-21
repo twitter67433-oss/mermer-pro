@@ -596,3 +596,11 @@ body.cps-on .cp{display:none}
 .cps-hint{margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid #9a7432;background:rgba(154,116,50,.14);color:inherit;font-size:12.5px;line-height:1.4}
 .cps-hint button{margin-top:6px}
 body.simple .cps,body.simple .cps-card{display:block!important}
+
+/* v8.2.3 local BİLEŞİK OTO settings */
+.cp-row{margin:8px 0;padding:6px 0;border-top:1px dotted rgba(127,127,127,.3)}
+.cp-row b{display:block;font-size:11px;margin-bottom:4px}
+.cp-rd{margin-right:10px}
+.cp-err{margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid #9b1c31;background:rgba(155,28,49,.08);color:#9b1c31;font-size:12px;line-height:1.4}
+.cp-set .mini.on{font-weight:700;padding:8px 16px}
+/* v8.2.3: 🖥 SUNUCU stays in the page but collapsed at the bottom, not taking the top of SHORT */

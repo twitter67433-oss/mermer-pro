@@ -69,10 +69,10 @@ for (const fl of ["server/comp-engine.cjs", "server/comp-server.mjs"]){ const co
 { const code = strip(fs.readFileSync(path.join(D, "server/comp-server.mjs"), "utf8")), urls = [...code.matchAll(/fetch\(([^)]*)/g)].map(m => m[1]);
   ok("comp-server.mjs fetches only ntfy.sh (address discovery) and its own tunnel /api/ping", urls.length > 0 && urls.every(u => /ntfy\.sh|\/api\/ping/.test(u)), urls.map(u => u.slice(0, 40)).join(" | "));
   ok("engine uses no module of the GERÇEK / MEME / key code (only sert, psim, aksiyon, comp, squeeze)", (fs.readFileSync(path.join(D, "server/comp-engine.cjs"), "utf8").match(/require\(path\.join\(ROOT, "([a-z0-9.-]+)"\)\)/g) || []).every(m => /"(sert|psim|aksiyon|comp|squeeze)\.js"/.test(m))); }
-/* the signal engine and the existing lists/badges are untouched by v8.2.1 */
+/* the signal engine and the existing lists/badges stay untouched; v8.2.3 may change comp.js settings only */
 { const { execSync } = require("child_process"); let d = ""; try { d = execSync("git diff --name-only 3e11991", { cwd: D }).toString(); } catch(e){}
-  const touched = d.split("\n").filter(x => /^(sert|sig8|aksiyon|psim|comp|badge|hareket|squeeze|agg|trade|auto|exec|bkeys|bfxsafe)\.js$/.test(x));
-  ok("v8.2.1 does not modify the signal engine, badges, psim, comp.js or any GERÇEK / key module", !touched.length, touched.join() || "(git: sert/sig8/aksiyon/psim/comp/badge/trade/auto/exec/bkeys unchanged)"); }
+  const touched = d.split("\n").filter(x => /^(sert|sig8|aksiyon|psim|badge|hareket|squeeze|agg|trade|auto|exec|bkeys|bfxsafe)\.js$/.test(x));
+  ok("v8.2.3 does not modify the signal engine, badges, psim or any GERÇEK / key module (comp.js settings only)", !touched.length, touched.join() || "(git: sert/sig8/aksiyon/psim/badge/trade/auto/exec/bkeys unchanged)"); }
 /* ---- 6. real HTTP server: token auth, read-only state, file modes ---- */
 { const dir = fs.mkdtempSync(path.join(os.tmpdir(), "compsrv-")), port = 20000 + Math.floor(Math.random()*20000);
   const ch = spawn(process.execPath, [path.join(D, "server/comp-server.mjs")], { env: Object.assign({}, process.env, { COMP_DATA: dir, COMP_PORT: String(port), COMP_TUNNEL: "0", COMP_DISCOVERY: "0", COMP_OFFLINE: "1" }), stdio: "ignore" });

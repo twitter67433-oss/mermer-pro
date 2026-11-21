@@ -1,4 +1,4 @@
-// v8.2.2 🖥 SUNUCU phone panel (compsrv.js) tests: node tests/compsrv.test.js
+// v8.2.3 🖥 SUNUCU phone panel (compsrv.js) tests: node tests/compsrv.test.js
 const fs = require("fs"), path = require("path"), X = require("../compsrv.js"), D = path.join(__dirname, ".."); let f = 0;
 const ok = (n, c, i) => { console.log((c ? "PASS " : "FAIL ") + n + (i !== undefined ? "  · " + i : "")); if (!c) f++; };
 const T = "A".repeat(43);
@@ -19,9 +19,12 @@ const ger = html.match(/<section id="(?:real|gercek|trade)[^>]*>[\s\S]*?<\/secti
 ok("local comp.js is unchanged by v8.2.1 (separate account stays untouched; hidden only while paired)", /body\.cps-on \.cp\{display:none\}/.test(fs.readFileSync(path.join(D, "meme.css"), "utf8")));
 for (const fl of ["trade.js", "auto.js", "exec.js", "bkeys.js", "bfxsafe.js", "copy.js", "remote.js", "meme.js", "pump.js", "sert.js", "aksiyon.js", "sig8.js", "badge.js"]){ const s = fs.readFileSync(path.join(D, fl), "utf8"); ok(`${fl}: no compsrv / COMPSRV reference`, !/compsrv|COMPSRV|comppair/i.test(s)); }
 
-ok("unpaired panel is an always-open card with a paste box and BAĞLAN (not a collapsed details)", /cps-unpaired/.test(src) && />BAĞLAN</.test(src) && !/data-cs="pair">EŞLE</.test(src) && src.indexOf("cps-unpaired") < src.indexOf("<details"));
-ok("index.html: 🖥 SUNUCU sits ABOVE the local 🧪 panel in SHORT and LONG", html.indexOf('id="cps-short"') < html.indexOf('id="cp-short"') && html.indexOf('id="cps-long"') < html.indexOf('id="cp-long"'));
+ok("unpaired 🖥 is a collapsed details (not an always-open card at the top) and still has BAĞLAN", /cps-unpaired/.test(src) && /<details class="cp-d cps-d cps-unpaired">/.test(src) && />BAĞLAN</.test(src) && !/cps-unpaired"><div class="cps-card/.test(src));
+ok("index.html: local 🧪 panel sits ABOVE the 🖥 SUNUCU card in SHORT and LONG", html.indexOf('id="cp-short"') < html.indexOf('id="cps-short"') && html.indexOf('id="cp-long"') < html.indexOf('id="cps-long"'));
 ok("a COMP pair link in the MEME SUNUCU box is detected and routed (hint + intercept); #pair= is left to remote.js", /sv-link/.test(src) && /Bu link SHORT sekmesindeki/.test(src) && /#sv-pair/.test(src) && /pairFrom/.test(src) && !/indexOf\("#pair="\)/.test(src));
-ok("paints immediately (not after 1.5 s)", /paint\(\); setTimeout\(poll/.test(code) && !/setTimeout\(\(\) => \{ paint\(\); poll\(\); \}, 1500\)/.test(code));
+ok("paints immediately; does not start poll unless paired", /paint\(\); setInterval\(paint/.test(code) && /if \(P\)\{ setInterval\(poll/.test(code));
+ok("auto-unpairs leftover pre-8.2.3 sessions (mig !== 823) so the local panel resumes", /p\.mig !== 823/.test(src) && /mig: 823/.test(src));
+ok("poll / discover / ntfy do nothing while unpaired (0 requests)", /async function poll\(\)\{ if \(!P\) return/.test(code) && /async function discover\([^)]*\)\{ if \(!P /.test(code) && /async function api\([^)]*\)\{ if \(!P\) throw/.test(code));
+ok("#comppair= hash is stripped and not auto-paired (BAĞLAN stays manual)", /do not auto-pair/.test(src) && /history.replaceState/.test(src));
 
 console.log(f ? `\n${f} FAILED` : "\nall passed"); process.exit(f ? 1 : 0);

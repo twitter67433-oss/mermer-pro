@@ -1,5 +1,11 @@
 # CHANGELOG — MERMER TERMİNAL
 
+## 8.2.3 — 2026-11-21 · Yerel 🧪 BİLEŞİK OTO ayarları; 🖥 SUNUCU varsayılan kapalı
+- **Yerel panel (KAYDET):** kaldıraç; işlem tutarı $ veya %; maks. pozisyon; STOP zorunlu — OTOMATİK (sinyal, likidasyon mesafesinin içinde sıkılaştırılır), % veya $ (likidasyonun ötesindeyse reddedilir); TP $ veya % + isteğe bağlı iz-süren; günlük hedef / günlük zarar; başlangıç kasa (yalnız SIFIRLA ile uygulanır). Geçersiz değerler kaydedilmez. Varsayılanlar eskisi gibi: 1000 $, maks. 2, %5, 20×, +7 $ net, OTOMATİK stop.
+- **🖥 SUNUCU:** kutu sunucusu durduruldu (STOP dosyası, süreç yok; state.json duruyor). Panel kodu duruyor ama SHORT/LONG'da yerel 🧪'nin *altında*, varsayılan kapalı bir `<details>`. Eski eşleşme (v8.2.2) bir kez çözülür; eşleşmemişken sunucuya / ntfy'ye istek yok (0 istek). `#comppair=` otomatik eşlemez; BAĞLAN yolu ileride duruyor.
+- Dokunulmadı: sinyal motoru, listeler, rozetler, GERÇEK, MEME. "Kanıtlanmadı" uyarısı duruyor.
+
+
 ## 8.2.2 — 2026-11-21 · 🖥 SUNUCU paneli SHORT/LONG üstünde, her zaman görünür
 - **Düzeltme:** v8.2.1'de eşleşmemiş 🖥 SUNUCU paneli kapalı bir `<details>` idi ve yerel 🧪 BİLEŞİK OTO'nun *altında* duruyordu. Telefonda (412×915) 🧪 paneli ilk ekranı doldurduğu için 🖥 satırı ya katlanmış bir özet olarak kalıyor ya da kaydırınca bile yapıştırma kutusu görünmüyordu. Panel artık SHORT ve LONG'un *en üstünde*, her zaman açık bir kart: yapıştırma kutusu + **BAĞLAN** düğmesi.
 - MEME sekmesindeki "Gelişmiş · SUNUCU" kutusuna BİLEŞİK (`#comppair=`) linki yapıştırılırsa ipucu çıkar: "Bu link SHORT sekmesindeki 🖥 SUNUCU için"; **SHORT'A GİT VE BAĞLAN** (veya o kutudaki bağlan düğmesi) paneli SHORT'a yönlendirir. MEME `#pair=` linkleri eskisi gibi çalışır; GERÇEK ve sinyal motoruna dokunulmadı.
