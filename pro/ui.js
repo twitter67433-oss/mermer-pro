@@ -105,8 +105,8 @@ function candBox(c, d){ const sz = C.size({ balance: cfg.balance, riskPct: cfg.r
   <ul class="pro-why">${c.why.map(w => `<li>${esc(w)}</li>`).join("")}<li>aileler: ${c.pro} lehte · ${c.con} aleyhte</li></ul>`; }
 function evidenceTable(){ const R = V.rows || []; if (!R.length) return '<div class="empty">doğrulama verisi yok</div>';
   const f = (x, d = 3) => fin(x) ? x.toFixed(d) : "—";
-  return `<table class="pro-t"><tr><th>strateji</th><th>giriş</th><th>H1 beklenti R [95% GA]</th><th>H2 beklenti R [95% GA]</th><th>PF H1/H2</th><th>rastgele H1/H2</th><th>durum</th></tr>${R.map(r => `<tr><td>${esc(r.name)}</td><td>${r.mode === "PB" ? "geri çekilme" : "piyasa"}</td>
-    <td>${f(r.h1.exp)} [${f(r.h1.ciLo, 2)}, ${f(r.h1.ciHi, 2)}] n${r.h1.n}</td><td>${f(r.h2.exp)} [${f(r.h2.ciLo, 2)}, ${f(r.h2.ciHi, 2)}] n${r.h2.n}</td><td>${f(r.h1.pf, 2)} / ${f(r.h2.pf, 2)}</td><td>${f(r.h1.rand)} / ${f(r.h2.rand)}</td><td>${r.pass ? '<b class="pro-up">aktif</b>' : '<b class="pro-dn">kanıtlanmadı</b>'}</td></tr>`).join("")}</table>
+  return `<table class="pro-t"><tr><th>strateji · giriş</th><th>H1 R [95% GA]</th><th>H2 R [95% GA]</th><th>PF H1/H2</th><th>rastgele</th><th>durum</th></tr>${R.map(r => `<tr><td title="${esc(r.name)}"><b>${esc(r.key)}</b> ${r.mode === "PB" ? "limit" : "piyasa"}</td>
+    <td>${f(r.h1.exp)} [${f(r.h1.ciLo, 2)}, ${f(r.h1.ciHi, 2)}] n${r.h1.n}</td><td>${f(r.h2.exp)} [${f(r.h2.ciLo, 2)}, ${f(r.h2.ciHi, 2)}] n${r.h2.n}</td><td>${f(r.h1.pf, 2)} / ${f(r.h2.pf, 2)}</td><td>${f(r.h1.rand)} / ${f(r.h2.rand)}</td><td>${r.pass ? '<b class="pro-up">aktif</b>' : '<b class="pro-dn">✗ kanıt yok</b>'}</td></tr>`).join("")}</table><div class="pro-note">TPB = trend geri çekilme · RREV = yatay bant dönüşü · BRK = sıkışma kırılımı · SWP = likidite süpürme dönüşü · limit = 0.3 ATR geri çekilme limiti. Hepsi: kanıtlanmadı.</div>
   <div class="pro-note">${esc(V.meta.text || "")}</div>`; }
 function paint(){ const box = $("#pro-box"); if (!box) return; const d = S.data, dec = decide(d), ev = d && d.ev;
   const keep = {}; box.querySelectorAll("details[data-k]").forEach(x => keep[x.dataset.k] = x.open);
