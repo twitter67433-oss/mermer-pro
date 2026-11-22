@@ -7,13 +7,13 @@ const sig = (o = {}) => Object.assign({ sym: "AAAUSDT", k: "sert", side: -1, ent
 const mk = (cfg = {}) => { const S = C.create(Object.assign({ on: true }, cfg)); C.roll(S, T0); return S; };
 const tick = (S, sym, px, t) => C.stepSym(S, sym, { o: px, h: px, l: px, c: px }, t);
 /* defaults = the owner's brief */
-{ const c = C.cfgOf({}); ok("defaults: 1000 $ vault, max 2 positions, 5 % stake (=50 $), 20×, +7 $ net TP, 2000 $ target, −10 % day loss, automatic (on) in SİM", c.start === 1000 && c.maxPos === 2 && c.stakePct === 5 && c.lev === 20 && c.tp === 7 && c.target === 2000 && c.lossPct === 10 && c.on === true && c.trail === false);
+{ const c = C.cfgOf({}); ok("MERMER PRO defaults: 1000 $ vault, max 2 positions, 5 % stake, 5× (was 20×), +7 $ net TP, 2000 $ target, −10 % day loss, OFF by default (kanıtlanmadı)", c.start === 1000 && c.maxPos === 2 && c.stakePct === 5 && c.lev === 5 && c.tp === 7 && c.target === 2000 && c.lossPct === 10 && c.on === false && c.trail === false);
   const d = C.cfgOf({ lev: 999, maxPos: 99, tp: -5, stakePct: "x", start: 0 }); ok("settings are clamped / sanitized", d.lev === 50 && d.maxPos === 5 && d.tp === 0.5 && d.stakePct === 5 && d.start === 10, JSON.stringify([d.lev, d.maxPos, d.tp, d.stakePct, d.start])); }
 /* compounding stake 50 → 60 → 70 → 80, shrink after loss */
 { const S = mk(); ok("stake at 1000 = 50 $", C.stake(S) === 50);
   S.acct.bal = 1200; ok("stake at 1200 = 60 $", C.stake(S) === 60); S.acct.bal = 1400; ok("stake at 1400 = 70 $", C.stake(S) === 70); S.acct.bal = 1600; ok("stake at 1600 = 80 $", C.stake(S) === 80);
   S.acct.bal = 800; ok("stake shrinks after losses (800 → 40 $)", C.stake(S) === 40); S.acct.bal = 50; ok("below min stake → no trade", C.stake(S) === 0);
-  const s2 = mk(); const g = C.enter(s2, sig(), 100, T0, { v: GIR }); ok("margin of the first trade = 50 $, notional 1000 $ at 20×", g.ok && near(g.pos.margin, 50) && near(g.pos.qty*g.pos.entry, 1000, 1e-6), g.pos && g.pos.margin); }
+  const s2 = mk({ lev: 20 }); const g = C.enter(s2, sig(), 100, T0, { v: GIR }); ok("margin of the first trade = 50 $, notional 1000 $ at 20×", g.ok && near(g.pos.margin, 50) && near(g.pos.qty*g.pos.entry, 1000, 1e-6), g.pos && g.pos.margin); }
 /* take-profit nets +7 $ AFTER fees, with the realistic cost model ON and OFF */
 for (const side of [1, -1]) for (const costs of [true, false]){ const C0 = Object.assign({}, P.COST); if (!costs) P.setCost({ spread: 0, slip: 0, lat: 0 });
   const S = mk(), g = C.enter(S, sig({ side, entry: 100, stop: side > 0 ? 97 : 103 }), 100, T0, { v: GIR }), p = g.pos; const r = tick(S, "AAAUSDT", p.tp, T0 + 60000);
@@ -68,7 +68,7 @@ for (const side of [1, -1]) for (const costs of [true, false]){ const C0 = Objec
 { const st = P.create(1000); let e = ""; try { P.open(st, { sym: "A", side: 1, margin: 50, lev: 50, px: 100, stop: 97 }); } catch(x){ e = x.message; } ok("manual SİM (isolated) still refuses a stop beyond liquidation", /likidasyon/.test(e));
   const p = P.open(st, { sym: "A", side: 1, margin: 50, lev: 50, px: 100, stop: 97, cross: true }); ok("cross open allows it (account-level check instead)", p.cross === true && p.liq === 0); }
 /* persistence is plain JSON; SİM only, never GERÇEK */
-{ const S = mk(); C.enter(S, sig(), 100, T0, { v: GIR }); const j = JSON.parse(JSON.stringify(S)); ok("state survives a JSON round trip (localStorage)", j.acct.pos.length === 1 && j.acct.pos[0].stop === 103 && j.cfg.lev === 20); }
+{ const S = mk(); C.enter(S, sig(), 100, T0, { v: GIR }); const j = JSON.parse(JSON.stringify(S)); ok("state survives a JSON round trip (localStorage)", j.acct.pos.length === 1 && j.acct.pos[0].stop === 103 && j.cfg.lev === 5); }
 const src = fs.readFileSync(path.join(__dirname, "../comp.js"), "utf8"), code = src.replace(/\/\*[\s\S]*?\*\//g, "");
 ok("comp.js never references real-trading modules or order endpoints", !/\b(TRADE|EXEC|AUTO|MEME|BKEYS|BFXSAFE|CONN\.(save|key))\b\.|fapi\/v1\/(order|batchOrders|leverage|algoOrder)|\/api\/trade|trade-local|sendTransaction|sendBundle|apiKey|api_key|secret|privateKey|signTransaction|X-MBX-APIKEY/i.test(code));
 ok("its only storage key is mermer.comp", (code.match(/mermer\.[a-z.]+/g) || []).every(k => k === "mermer.comp"), (code.match(/mermer\.[a-z.]+/g) || []).join());
@@ -96,7 +96,7 @@ const ger = html.match(/<section id="(?:real|gercek|trade)[^>]*>[\s\S]*?<\/secti
   ok("stop $ ≈ 10 $ loss (fill slippage allowed)", g.ok && g.pos.stop > g.pos.entry && near(loss, 10, 0.5), g.pos && loss); }
 { const S = mk({ slMode: "pct", slPct: 10, lev: 20 }); const g = C.enter(S, sig({ stop: 103 }), 100, T0, { v: GIR });
   ok("user stop past liq is refused", !g.ok && /likidasyon/.test(g.why), g.why); }
-{ const far = 100 + 20; /* 20 % away, far past 20× liq */ const S = mk({ slMode: "auto" }); const g = C.enter(S, sig({ side: -1, stop: far }), 100, T0, { v: GIR });
+{ const far = 100 + 20; /* 20 % away, far past 20× liq */ const S = mk({ slMode: "auto", lev: 20 }); const g = C.enter(S, sig({ side: -1, stop: far }), 100, T0, { v: GIR });
   const cap = 100 * C.maxSlPct(20)/100; ok("OTOMATİK stop past liq is tightened inside the cap, not refused", g.ok && g.tightened && g.pos.stop <= 100 + cap + 1e-9 && g.pos.stop > 100, g.pos && g.pos.stop); }
 { const S = mk({ tpMode: "pct", tpPct: 1 }); const g = C.enter(S, sig({ side: -1, stop: 103 }), 100, T0, { v: GIR });
   ok("TP % = 1 % of entry (SHORT below entry)", g.ok && g.pos.tp < g.pos.entry && near(g.pos.tp, g.pos.entry*0.99, 0.02), g.pos && g.pos.tp); }

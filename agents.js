@@ -56,7 +56,7 @@ function scanTokens(){ const ST = M()._ST, out = []; for (const [mint, c] of ST.
   SCN.rank = out.sort((a, b) => b.score - a.score); }
 async function scanPerps(){ if (!C.perps || SCN.busy || !ENG() || Date.now() - SCN.perpAt < 300000) return; SCN.busy = true;
   try { const T = await ENG().fx("/fapi/v1/ticker/24hr"); const L = T.filter(x => /USDT$/.test(x.symbol)).sort((a, b) => +b.quoteVolume - +a.quoteVolume).slice(0, 30); const hits = [];
-    for (let i = 0; i < L.length; i += 5) await Promise.all(L.slice(i, i + 5).map(async x => { try { const k = await ENG().fx(`/fapi/v1/klines?symbol=${x.symbol}&interval=1h&limit=60`); const c = k.map(b => +b[4]); const s = A().perpSetups(c);
+    for (let i = 0; i < L.length; i += 5) await Promise.all(L.slice(i, i + 5).map(async x => { try { const k = await ENG().fx(`/fapi/v1/klines?symbol=${x.symbol}&interval=1h&limit=61`); const c = k.filter(b => +b[6] < Date.now()).map(b => +b[4]); /* PRO fix: drop the forming 1h candle (repaint) */ const s = A().perpSetups(c);
       if (s.tags.length) hits.push({ sym: x.symbol, tags: s.tags, rsi: s.rsi, px: c[c.length-1], chg: +x.priceChangePercent }); } catch(e){} }));
     SCN.perps = hits; SCN.perpN = L.length; SCN.perpAt = Date.now(); SCN.perpErr = null; }
   catch(e){ SCN.perpErr = e.message || String(e); SCN.perpAt = Date.now() - 240000; } finally { SCN.busy = false; } }

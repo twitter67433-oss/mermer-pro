@@ -1,4 +1,17 @@
-# CHANGELOG — MERMER TERMİNAL
+# CHANGELOG — MERMER PRO (MERMER TERMİNAL 8.2.5'ten ayrılmış kopya)
+
+## 9.0.0 — 2026-11-22 · MERMER PRO: kanıta dayalı PRO sekmesi
+- **Ayrı uygulama:** ad MERMER PRO, Android paketi `com.onur.mermerpro`, ayrı GitHub deposu/Pages adresi, `mpro:` önekli depolama (orijinal uygulamanın verisi görülmez).
+- **PRO sekmesi (varsayılan açılış):** tek cevap LONG / SHORT / BEKLE; dokununca giriş, ATR stop, TP1/TP2, geçersizlik, RR, aile kanıtları, reddedilen adaylar. Yalnız kapanmış mumlar; 5dk/15dk/1s/4s; EMA, RSI, MACD, ADX, ATR, VWAP, Bollinger, OBV, taker delta, fonlama, yapı (HH/HL/LH/LL, BOS), süpürme; aileler bir kez sayılır. Rejim: TREND / YATAY / GEÇİŞ / YÜKSEK VOL / DÜŞÜK LİKİDİTE / ANORMAL.
+- **Doğrulama (tools/pro):** 120 coin × 180 gün Binance USDⓈ-M, maliyet+kayma+fonlama, iki örnek-dışı yarı, bootstrap GA, rastgele giriş tabanı. **Sonuç: 4 stratejinin hiçbiri geçmedi → hepsi "kanıtlanmadı", PRO sekmesi BEKLE der.** Ayrıntı: docs/PRO_VALIDATION.md.
+- **İleri test günlüğü:** her kurulum (gölge) kaydedilir, TP/SL/zaman aşımıyla kendiliğinden sonuçlanır; strateji/giriş/rejim başına canlı isabet ve ortalama R. Otomatik ayar yok.
+- **Risk motoru:** işlem başı %1 (en fazla %2), stop mesafesinden boyut, kaldıraç tavanı (≤10, varsayılan 5), stop likidasyonun içinde, günlük zarar %3, 3 kayıp → 12 saat soğuma, en fazla 2 açık, KAPAT ALL, ACİL DURDURMA. Martingale / kayıptan sonra büyütme yok.
+- **Denetim düzeltmeleri:** kapanmamış mum (repaint) coinan.js + agents.js, Wilder RSI (agentcore.js), EMA SMA tohumu (chart.js), BİLEŞİK OTO varsayılan kapalı/5× (comp.js). Liste: docs/PRO_AUDIT.md.
+- **Testler:** 36 mevcut test (uyarlandı) + 5 yeni (indikatör referansları, ileriye bakış yok, risk, sonuçlandırıcı, depolama/güvenlik) = 41, hepsi geçiyor.
+- Dokunulmadı: GERÇEK sekmesi ve güvenceleri, MEME. PRO sekmesi emir göndermez, API anahtarı kullanmaz.
+
+---
+
 
 ## 8.2.5 — 2026-11-21 · formda satır içi onsubmit yok (CSP)
 - 8.2.4'teki `onsubmit="return false"` CSP'yi ihlal ediyordu; kaldırıldı, gönderim JS ile `preventDefault` ile durdurulur. Ayarlar aynı.

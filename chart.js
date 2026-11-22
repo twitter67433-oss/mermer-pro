@@ -25,7 +25,7 @@ ovBar && ovBar.addEventListener("click", e => { const b = e.target.closest("[dat
 function tzOff(ts){ const d = new Date(ts*1000), TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Berlin";
   return (new Date(d.toLocaleString("en-US", { timeZone: TZ })) - new Date(d.toLocaleString("en-US", { timeZone: "UTC" })))/1000; }
 const intraday = () => SEC[tf] < 86400;
-function emaAll(n){ const k = 2/(n + 1), out = []; let e = null; for (const b of bars){ e = e === null ? b.c : b.c*k + e*(1 - k); out.push(e); } return out; }
+function emaAll(n){ const k = 2/(n + 1), out = []; let e = null, s = 0, c = 0; for (const b of bars){ if (e === null){ s += b.c; c++; if (c >= n) e = s/c; out.push(e === null ? s/c : e); } else { e = b.c*k + e*(1 - k); out.push(e); } } return out; } /* PRO fix: SMA-seeded EMA (matches Binance/TradingView; was seeded with the first close) */
 function vwapAll(){ const out = []; let day = null, pv = 0, v = 0; for (const b of bars){ const d = Math.floor(b.t/86400); if (d !== day){ day = d; pv = 0; v = 0; } const tp = (b.h + b.l + b.c)/3; pv += tp*b.v; v += b.v; out.push(v ? pv/v : b.c); } return out; }
 const vcol = b => b.c >= b.o ? "rgba(15,107,69,.38)" : "rgba(155,28,49,.38)";
 function plan(){ const S = D && D.data.signal; return S && S.dir === "SHORT" ? S.active : (D && (D.data.plan || (S && S.active))); }

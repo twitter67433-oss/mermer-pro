@@ -1,3 +1,15 @@
+# MERMER PRO
+
+MERMER TERMİNAL 8.2.5'in ayrı kopyası. Canlı: https://twitter67433-oss.github.io/mermer-pro/ · Android: `com.onur.mermerpro`.
+
+**PRO sekmesi** tek cevap verir: LONG / SHORT / BEKLE. Bir strateji yalnız örnek dışı doğrulamayı geçerse (iki yarıda pozitif beklenti, GA alt sınırı > −0.05R, rastgele girişi yener) LONG/SHORT üretebilir. **Şu an hiçbiri geçmedi (docs/PRO_VALIDATION.md) → PRO sekmesi BEKLE der.** Bu bir kâr garantisi değildir; geçmiş sonuçlar geleceği göstermez.
+
+- Doğrulamayı yeniden çalıştır: `node tools/pro/fetch.js && REPS=200 node tools/pro/bt.js && node tools/pro/report.js`
+- Testler: `for f in tests/*.test.js; do node $f; done`
+- Denetim: docs/PRO_AUDIT.md · Sınırlar: likidasyon/OI/emir defteri yalnız canlı ve karar dışı.
+
+---
+
 # MERMER TERMİNAL (eski adı NEON//TERMINAL) — mobil · v8.2
 
 ## v8.2

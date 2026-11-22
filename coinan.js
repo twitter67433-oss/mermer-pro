@@ -96,7 +96,7 @@ function bars(k){ return k.map(x => ({ t: +x[0], o: +x[1], h: +x[2], l: +x[3], c
 async function analyze(sym){ sym = sym || S.sym; if (S.busy) return; S.busy = true; S.err = null; const my = ++S.n; paintV(true);
   try { const info = S.list.find(x => x.s === sym); if (S.list.length && !info) throw new Error(sym + " Binance USDⓈ-M perp listesinde yok");
     if (info) S.dec = Math.max(0, Math.min(8, Math.round(-Math.log10(info.tick))));
-    const K = await Promise.all(TFS.map(t => j(`/fapi/v1/klines?symbol=${sym}&interval=${t}&limit=300`).then(bars)));
+    const K = await Promise.all(TFS.map(t => j(`/fapi/v1/klines?symbol=${sym}&interval=${t}&limit=300`).then(a => bars(a.filter(x => +x[6] < Date.now()))) /* PRO fix: closed candles only (no repaint) */));
     const opt = p => j(p).catch(() => null);
     const [prem, oiNow, oiH, oi5, gls, tls, tlp, tk, ag, t24] = await Promise.all([opt(`/fapi/v1/premiumIndex?symbol=${sym}`), opt(`/fapi/v1/openInterest?symbol=${sym}`), opt(`/futures/data/openInterestHist?symbol=${sym}&period=1h&limit=25`),
       opt(`/futures/data/openInterestHist?symbol=${sym}&period=5m&limit=13`), opt(`/futures/data/globalLongShortAccountRatio?symbol=${sym}&period=1h&limit=1`), opt(`/futures/data/topLongShortAccountRatio?symbol=${sym}&period=1h&limit=1`),

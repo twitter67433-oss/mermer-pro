@@ -6,3 +6,4 @@ neon-bot-data/
 *.keystore
 keystore.properties
 *.apk
+tools/pro/trades.json

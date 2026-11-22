@@ -41,7 +41,8 @@ function rugScore(f){ const F = []; const add = (w, why) => F.push([w, why]);
   if (f.noSoc) add(8, "sosyal hesap yok");
   return { risk: Math.min(100, F.reduce((a, x) => a + x[0], 0)), F }; }
 /* ---------------- TARAYICI (perps) ---------------- */
-function rsi(c, n = 14){ if (c.length < n + 1) return null; let g = 0, l = 0; for (let i = c.length - n; i < c.length; i++){ const d = c[i] - c[i-1]; d > 0 ? g += d : l -= d; } return l === 0 ? 100 : 100 - 100/(1 + g/l); }
+function rsi(c, n = 14){ if (c.length < n + 1) return null; let g = 0, l = 0; for (let i = 1; i <= n; i++){ const d = c[i] - c[i-1]; d > 0 ? g += d : l -= d; } g /= n; l /= n; /* PRO fix: Wilder RSI over the whole series (was a 14-bar SMA 'Cutler' RSI that disagreed with every other RSI in the app) */
+  for (let i = n + 1; i < c.length; i++){ const d = c[i] - c[i-1]; g = (g*(n - 1) + Math.max(d, 0))/n; l = (l*(n - 1) + Math.max(-d, 0))/n; } return l === 0 ? (g === 0 ? 50 : 100) : 100 - 100/(1 + g/l); }
 function perpSetups(c){ if (!c || c.length < 22) return { tags: [], rsi: null };
   const last = c[c.length-1], hi20 = Math.max(...c.slice(-21, -1)), ma20 = c.slice(-20).reduce((a, b) => a + b, 0)/20, ma20p = c.slice(-21, -1).reduce((a, b) => a + b, 0)/20,
     run = c[c.length-6]/c[c.length-16] - 1, rng5 = (Math.max(...c.slice(-5)) - Math.min(...c.slice(-5)))/last, r = rsi(c), rp = rsi(c.slice(0, -1)); const tags = [];

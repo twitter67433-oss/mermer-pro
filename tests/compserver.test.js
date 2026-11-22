@@ -30,7 +30,7 @@ const hold = (E, s) => E.HOLD.set(s.k + "|" + s.sym, s);
   /* ---- 2. step: GİR → SİM trade with the owner's defaults ---- */
   await E.step(); const p = E.S.acct.pos[0];
   ok("GİR signal → one SİM SHORT opened automatically", E.S.acct.pos.length === 1 && p.sym === "TESTUSDT" && p.side === -1, E.note);
-  ok("defaults: margin 50 $, 20×, cross, mandatory stop, TP price set", near(p.margin, 50) && p.lev === 20 && p.cross === true && p.stop > p.entry && p.tp > 0 && p.tp < p.entry, JSON.stringify([p.margin, p.lev, p.stop, p.tp]));
+  ok("defaults: margin 50 $, 5× (MERMER PRO default), cross, mandatory stop, TP price set", near(p.margin, 50) && p.lev === 5 && p.cross === true && p.stop > p.entry && p.tp > 0 && p.tp < p.entry, JSON.stringify([p.margin, p.lev, p.stop, p.tp]));
   ok("the 2nd list on the same coin is refused (one position per coin)", E.S.acct.pos.length === 1);
   PX.TESTUSDT = p.tp; clock += 5000; E.pxT = 0; await E.step();
   ok("price at TP → closes 'hedef' with ≈ +7 $ net after fees", E.S.acct.hist.length === 1 && E.S.acct.hist[0].why === "hedef" && near(E.S.acct.hist[0].net, 7, 0.05), E.S.acct.hist[0] && E.S.acct.hist[0].net.toFixed(3));
@@ -80,7 +80,7 @@ for (const fl of ["server/comp-engine.cjs", "server/comp-server.mjs"]){ const co
   for (let i = 0; i < 40; i++){ if ((await call("/api/ping", { m: "GET" })).code === 200) break; await new Promise(z => setTimeout(z, 150)); }
   const tok = fs.readFileSync(path.join(dir, "token"), "utf8").trim(), mode = n => (fs.statSync(path.join(dir, n)).mode & 0o777).toString(8);
   ok("API: ping open, everything else 401 without the token", (await call("/api/ping", { m: "GET" })).code === 200 && (await call("/api/state")).code === 401 && (await call("/api/cfg", { b: JSON.stringify({ cfg: { lev: 5 } }) })).code === 401 && (await call("/api/state", { m: "GET", h: { authorization: "Bearer wrong" } })).code === 401);
-  const st = await call("/api/state", { m: "GET", h: { authorization: "Bearer " + tok } }); ok("read-only state endpoint with the token (GET Bearer)", st.code === 200 && st.j.sim === true && st.j.status.bal === 1000 && st.j.cfg.lev === 20 && st.j.cfg.maxPos === 2 && st.j.cfg.tp === 7);
+  const st = await call("/api/state", { m: "GET", h: { authorization: "Bearer " + tok } }); ok("read-only state endpoint with the token (GET Bearer)", st.code === 200 && st.j.sim === true && st.j.status.bal === 1000 && st.j.cfg.lev === 5 && st.j.cfg.maxPos === 2 && st.j.cfg.tp === 7);
   const c2 = await call("/api/cfg", { b: JSON.stringify({ t: tok, cfg: { lev: 10, tp: 5 } }) }); ok("settings from the phone (POST text/plain, token in body) reach the server", c2.code === 200 && c2.j.cfg.lev === 10 && c2.j.cfg.tp === 5);
   ok("reset needs the typed word", (await call("/api/reset", { b: JSON.stringify({ t: tok }) })).code === 400 && (await call("/api/reset", { b: JSON.stringify({ t: tok, confirm: "SIFIRLA" }) })).code === 200);
   ok("unknown / order-like endpoints do not exist", (await call("/api/order", { b: JSON.stringify({ t: tok }) })).code === 404 && (await call("/api/trade", { b: JSON.stringify({ t: tok }) })).code === 404);

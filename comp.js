@@ -8,11 +8,12 @@
   if (typeof module === "object" && module.exports) module.exports = M; else root.COMPX = M; })(typeof self !== "undefined" ? self : this, function (P, AX){
 const FEE = P.FEE, MMR = P.MMR, fin = x => typeof x === "number" && isFinite(x), clamp = (v, a, b, d) => { v = +v; return fin(v) ? Math.min(b, Math.max(a, v)) : d; };
 /* defaults = the owner's brief: 1000 $ vault, max 2 positions, 5 % of the balance as margin (50 $ at 1000 → 60/70/80 as it grows), cross margin, +7 $ net take-profit, 2000 $ daily target */
-const DEF = { on: true, start: 1000, maxPos: 2, stakeMode: "pct", stakePct: 5, stakeUsd: 50, minStake: 5, lev: 20,
+/* MERMER PRO: default OFF and 5× — the v8.2 29-day backtest lost (−2.68 $/trade, 1000→126 $ chained); it stays a SİM-only, kanıtlanmadı tool */
+const DEF = { on: false, start: 1000, maxPos: 2, stakeMode: "pct", stakePct: 5, stakeUsd: 50, minStake: 5, lev: 5,
   slMode: "auto", slPct: 1, slUsd: 20, tpMode: "usd", tp: 7, tpPct: 1, trail: false, give: 3, target: 2000, lossPct: 10, pauseLosses: 2, pauseMin: 60, tmax: 60*60000, stocks: false };
 function cfgOf(o){ o = o || {};
   const stakeMode = o.stakeMode === "usd" ? "usd" : "pct", slMode = (o.slMode === "pct" || o.slMode === "usd") ? o.slMode : "auto", tpMode = o.tpMode === "pct" ? "pct" : "usd";
-  return { on: o.on !== false, start: clamp(o.start, 10, 1e7, DEF.start), maxPos: Math.round(clamp(o.maxPos, 1, 5, DEF.maxPos)),
+  return { on: o.on === true, start: clamp(o.start, 10, 1e7, DEF.start), maxPos: Math.round(clamp(o.maxPos, 1, 5, DEF.maxPos)),
     stakeMode, stakePct: clamp(o.stakePct, 0.5, 25, DEF.stakePct), stakeUsd: clamp(o.stakeUsd, 1, 1e6, DEF.stakeUsd), minStake: clamp(o.minStake, 1, 1e5, DEF.minStake),
     lev: Math.round(clamp(o.lev, 1, 50, DEF.lev)), slMode, slPct: clamp(o.slPct, 0.05, 20, DEF.slPct), slUsd: clamp(o.slUsd, 0.5, 1e5, DEF.slUsd),
     tpMode, tp: clamp(o.tp, 0.5, 1000, DEF.tp), tpPct: clamp(o.tpPct, 0.05, 50, DEF.tpPct), trail: o.trail === true, give: clamp(o.give, 0.25, 500, DEF.give),
@@ -181,7 +182,7 @@ function click(e){ const b = e.target.closest("[data-cp]"); if (!b) return; cons
   else if (a === "save"){ const root = b.closest(".cp-set") || b.closest(".cp"), raw = readForm(root), r = X.validateCfg(Object.assign({}, S.cfg, raw));
     if (!r.ok){ draft = X.cfgOf(Object.assign({}, S.cfg, raw)); errs = r.errs; note = "ayarlar kaydedilmedi — " + r.errs[0]; forcePaint = true; paint(); return; }
     setCfg(r.cfg); draft = null; errs = []; note = "ayarlar kaydedildi"; toast("✔ ayarlar kaydedildi", "good"); forcePaint = true; paint(); }
-  else if (a === "reset"){ const go = () => { const c = S.cfg; S = X.create(Object.assign({}, c, { on: true })); note = "sıfırlandı"; draft = null; errs = []; save(); forcePaint = true; paint(); };
+  else if (a === "reset"){ const go = () => { const c = S.cfg; S = X.create(Object.assign({}, c)); note = "sıfırlandı"; draft = null; errs = []; save(); forcePaint = true; paint(); };
     if (window.CONN && CONN.typedConfirm) CONN.typedConfirm("BİLEŞİK OTO SIFIRLA", `Sanal kasa <b>${S.cfg.start} $</b> olur; sanal pozisyonlar ve geçmiş silinir. Gerçek hesap etkilenmez.`, "SIFIRLA").then(ok => ok && go()); else if (confirm("Bileşik SİM sıfırlansın mı?")) go(); } }
 function init(){ document.addEventListener("click", ev => { if (ev.target.closest(".cp")) click(ev); }); document.addEventListener("submit", ev => { if (ev.target.closest && ev.target.closest(".cp-wrap")) ev.preventDefault(); });
   setInterval(step, 3000); setInterval(paint, 4000); setTimeout(paint, 400); }
