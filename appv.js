@@ -1,4 +1,4 @@
-window.APP_V = "9.0.0"; /* v8.0: was an inline <script> — moved to a file so the CSP can drop script-src 'unsafe-inline' */
+window.APP_V = "9.0.1"; /* v8.0: was an inline <script> — moved to a file so the CSP can drop script-src 'unsafe-inline' */
 /* v8.0.2 AÇILIŞ KORUMASI — first script in <head>, plain ES5 so even an old Android WebView runs it. Never touches localStorage data.
    1) boot screen (#boot) is removed after 4 s no matter what (slow network, a script that failed, a JS error) → the app can never hang on it.
    2) startup errors / a script or stylesheet that failed to load → a small "YENİLE" bar instead of a frozen screen.

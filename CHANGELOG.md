@@ -1,5 +1,8 @@
 # CHANGELOG — MERMER PRO (MERMER TERMİNAL 8.2.5'ten ayrılmış kopya)
 
+## 9.0.1 — 2026-11-22 · telefonda kısa doğrulama tablosu
+- Strateji kanıtı tablosu kısaltıldı (TPB/RREV/BRK/SWP + açıklama satırı); risk kontrolü gölge portföyün gerçek durumunu (günlük zarar, soğuma, açık sayısı) kullanır.
+
 ## 9.0.0 — 2026-11-22 · MERMER PRO: kanıta dayalı PRO sekmesi
 - **Ayrı uygulama:** ad MERMER PRO, Android paketi `com.onur.mermerpro`, ayrı GitHub deposu/Pages adresi, `mpro:` önekli depolama (orijinal uygulamanın verisi görülmez).
 - **PRO sekmesi (varsayılan açılış):** tek cevap LONG / SHORT / BEKLE; dokununca giriş, ATR stop, TP1/TP2, geçersizlik, RR, aile kanıtları, reddedilen adaylar. Yalnız kapanmış mumlar; 5dk/15dk/1s/4s; EMA, RSI, MACD, ADX, ATR, VWAP, Bollinger, OBV, taker delta, fonlama, yapı (HH/HL/LH/LL, BOS), süpürme; aileler bir kez sayılır. Rejim: TREND / YATAY / GEÇİŞ / YÜKSEK VOL / DÜŞÜK LİKİDİTE / ANORMAL.
